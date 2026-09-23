@@ -173,7 +173,7 @@ export default function AdminHome() {
             <SectionTitle>Party</SectionTitle>
             <Grid min={240}>
               <StatTile
-                label="CUSTOMERS"
+                label="GRAHAK"
                 value={String(n?.customers ?? 0)}
                 sub="khata, credit limit"
                 icon="person-outline"
@@ -205,7 +205,7 @@ export default function AdminHome() {
         {canCatalog || canSettings ? (
           <>
             <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: space.sm }}>
-              <SectionTitle>Advanced</SectionTitle>
+              <SectionTitle>Gehra setup</SectionTitle>
               <Button
                 title={advanced ? 'Band karo' : 'Kholo'}
                 tone="ghost"
@@ -222,12 +222,12 @@ export default function AdminHome() {
                       onPress={() => router.push('/admin/families')}
                     />
                     <ListRow
-                      title="Vehicle master"
+                      title="Gaadi master"
                       subtitle={`${n?.models ?? 0} models, generations, aliases`}
                       onPress={() => router.push('/admin/vehicles')}
                     />
                     <ListRow
-                      title="Brands, units, HSN"
+                      title="Brand, unit, HSN"
                       subtitle={`${n?.brands ?? 0} brands · master data`}
                       onPress={() => router.push('/admin/masters?type=brands')}
                     />
@@ -235,9 +235,9 @@ export default function AdminHome() {
                 ) : null}
                 {canSettings ? (
                   <>
-                    <ListRow title="Locations" subtitle={`${n?.locations ?? 0} — warehouse, counter, workshop`} onPress={() => router.push('/admin/masters?type=locations')} />
-                    <ListRow title="Tax rates" subtitle="GST slabs, effective dates ke saath" onPress={() => router.push('/admin/masters?type=tax_rates')} />
-                    <ListRow title="Numbering series" subtitle="Bill, credit note aur purchase number ka format" onPress={() => router.push('/admin/masters?type=document_sequences')} />
+                    <ListRow title="Location" subtitle={`${n?.locations ?? 0} — warehouse, counter, workshop`} onPress={() => router.push('/admin/masters?type=locations')} />
+                    <ListRow title="GST rate" subtitle="GST slabs, effective dates ke saath" onPress={() => router.push('/admin/masters?type=tax_rates')} />
+                    <ListRow title="Bill number ka format" subtitle="Bill, credit note aur purchase number ka format" onPress={() => router.push('/admin/masters?type=document_sequences')} />
                   </>
                 ) : null}
               </Card>

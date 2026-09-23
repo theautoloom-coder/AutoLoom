@@ -100,10 +100,10 @@ export default function PurchaseEdit() {
 
   async function post() {
     if (!id || !doc) return;
-    if (!doc.supplier_id) { notify('Choose the supplier.'); return; }
-    if (!doc.location_id) { notify('Choose the location receiving the stock.'); return; }
-    if (!(lines ?? []).length) { notify('Add at least one item.'); return; }
-    if ((lines ?? []).some((l) => l.qty <= 0 || l.rate < 0)) { notify('Every line needs a positive quantity and a rate.'); return; }
+    if (!doc.supplier_id) { notify('Supplier chuno.'); return; }
+    if (!doc.location_id) { notify('Jahan maal aa raha hai wo location chuno.'); return; }
+    if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
+    if ((lines ?? []).some((l) => l.qty <= 0 || l.rate < 0)) { notify('Har line mein qty aur rate dono chahiye.'); return; }
     if (doc.doc_type === 'debit_note') {
       for (const l of lines ?? []) {
         const ol = originalLines?.find((x) => x.id === l.against_line_id);
@@ -127,7 +127,7 @@ export default function PurchaseEdit() {
 
   async function discard() {
     if (!id) return;
-    if (!(await confirm('Discard draft?', 'The draft and its lines will be deleted.'))) return;
+    if (!(await confirm('Adhoora bill chhod dein?', 'The draft and its lines will be deleted.'))) return;
     await db.writeTransaction(async (tx) => {
       await tx.execute('DELETE FROM purchase_lines WHERE purchase_id = ?', [id]);
       await deleteRow(tx, 'purchases', id);
@@ -135,7 +135,7 @@ export default function PurchaseEdit() {
     router.back();
   }
 
-  if (!can('purchase.create')) return <Screen><Text>You do not have permission to receive purchases.</Text></Screen>;
+  if (!can('purchase.create')) return <Screen><Text>Aapko purchase lene ki permission nahi hai.</Text></Screen>;
   if (!doc) return <PreparingDraft what="draft" />;
   if (doc.status !== 'draft') { router.replace(`/purchase/${doc.id}`); return null; }
 
@@ -143,22 +143,22 @@ export default function PurchaseEdit() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isReturn ? 'Purchase return' : 'Receive purchase' }} />
+      <Stack.Screen options={{ title: isReturn ? 'Purchase wapasi' : 'Purchase bill' }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Text variant="display">{isReturn ? 'Purchase return' : 'Receive purchase'}</Text>
+          <Text variant="display">{isReturn ? 'Purchase wapasi' : 'Purchase bill'}</Text>
           <Badge>draft</Badge>
         </Row>
         {isReturn && original?.[0] ? <Text variant="small" color="textMuted">Against {original[0].doc_no}. Quantities are pre-filled with what has not been returned yet; reduce them as needed.</Text> : null}
 
-        <FormSection title="Supplier & bill">
+        <FormSection title="Supplier aur bill">
           <SelectField label="Supplier" value={doc.supplier_id} options={(suppliers ?? []).map((s) => ({ value: s.id, label: s.name, sublabel: s.gstin ?? undefined }))} onChange={chooseSupplier} />
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Supplier bill no." value={doc.supplier_invoice_no ?? ''} onChangeText={(v) => patch({ supplier_invoice_no: v })} autoCapitalize="characters" />
-            <Input containerStyle={{ flex: 1 }} label="Bill date" value={doc.supplier_invoice_date ?? ''} onChangeText={(v) => patch({ supplier_invoice_date: v })} placeholder="YYYY-MM-DD" />
+            <Input containerStyle={{ flex: 1 }} label="Bill ki date" value={doc.supplier_invoice_date ?? ''} onChangeText={(v) => patch({ supplier_invoice_date: v })} placeholder="YYYY-MM-DD" />
           </Row>
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Our date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" />
+            <Input containerStyle={{ flex: 1 }} label="Humari date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" />
             <View style={{ flex: 1 }}>
               <SelectField label={isReturn ? 'Return from' : 'Receive into'} value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} />
             </View>
@@ -169,7 +169,7 @@ export default function PurchaseEdit() {
           </Row>
         </FormSection>
 
-        <SectionTitle>Items · {(lines ?? []).length}</SectionTitle>
+        <SectionTitle>Maal · {(lines ?? []).length}</SectionTitle>
         {!isReturn ? (
           <Card>
             <VariantPicker onPick={addLine} showCost locationId={doc.location_id} autoFocus={false}
@@ -188,15 +188,15 @@ export default function PurchaseEdit() {
             <LineCard key={l.id} title={l.description} subtitle={`HSN ${l.hsn_code ?? '—'} · GST ${l.tax_rate_pct}%`} onRemove={() => deleteRow(db, 'purchase_lines', l.id)}>
               <Row gap={12} wrap>
                 <View style={{ flex: 1, minWidth: 90 }}><NumberField label={`Qty${l.unit_code ? ` (${l.unit_code})` : ''}`} value={l.qty} onChange={(v) => patchLine(l.id, { qty: v ?? 0 })} decimals={3} /></View>
-                <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Rate (pre-tax)" value={l.rate} onChange={(v) => patchLine(l.id, { rate: v ?? 0 })} /></View>
-                <View style={{ flex: 1, minWidth: 90 }}><NumberField label="Disc %" value={l.discount_pct} onChange={(v) => patchLine(l.id, { discount_pct: v ?? 0 })} /></View>
+                <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Rate (GST se pehle)" value={l.rate} onChange={(v) => patchLine(l.id, { rate: v ?? 0 })} /></View>
+                <View style={{ flex: 1, minWidth: 90 }}><NumberField label="Chhoot %" value={l.discount_pct} onChange={(v) => patchLine(l.id, { discount_pct: v ?? 0 })} /></View>
                 <View style={{ flex: 1, minWidth: 90 }}><NumberField label="GST %" value={l.tax_rate_pct} onChange={(v) => patchLine(l.id, { tax_rate_pct: v ?? 0 })} /></View>
                 {!isReturn ? <View style={{ flex: 1, minWidth: 90 }}><NumberField label="MRP" value={l.mrp ?? null} onChange={(v) => patchLine(l.id, { mrp: v })} /></View> : null}
               </Row>
               {!isReturn ? (
                 <Row gap={12}>
                   <Input containerStyle={{ flex: 1 }} label="Batch" value={l.batch_no ?? ''} onChangeText={(v) => patchLine(l.id, { batch_no: v || null })} />
-                  <View style={{ flex: 1 }}><NumberField label="Warranty (months)" value={l.warranty_months ?? null} onChange={(v) => patchLine(l.id, { warranty_months: v })} decimals={0} /></View>
+                  <View style={{ flex: 1 }}><NumberField label="Warranty (mahine)" value={l.warranty_months ?? null} onChange={(v) => patchLine(l.id, { warranty_months: v })} decimals={0} /></View>
                 </Row>
               ) : null}
               <Row style={{ justifyContent: 'space-between' }}>
@@ -207,28 +207,28 @@ export default function PurchaseEdit() {
           );
         })}
 
-        <FormSection title="Totals">
-          <NumberField label="Freight / other charges (spread into landed cost)" value={doc.other_charges} onChange={(v) => patch({ other_charges: v ?? 0 })} />
-          <Input label="Notes" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} />
+        <FormSection title="Total">
+          <NumberField label="Bhada / aur kharcha (har item ke cost mein bat jaayega)" value={doc.other_charges} onChange={(v) => patch({ other_charges: v ?? 0 })} />
+          <Input label="Note" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} />
           <Divider />
           <KV k="Subtotal" v={formatINR(totals.totals.subtotal)} mono />
-          {totals.totals.discount_total ? <KV k="Discount" v={`- ${formatINR(totals.totals.discount_total)}`} mono /> : null}
+          {totals.totals.discount_total ? <KV k="Chhoot" v={`- ${formatINR(totals.totals.discount_total)}`} mono /> : null}
           <KV k="Taxable" v={formatINR(totals.totals.taxable_total)} mono />
           {interstate ? <KV k="IGST" v={formatINR(totals.totals.igst_total)} mono /> : <><KV k="CGST" v={formatINR(totals.totals.cgst_total)} mono /><KV k="SGST" v={formatINR(totals.totals.sgst_total)} mono /></>}
-          {doc.other_charges ? <KV k="Other charges" v={formatINR(doc.other_charges)} mono /> : null}
+          {doc.other_charges ? <KV k="Aur kharcha" v={formatINR(doc.other_charges)} mono /> : null}
           {totals.totals.round_off ? <KV k="Round off" v={formatINR(totals.totals.round_off, { paise: true })} mono /> : null}
           <Divider />
           <Row style={{ justifyContent: 'space-between' }}>
-            <Text variant="title">Grand total</Text>
+            <Text variant="title">Poora total</Text>
             <Text variant="number" mono>{formatINR(totals.totals.grand_total)}</Text>
           </Row>
         </FormSection>
 
         <Row gap={space.sm}>
           <Button title={isReturn ? 'Post debit note' : 'Post purchase'} size="lg" onPress={post} loading={posting} style={{ flex: 1 }} />
-          <Button title="Discard" tone="danger" onPress={discard} />
+          <Button title="Chhod do" tone="danger" onPress={discard} />
         </Row>
-        <Text variant="small" color="textFaint">Drafts are saved on this device as you type and sync like any other change.</Text>
+        <Text variant="small" color="textFaint">Adhoore bill likhte hi is phone par save hote rehte hain, aur baaki sab ki tarah sync ho jaate hain.</Text>
       </Screen>
     </>
   );

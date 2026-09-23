@@ -3,7 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { formatINR } from '@domain';
+import { formatINR, statusLabel } from '@domain';
 
 import { cancelPurchase } from '@/lib/posting';
 import { useSession } from '@/lib/session';
@@ -34,15 +34,15 @@ export default function PurchaseDetail() {
     if (!p) return;
     const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Reason for cancelling (recorded in the audit log)') : 'Cancelled';
     if (!reason) return;
-    if (!(await confirm('Cancel this document?', 'Stock movements and the supplier ledger entry will be reversed. The number stays consumed.'))) return;
+    if (!(await confirm('Ise cancel karein?', 'Stock movements and the supplier ledger entry will be reversed. The number stays consumed.'))) return;
     setBusy(true);
     try {
       await db.writeTransaction(async (tx) => cancelPurchase(tx, p.id, reason, actor));
-      notify('Cancelled.');
+      notify('Cancel ho gaya.');
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!p) return <Screen><Empty title="Purchase not found on this device" /></Screen>;
+  if (!p) return <Screen><Empty title="Ye purchase is phone par nahi mila" /></Screen>;
   const isReturn = p.doc_type === 'debit_note';
   const due = p.grand_total - p.paid_total;
 
@@ -53,7 +53,7 @@ export default function PurchaseDetail() {
         <Row style={{ justifyContent: 'space-between' }} align="flex-start">
           <View style={{ flex: 1 }}>
             <Row gap={6}>
-              <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'posted' ? 'ok' : 'neutral'}>{p.status}</Badge>
+              <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'posted' ? 'ok' : 'neutral'}>{statusLabel(p.status)}</Badge>
               {isReturn ? <Badge tone="info">debit note{p.against_no ? ` · against ${p.against_no}` : ''}</Badge> : null}
             </Row>
             <Text variant="display" style={{ marginTop: space.xs }}>{p.doc_no ?? 'Draft'}</Text>
@@ -72,13 +72,13 @@ export default function PurchaseDetail() {
 
         {p.status === 'posted' ? (
           <Row gap={space.sm} wrap>
-            {!isReturn && can('payment.pay_supplier') && due > 0 ? <Button title="Pay supplier" onPress={() => router.push(`/payment/edit?direction=out&party=${p.supplier_id}&doc=${p.id}`)} /> : null}
-            {!isReturn && can('purchase.create') ? <Button title="Purchase return" tone="secondary" onPress={() => router.push(`/purchase/edit?against=${p.id}`)} /> : null}
+            {!isReturn && can('payment.pay_supplier') && due > 0 ? <Button title="Supplier ko paisa do" onPress={() => router.push(`/payment/edit?direction=out&party=${p.supplier_id}&doc=${p.id}`)} /> : null}
+            {!isReturn && can('purchase.create') ? <Button title="Purchase wapasi" tone="secondary" onPress={() => router.push(`/purchase/edit?against=${p.id}`)} /> : null}
             {can('purchase.cancel') ? <Button title="Cancel document" tone="danger" onPress={cancel} loading={busy} /> : null}
           </Row>
         ) : null}
 
-        <SectionTitle>Items</SectionTitle>
+        <SectionTitle>Maal</SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(lines ?? []).map((l) => (
             <ListRow key={l.id} title={l.description} subtitle={`${l.sku} · ${l.qty} ${l.unit_code ?? ''} @ ${formatINR(l.rate)}${l.discount_pct ? ` − ${l.discount_pct}%` : ''} · GST ${l.tax_rate_pct}%${l.batch_no ? ` · batch ${l.batch_no}` : ''}`}
@@ -88,21 +88,21 @@ export default function PurchaseDetail() {
         </Card>
 
         <Card style={{ gap: 0 }}>
-          <KV k="Supplier bill" v={`${p.supplier_invoice_no ?? '—'}${p.supplier_invoice_date ? ` · ${p.supplier_invoice_date}` : ''}`} />
+          <KV k="Supplier ka bill" v={`${p.supplier_invoice_no ?? '—'}${p.supplier_invoice_date ? ` · ${p.supplier_invoice_date}` : ''}`} />
           <KV k="Subtotal" v={formatINR(p.subtotal)} mono />
-          {p.discount_total ? <KV k="Discount" v={`- ${formatINR(p.discount_total)}`} mono /> : null}
+          {p.discount_total ? <KV k="Chhoot" v={`- ${formatINR(p.discount_total)}`} mono /> : null}
           <KV k="Taxable" v={formatINR(p.taxable_total)} mono />
           {p.is_interstate ? <KV k="IGST" v={formatINR(p.igst_total)} mono /> : <><KV k="CGST" v={formatINR(p.cgst_total)} mono /><KV k="SGST" v={formatINR(p.sgst_total)} mono /></>}
-          {p.other_charges ? <KV k="Other charges" v={formatINR(p.other_charges)} mono /> : null}
+          {p.other_charges ? <KV k="Aur kharcha" v={formatINR(p.other_charges)} mono /> : null}
           {p.round_off ? <KV k="Round off" v={formatINR(p.round_off, { paise: true })} mono /> : null}
           <Divider />
-          <KV k="Grand total" v={formatINR(p.grand_total)} mono />
-          {p.notes ? <KV k="Notes" v={p.notes} /> : null}
+          <KV k="Poora total" v={formatINR(p.grand_total)} mono />
+          {p.notes ? <KV k="Note" v={p.notes} /> : null}
         </Card>
 
         {(payments ?? []).length ? (
           <>
-            <SectionTitle>Payments</SectionTitle>
+            <SectionTitle>Payment</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(payments ?? []).map((py) => <ListRow key={py.id} title={py.doc_no} subtitle={`${py.payment_date} · ${py.mode}`} right={<Text mono>{formatINR(py.amount)}</Text>} />)}
             </Card>
@@ -110,7 +110,7 @@ export default function PurchaseDetail() {
         ) : null}
         {(returns ?? []).length ? (
           <>
-            <SectionTitle>Returns against this bill</SectionTitle>
+            <SectionTitle>Is bill ki wapasi</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(returns ?? []).map((r) => <ListRow key={r.id} title={r.doc_no ?? 'Draft'} subtitle={r.doc_date} onPress={() => router.push(r.status === 'draft' ? `/purchase/edit?id=${r.id}` : `/purchase/${r.id}`)} right={<Text mono>{formatINR(r.grand_total)}</Text>} />)}
             </Card>

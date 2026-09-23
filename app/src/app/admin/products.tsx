@@ -36,19 +36,19 @@ export default function ProductsAdmin() {
         <Text variant="display">Saara maal</Text>
         {can('catalog.edit') ? <Button title="+ Naya item" onPress={() => router.push('/admin/item')} /> : null}
       </Row>
-      <Input value={q} onChangeText={setQ} placeholder="Search by name, SKU, barcode or spec" autoCapitalize="none" autoCorrect={false} />
+      <Input value={q} onChangeText={setQ} placeholder="Naam, SKU, barcode ya spec se dhoondo" autoCapitalize="none" autoCorrect={false} />
 
       {tokens.length > 0 ? (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(hits ?? []).map((h) => (
             <ListRow key={h.id} title={`${h.product_name} · ${h.variant_name}`} subtitle={h.sku} onPress={() => router.push(`/admin/item?id=${h.product_id}`)} right={<Text mono>{h.qty}</Text>} />
           ))}
-          {(hits ?? []).length === 0 ? <Empty title="No matching SKU" /> : null}
+          {(hits ?? []).length === 0 ? <Empty title="Koi SKU nahi mila" /> : null}
         </Card>
       ) : (
         <>
           <Row gap={space.xs} wrap>
-            <Chip label="All" selected={!family} onPress={() => setFamily(null)} />
+            <Chip label="Sab" selected={!family} onPress={() => setFamily(null)} />
             {(families ?? []).filter((f) => f.n > 0).map((f) => (
               <Chip key={f.id} label={`${f.name} · ${f.n}`} selected={family === f.id} onPress={() => setFamily(family === f.id ? null : f.id)} />
             ))}
@@ -71,7 +71,7 @@ export default function ProductsAdmin() {
                 right={<Text mono>{Math.round(p.qty)} pcs</Text>}
               />
             ))}
-            {(products ?? []).length === 0 ? <Empty title="No products yet" hint="Create the first one with New product." /> : null}
+            {(products ?? []).length === 0 ? <Empty title="Abhi koi maal nahi" hint="Pehla item “Naya item” se banao." /> : null}
           </Card>
         </>
       )}

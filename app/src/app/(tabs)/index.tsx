@@ -153,14 +153,14 @@ export default function HomeScreen() {
           <Enter index={2}>
             <Row gap={space.sm} align="stretch">
               <Figure
-                label="Customer pending"
+                label="Grahak se baaki"
                 value={formatINRShort(kpi?.receivables ?? 0)}
                 sub={overdue ? `${formatINRShort(overdue)} overdue` : 'kuch overdue nahi'}
                 tone={overdue ? 'warn' : undefined}
                 onPress={() => router.push('/reminders')}
               />
               <Figure
-                label="Stock value"
+                label="Stock ki keemat"
                 value={formatINRShort(totalStock)}
                 sub={`cost par · ${(locations ?? []).length} location`}
                 onPress={() => router.push('/stock')}

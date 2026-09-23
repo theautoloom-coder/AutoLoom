@@ -7,7 +7,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { formatINR, normaliseRegistration, resolvePrice, toDateString } from '@domain';
+import { formatINR, normaliseRegistration, resolvePrice, statusLabel, toDateString } from '@domain';
 
 import { CUSTOMER_PRICE_CONTEXT } from '@/lib/queries';
 import { closeJobCard } from '@/lib/posting';
@@ -62,9 +62,9 @@ export default function JobCardEdit() {
   const patch = (p: Record<string, string | number | null>) => id && updateRow(db, 'job_cards', id, p);
 
   async function addVehicle() {
-    if (!doc?.customer_id) { notify('Choose the customer first.'); return; }
+    if (!doc?.customer_id) { notify('Pehle grahak chuno.'); return; }
     const reg = normaliseRegistration(newReg);
-    if (reg.length < 6) { notify('Enter the registration number.'); return; }
+    if (reg.length < 6) { notify('Gaadi number likho.'); return; }
     const vid = await insertRow(db, 'customer_vehicles', { customer_id: doc.customer_id, registration_no: reg, model_id: newRegModel }, actor);
     await patch({ customer_vehicle_id: vid });
     setNewReg('');
@@ -87,10 +87,10 @@ export default function JobCardEdit() {
 
   async function close() {
     if (!id || !doc) return;
-    if (!doc.customer_id) { notify('Choose the customer.'); return; }
-    if (!(parts ?? []).length && !(labour ?? []).length) { notify('Add parts or labour first.'); return; }
+    if (!doc.customer_id) { notify('Grahak chuno.'); return; }
+    if (!(parts ?? []).length && !(labour ?? []).length) { notify('Pehle maal ya labour daalo.'); return; }
     const total = (parts ?? []).reduce((a, p) => a + p.qty * p.rate * (1 + p.tax_rate_pct / 100), 0) + (labour ?? []).reduce((a, l) => a + l.amount * (1 + l.tax_rate_pct / 100), 0);
-    if (!(await confirm('Close job card and invoice?', `An invoice of about ${formatINR(total)} will be posted (${mode.toUpperCase()}); parts leave workshop stock.`))) return;
+    if (!(await confirm('Job card band karke bill banayein?', `An invoice of about ${formatINR(total)} will be posted (${mode.toUpperCase()}); parts leave workshop stock.`))) return;
     setBusy(true);
     try {
       let res = { invoiceId: '', docNo: '' };
@@ -101,12 +101,12 @@ export default function JobCardEdit() {
   }
 
   async function discard() {
-    if (!id || !(await confirm('Discard job card?', 'Nothing has been billed or moved.'))) return;
+    if (!id || !(await confirm('Job card chhod dein?', 'Nothing has been billed or moved.'))) return;
     await db.writeTransaction(async (tx) => { await tx.execute('DELETE FROM job_card_lines WHERE job_card_id = ?', [id]); await tx.execute('DELETE FROM job_card_labour WHERE job_card_id = ?', [id]); await deleteRow(tx, 'job_cards', id); });
     router.back();
   }
 
-  if (!can('jobcard.edit')) return <Screen><Text>You do not have permission to edit job cards.</Text></Screen>;
+  if (!can('jobcard.edit')) return <Screen><Text>Aapko job card badalne ki permission nahi hai.</Text></Screen>;
   if (!doc) return <PreparingDraft what="job card" />;
   if (doc.status === 'closed' || doc.status === 'cancelled') { router.replace(`/job-card/${doc.id}`); return null; }
 
@@ -120,14 +120,14 @@ export default function JobCardEdit() {
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}>
           <Text variant="display">Job card</Text>
-          <Badge tone={doc.status === 'ready' ? 'info' : doc.status === 'in_progress' ? 'warn' : 'neutral'}>{doc.status.replace('_', ' ')}</Badge>
+          <Badge tone={doc.status === 'ready' ? 'info' : doc.status === 'in_progress' ? 'warn' : 'neutral'}>{statusLabel(doc.status)}</Badge>
         </Row>
 
         <FormSection title="Customer & vehicle">
-          <SelectField label="Customer" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: [c.customer_type, c.mobile].filter(Boolean).join(' · ') }))} onChange={(v) => patch({ customer_id: v, customer_vehicle_id: null })} onCreate={() => router.push('/customer/edit')} />
+          <SelectField label="Grahak" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: [c.customer_type, c.mobile].filter(Boolean).join(' · ') }))} onChange={(v) => patch({ customer_id: v, customer_vehicle_id: null })} onCreate={() => router.push('/customer/edit')} />
           {doc.customer_id ? (
             <>
-              <SelectField label="Vehicle" value={doc.customer_vehicle_id} options={(vehicles ?? []).map((v) => ({ value: v.id, label: v.registration_no, sublabel: v.model_name ?? undefined }))} onChange={(v) => patch({ customer_vehicle_id: v })} allowClear placeholder="Choose or add below" />
+              <SelectField label="Gaadi" value={doc.customer_vehicle_id} options={(vehicles ?? []).map((v) => ({ value: v.id, label: v.registration_no, sublabel: v.model_name ?? undefined }))} onChange={(v) => patch({ customer_vehicle_id: v })} allowClear placeholder="Choose or add below" />
               {!doc.customer_vehicle_id ? (
                 <Row gap={8} align="flex-end">
                   <Input containerStyle={{ flex: 1 }} label="Registration" value={newReg} onChangeText={(v) => setNewReg(v.toUpperCase())} placeholder="UP16AB1234" autoCapitalize="characters" />
@@ -141,15 +141,15 @@ export default function JobCardEdit() {
             <Input containerStyle={{ flex: 1 }} label="Date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} />
             <View style={{ flex: 1 }}><NumberField label="Odometer (km)" value={doc.odometer_km} onChange={(v) => patch({ odometer_km: v })} decimals={0} /></View>
           </Row>
-          <Input label="Customer requirement" value={doc.requirement ?? ''} onChangeText={(v) => patch({ requirement: v })} placeholder="Fit LED headlights + fog lamps, check horn" multiline />
+          <Input label="Grahak ko kya chahiye" value={doc.requirement ?? ''} onChangeText={(v) => patch({ requirement: v })} placeholder="Fit LED headlights + fog lamps, check horn" multiline />
           <Row gap={12}>
             <View style={{ flex: 1 }}><SelectField label="Technician" value={doc.technician_id} options={(techs ?? []).map((t) => ({ value: t.id, label: t.full_name }))} onChange={(v) => patch({ technician_id: v })} allowClear /></View>
-            <View style={{ flex: 1 }}><SelectField label="Parts from" value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ location_id: v })} /></View>
+            <View style={{ flex: 1 }}><SelectField label="Maal kahan se" value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ location_id: v })} /></View>
           </Row>
           <Row gap={space.xs}>{STATUSES.map((s) => <Chip key={s.value} label={s.label} selected={doc.status === s.value} onPress={() => patch({ status: s.value })} />)}</Row>
         </FormSection>
 
-        <SectionTitle>Parts · {(parts ?? []).length}</SectionTitle>
+        <SectionTitle>Maal · {(parts ?? []).length}</SectionTitle>
         <Card><VariantPicker onPick={addPart} showPrice locationId={doc.location_id} autoFocus={false} /></Card>
         {(parts ?? []).map((p) => (
           <LineCard key={p.id} title={p.description} subtitle={`${p.sku} · ${p.here} at ${locations?.find((l) => l.id === doc.location_id)?.name ?? 'location'}`} onRemove={() => deleteRow(db, 'job_card_lines', p.id)}>
@@ -166,7 +166,7 @@ export default function JobCardEdit() {
           <Row gap={8} align="flex-end">
             <Input containerStyle={{ flex: 2 }} label="Work done" value={labourText} onChangeText={setLabourText} placeholder="Headlight fitting" onSubmitEditing={addLabour} />
             <View style={{ flex: 1 }}><NumberField label="Amount (₹)" value={labourAmt} onChange={setLabourAmt} placeholder="Horn labour amount" /></View>
-            <Button title="Add" tone="secondary" onPress={addLabour} disabled={!labourText.trim() || !labourAmt} />
+            <Button title="Jodo" tone="secondary" onPress={addLabour} disabled={!labourText.trim() || !labourAmt} />
           </Row>
           {(labour ?? []).map((l) => (
             <Row key={l.id} style={{ justifyContent: 'space-between', paddingVertical: 4 }}>
@@ -178,16 +178,16 @@ export default function JobCardEdit() {
         </Card>
 
         <FormSection title="Close & bill">
-          <KV k="Parts" v={formatINR(partsTotal)} mono />
+          <KV k="Maal" v={formatINR(partsTotal)} mono />
           <KV k="Labour" v={formatINR(labourTotal)} mono />
           <Divider />
           <SelectField label="Payment" value={mode} options={MODES} onChange={(v) => setMode(v ?? 'cash')} />
           <Input label="Internal notes" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} />
           <Row gap={space.sm}>
             <Button title="Close job card & post invoice" size="lg" onPress={close} loading={busy} style={{ flex: 1 }} disabled={!can('sale.create')} />
-            <Button title="Discard" tone="danger" onPress={discard} />
+            <Button title="Chhod do" tone="danger" onPress={discard} />
           </Row>
-          {!can('sale.create') ? <Text variant="small" color="textMuted">Closing needs the sale.create permission; the workshop role has it by default.</Text> : null}
+          {!can('sale.create') ? <Text variant="small" color="textMuted">Band karne ke liye bill banane ki permission chahiye — workshop role ke paas wo pehle se hai.</Text> : null}
         </FormSection>
       </Screen>
     </>

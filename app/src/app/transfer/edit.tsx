@@ -54,11 +54,11 @@ export default function TransferEdit() {
 
   async function dispatch() {
     if (!id || !doc) return;
-    if (doc.from_location_id === doc.to_location_id) { notify('Source and destination must differ.'); return; }
-    if (!(lines ?? []).length) { notify('Add at least one item.'); return; }
+    if (doc.from_location_id === doc.to_location_id) { notify('Kahan se aur kahan tak alag hone chahiye.'); return; }
+    if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
     const short = (lines ?? []).filter((l) => l.qty > l.here);
-    if (short.length && !(await confirm('Some lines exceed stock at the source', `${short.map((l) => l.description).join(', ')}. Dispatch anyway? Stock will go negative at the source until corrected.`))) return;
-    if (!(await confirm('Dispatch transfer?', 'Stock leaves the source location now and will be in transit until received.'))) return;
+    if (short.length && !(await confirm('Kuch line mein wahan ke stock se zyada qty hai', `${short.map((l) => l.description).join(', ')}. Dispatch anyway? Stock will go negative at the source until corrected.`))) return;
+    if (!(await confirm('Transfer bhej dein?', 'Stock leaves the source location now and will be in transit until received.'))) return;
     setBusy(true);
     try {
       await db.writeTransaction(async (tx) => dispatchTransfer(tx, id, actor));
@@ -67,12 +67,12 @@ export default function TransferEdit() {
   }
 
   async function discard() {
-    if (!id || !(await confirm('Discard draft?', 'Nothing has moved yet.'))) return;
+    if (!id || !(await confirm('Adhoora bill chhod dein?', 'Nothing has moved yet.'))) return;
     await db.writeTransaction(async (tx) => { await tx.execute('DELETE FROM stock_transfer_lines WHERE transfer_id = ?', [id]); await deleteRow(tx, 'stock_transfers', id); });
     router.back();
   }
 
-  if (!can('stock.transfer')) return <Screen><Text>You do not have permission to transfer stock.</Text></Screen>;
+  if (!can('stock.transfer')) return <Screen><Text>Aapko stock transfer karne ki permission nahi hai.</Text></Screen>;
   if (!doc) return <PreparingDraft what="draft" />;
   if (doc.status !== 'draft') { router.replace(`/transfer/${doc.id}`); return null; }
 
@@ -81,17 +81,17 @@ export default function TransferEdit() {
       <Stack.Screen options={{ title: 'New transfer' }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}><Text variant="display">Transfer</Text><Badge>draft</Badge></Row>
-        <FormSection title="Route">
+        <FormSection title="Kahan se kahan">
           <Row gap={12}>
-            <View style={{ flex: 1 }}><SelectField label="From" value={doc.from_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ from_location_id: v })} /></View>
-            <View style={{ flex: 1 }}><SelectField label="To" value={doc.to_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ to_location_id: v })} /></View>
+            <View style={{ flex: 1 }}><SelectField label="Se" value={doc.from_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ from_location_id: v })} /></View>
+            <View style={{ flex: 1 }}><SelectField label="Tak" value={doc.to_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ to_location_id: v })} /></View>
           </Row>
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} />
-            <Input containerStyle={{ flex: 2 }} label="Notes" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} placeholder="Van, driver, reason" />
+            <Input containerStyle={{ flex: 2 }} label="Note" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} placeholder="Gaadi, driver, wajah" />
           </Row>
         </FormSection>
-        <SectionTitle>Items · {(lines ?? []).length}</SectionTitle>
+        <SectionTitle>Maal · {(lines ?? []).length}</SectionTitle>
         <Card><VariantPicker onPick={addLine} locationId={doc.from_location_id} autoFocus={false} /></Card>
         {(lines ?? []).map((l) => (
           <LineCard key={l.id} title={l.description} subtitle={`${l.sku} · ${l.here} at source`} onRemove={() => deleteRow(db, 'stock_transfer_lines', l.id)}>
@@ -101,8 +101,8 @@ export default function TransferEdit() {
           </LineCard>
         ))}
         <Row gap={space.sm}>
-          <Button title="Dispatch" size="lg" onPress={dispatch} loading={busy} style={{ flex: 1 }} />
-          <Button title="Discard" tone="danger" onPress={discard} />
+          <Button title="Bhej do" size="lg" onPress={dispatch} loading={busy} style={{ flex: 1 }} />
+          <Button title="Chhod do" tone="danger" onPress={discard} />
         </Row>
       </Screen>
     </>

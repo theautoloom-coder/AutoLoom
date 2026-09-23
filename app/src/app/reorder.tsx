@@ -48,7 +48,7 @@ export default function ReorderScreen() {
   const value = visible.reduce((a, r) => a + r.suggest * (r.last_rate ?? r.avg_cost), 0);
 
   function exportCsv() {
-    if (Platform.OS !== 'web') { notify('CSV export is available in the web app.'); return; }
+    if (Platform.OS !== 'web') { notify('CSV export web par milta hai.'); return; }
     const csv = toCsv(visible.map((r) => ({ sku: r.sku, product: r.product_name, variant: r.variant_name, on_hand: r.qty, sold_in_period: r.sold, suggested_qty: r.suggest, supplier: r.supplier_name ?? '', last_rate: r.last_rate ?? '' })));
     const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = `autogrid-reorder-${toDateString()}.csv`; a.click();
   }
@@ -56,21 +56,21 @@ export default function ReorderScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Reorder</Text>
+        <Text variant="display">Kya mangwana hai</Text>
         <Button title="CSV" tone="secondary" size="sm" onPress={exportCsv} disabled={!visible.length} />
       </Row>
-      <Text variant="small" color="textMuted">Suggested quantity = sales per day over the window × days of cover − on hand, never below the SKU's own reorder quantity when it is under its minimum.</Text>
+      <Text variant="small" color="textMuted">Sujhaayi gayi qty = chune hue din mein roz ki bikri × kitne din chalana hai − jo abhi hai. Jo SKU apne minimum se neeche hai, uski apni reorder qty se kam kabhi nahi.</Text>
       <Row gap={space.xs} wrap>
-        <Text variant="label" color="textMuted">Window</Text>
+        <Text variant="label" color="textMuted">Kitne din ka</Text>
         {[30, 60, 90].map((d) => <Chip key={d} label={`${d} days`} selected={days === d} onPress={() => setDays(d)} />)}
-        <Text variant="label" color="textMuted" style={{ marginLeft: 8 }}>Cover</Text>
+        <Text variant="label" color="textMuted" style={{ marginLeft: 8 }}>Kitne din chalega</Text>
         {[15, 30, 45].map((d) => <Chip key={d} label={`${d} days`} selected={cover === d} onPress={() => setCover(d)} />)}
       </Row>
-      {families.length > 1 ? <Row gap={space.xs} wrap><Chip label="All" selected={!family} onPress={() => setFamily(null)} />{families.map((f) => <Chip key={f} label={f} selected={family === f} onPress={() => setFamily(family === f ? null : f)} />)}</Row> : null}
+      {families.length > 1 ? <Row gap={space.xs} wrap><Chip label="Sab" selected={!family} onPress={() => setFamily(null)} />{families.map((f) => <Chip key={f} label={f} selected={family === f} onPress={() => setFamily(family === f ? null : f)} />)}</Row> : null}
       <Card tone="alt">
         <Row gap={space.lg} wrap>
           <View><Text variant="label" color="textMuted">SKUs to order</Text><Text variant="number">{visible.length}</Text></View>
-          {can('catalog.view_cost') ? <View><Text variant="label" color="textMuted">Approx. purchase value</Text><Text variant="number">{formatINR(value)}</Text></View> : null}
+          {can('catalog.view_cost') ? <View><Text variant="label" color="textMuted">Takreeban kharid ka kharcha</Text><Text variant="number">{formatINR(value)}</Text></View> : null}
         </Row>
       </Card>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
@@ -80,7 +80,7 @@ export default function ReorderScreen() {
             onPress={() => router.push(`/product/${r.product_id}?variant=${r.id}`)}
             right={<View style={{ alignItems: 'flex-end' }}><Text variant="number" mono color="accent">{r.suggest}</Text><Badge tone={r.cls === 'fast' ? 'ok' : r.cls === 'dead' ? 'danger' : 'neutral'}>{r.cls}</Badge></View>} />
         ))}
-        {visible.length === 0 ? <Empty title="Nothing to reorder" hint="Everything has enough cover for the chosen window." /> : null}
+        {visible.length === 0 ? <Empty title="Kuch mangwane ki zaroorat nahi" hint="Chune hue din tak sab kuch kaafi hai." /> : null}
       </Card>
     </Screen>
   );

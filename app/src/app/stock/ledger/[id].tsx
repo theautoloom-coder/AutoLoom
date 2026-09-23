@@ -38,7 +38,7 @@ export default function StockLedger() {
     else if (m.ref_type === 'stock_adjustment') router.push(`/adjustment/${m.ref_id}`);
   }
 
-  if (!v) return <Screen><Empty title="SKU not found" /></Screen>;
+  if (!v) return <Screen><Empty title="Ye SKU nahi mila" /></Screen>;
 
   return (
     <>
@@ -47,7 +47,7 @@ export default function StockLedger() {
         <Text variant="display">{v.product_name} · {v.variant_name}</Text>
         <Text color="textMuted" mono>{v.sku}</Text>
         <Row gap={space.xs} wrap>
-          <Chip label="All locations" selected={!loc} onPress={() => setLoc(null)} />
+          <Chip label="Saari location" selected={!loc} onPress={() => setLoc(null)} />
           {(locations ?? []).map((l) => <Chip key={l.id} label={l.name} selected={loc === l.id} onPress={() => setLoc(l.id)} />)}
         </Row>
         <Card style={{ gap: 0 }}>
@@ -57,7 +57,7 @@ export default function StockLedger() {
             <Text variant="label" color="textMuted" style={{ width: 70, textAlign: 'right' }}>Balance</Text>
           </Row>
           <Divider />
-          {withBalance.length === 0 ? <Empty title="No movements" /> : null}
+          {withBalance.length === 0 ? <Empty title="Koi aana-jaana nahi" /> : null}
           {withBalance.map((m) => (
             <React.Fragment key={m.id}>
               <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">
@@ -75,7 +75,7 @@ export default function StockLedger() {
             </React.Fragment>
           ))}
         </Card>
-        {!loc ? <Text variant="small" color="textFaint">Pick a location to see the running balance.</Text> : null}
+        {!loc ? <Text variant="small" color="textFaint">Location chuno, tabhi chalta balance dikhega.</Text> : null}
       </Screen>
     </>
   );

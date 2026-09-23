@@ -76,8 +76,8 @@ export function ToastHost() {
             <Text variant="title">{confirmState?.title}</Text>
             <Text color="textMuted">{confirmState?.message}</Text>
             <Row gap={space.sm} style={{ justifyContent: 'flex-end', marginTop: space.xs }}>
-              <Button title="Cancel" tone="secondary" onPress={() => confirmState?.resolve(false)} />
-              <Button title="Continue" tone="danger" onPress={() => confirmState?.resolve(true)} />
+              <Button title="Rehne do" tone="secondary" onPress={() => confirmState?.resolve(false)} />
+              <Button title="Aage badho" tone="danger" onPress={() => confirmState?.resolve(true)} />
             </Row>
           </Pressable>
         </Pressable>

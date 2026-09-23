@@ -75,7 +75,7 @@ export function SelectField({
           <View style={[styles.sheet, { maxWidth: 640 }]}>
             <Row style={{ justifyContent: 'space-between' }}>
               <Text variant="title">{label ?? 'Choose'}</Text>
-              <Button title="Close" tone="ghost" size="sm" onPress={() => setOpen(false)} />
+              <Button title="Band karo" tone="ghost" size="sm" onPress={() => setOpen(false)} />
             </Row>
             <Input value={q} onChangeText={setQ} placeholder="Type to filter" autoFocus autoCapitalize="none" autoCorrect={false} />
             <FlatList
@@ -83,7 +83,7 @@ export function SelectField({
               keyExtractor={(o) => o.value}
               keyboardShouldPersistTaps="handled"
               ItemSeparatorComponent={Divider}
-              ListEmptyComponent={<Empty title="No matches" />}
+              ListEmptyComponent={<Empty title="Kuch nahi mila" />}
               ListHeaderComponent={
                 allowClear && value ? (
                   <Pressable
@@ -92,7 +92,7 @@ export function SelectField({
                       setOpen(false);
                     }}
                     style={styles.row}>
-                    <Text color="danger">Clear selection</Text>
+                    <Text color="danger">Chuna hua hatao</Text>
                   </Pressable>
                 ) : null
               }
@@ -187,7 +187,7 @@ export function MultiSelectField({
           <View style={[styles.sheet, { maxWidth: 640 }]}>
             <Row style={{ justifyContent: 'space-between' }}>
               <Text variant="title">{label ?? 'Choose'}</Text>
-              <Button title="Done" size="sm" onPress={() => setOpen(false)} />
+              <Button title="Ho gaya" size="sm" onPress={() => setOpen(false)} />
             </Row>
             <Input value={q} onChangeText={setQ} placeholder="Type to filter" autoCapitalize="none" autoCorrect={false} />
             <FlatList

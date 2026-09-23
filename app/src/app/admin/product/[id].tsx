@@ -133,7 +133,7 @@ export default function ProductWizard() {
     (async () => {
       const p = (await db.getOptional<Record<string, unknown>>('SELECT * FROM products WHERE id = ?', [id])) as Record<string, string | number | null> | null;
       if (!p) {
-        notify('Product not found on this device.');
+        notify('Ye item is phone par nahi mila.');
         router.back();
         return;
       }
@@ -236,7 +236,7 @@ export default function ProductWizard() {
       return { code: d.code, unit: d.unit, showInName: !!d.show_in_variant_name, values, defId: d.id, type: d.data_type };
     });
     if (axesInput.some((a) => a.values.length === 0)) {
-      notify('Choose at least one value for every variant axis.');
+      notify('Har cheez ke liye kam se kam ek value chuno.');
       return;
     }
     const combos = axisCombinations(axesInput);
@@ -254,7 +254,7 @@ export default function ProductWizard() {
       additions.push(draft);
     }
     if (additions.length === 0) {
-      notify('Those variants already exist.');
+      notify('Ye type pehle se hain.');
       return;
     }
     setVariants((vs) => [...vs, ...additions]);
@@ -285,7 +285,7 @@ export default function ProductWizard() {
   function addFitment() {
     const m = models?.find((x) => x.id === fitModel);
     if (!m) {
-      notify('Choose a vehicle model.');
+      notify('Gaadi ka model chuno.');
       return;
     }
     const g = gens?.find((x) => x.id === fitGen) ?? null;
@@ -432,12 +432,12 @@ export default function ProductWizard() {
   }
 
   async function deactivate() {
-    if (!(await confirm('Deactivate product?', 'It disappears from search and billing. Stock and history are kept.'))) return;
+    if (!(await confirm('Item band karein?', 'It disappears from search and billing. Stock and history are kept.'))) return;
     await updateRow(db, 'products', id, { is_active: false });
     router.back();
   }
 
-  if (!can('catalog.edit')) return <Screen><Text>Only administrators and owners can edit the catalogue.</Text></Screen>;
+  if (!can('catalog.edit')) return <Screen><Text>Sirf admin aur owner maal badal sakte hain.</Text></Screen>;
   if (!isNew && !loaded) return <Screen><Text>Loading…</Text></Screen>;
 
   // ---------------------------------------------------------------------------
@@ -491,21 +491,21 @@ export default function ProductWizard() {
                 onChange={setBrandId}
                 onCreate={async (text) => setBrandId(await insertRow(db, 'brands', { name: text, code: slug(text, 3), is_active: true }))}
               />
-              <Input label="Product name" value={name} onChangeText={setName} placeholder={`e.g. ${brand?.name ?? 'Brand'} Ultra LED Headlight Bulb`} hint="Do not put the vehicle or the variant (socket, colour) in the name; those come from fitment and variants." />
-              <Input label="Description" value={description} onChangeText={setDescription} multiline />
-              <SwitchRow label="Universal fit" hint="Sold by specification rather than by vehicle. Appears under “Universal” in every vehicle search." value={universal} onChange={setUniversal} />
+              <Input label="Item ka naam" value={name} onChangeText={setName} placeholder={`e.g. ${brand?.name ?? 'Brand'} Ultra LED Headlight Bulb`} hint="Naam mein gaadi ya type (socket, colour) mat likho — wo alag se aate hain." />
+              <Input label="Detail" value={description} onChangeText={setDescription} multiline />
+              <SwitchRow label="Sab gaadi mein lagta hai" hint="Ye spec se bikta hai, gaadi se nahi. Har gaadi ke search mein “Universal” ke neeche dikhega." value={universal} onChange={setUniversal} />
             </FormSection>
 
-            <FormSection title="Specifications" hint="Shared by every variant. Variant-specific fields come next.">
-              {productDefs.length === 0 ? <Text variant="small" color="textMuted">This family has no shared specifications.</Text> : null}
+            <FormSection title="Spec" hint="Ye sab type mein same rehta hai. Alag-alag wali cheezein aage aayengi.">
+              {productDefs.length === 0 ? <Text variant="small" color="textMuted">Is category mein koi common spec nahi hai.</Text> : null}
               {productDefs.map((d) => (
                 <SpecInput key={d.id} def={d} options={optsFor(d.id)} value={productSpecs[d.id]} onChange={(v) => setProductSpecs((s) => ({ ...s, [d.id]: v }))} />
               ))}
             </FormSection>
 
-            <FormSection title="Classification & tax">
+            <FormSection title="Category aur GST">
               <SelectField label="Category" value={categoryId} options={(categories ?? []).filter((c) => c.level === 1).map((c) => ({ value: c.id, label: c.name }))} onChange={setCategoryId} allowClear />
-              <SelectField label="Subcategory" value={subcategoryId} options={(categories ?? []).filter((c) => c.level === 2 && (!categoryId || c.parent_id === categoryId)).map((c) => ({ value: c.id, label: c.name }))} onChange={setSubcategoryId} allowClear />
+              <SelectField label="Sub-category" value={subcategoryId} options={(categories ?? []).filter((c) => c.level === 2 && (!categoryId || c.parent_id === categoryId)).map((c) => ({ value: c.id, label: c.name }))} onChange={setSubcategoryId} allowClear />
               <SelectField label="HSN code" value={hsn} options={(hsns ?? []).map((h) => ({ value: h.code, label: h.code, sublabel: h.description ?? undefined }))} onChange={setHsn} allowClear />
               <Row gap={12}>
                 <View style={{ flex: 1 }}>
@@ -524,7 +524,7 @@ export default function ProductWizard() {
         {step === 'variants' && family ? (
           <>
             {axisDefs.length > 0 ? (
-              <FormSection title="Variant axes" hint="Pick every value you stock. One SKU is created per combination, each with its own stock and prices.">
+              <FormSection title="Kis-kis cheez se type bante hain" hint="Jo bhi aapke paas hai sab chuno. Har jod ka apna SKU banega, apna stock aur apna rate.">
                 {axisDefs.map((d) =>
                   d.data_type === 'select' ? (
                     <MultiSelectField key={d.id} label={d.name} values={axisChoices[d.id] ?? []} options={optsFor(d.id).map((o) => ({ value: o.id, label: o.value }))} onChange={(vals) => setAxisChoices((a) => ({ ...a, [d.id]: vals }))} />
@@ -535,23 +535,23 @@ export default function ProductWizard() {
                       value={(axisChoices[d.id] ?? []).join(', ')}
                       onChangeText={(s) => setAxisChoices((a) => ({ ...a, [d.id]: s.split(',').map((x) => x.trim()).filter(Boolean) }))}
                       placeholder={d.data_type === 'number' ? '60, 80, 100' : 'comma separated values'}
-                      hint="Comma separated"
+                      hint="Comma se alag karo"
                     />
                   )
                 )}
-                <Button title="Generate variants" tone="secondary" onPress={generateVariants} />
+                <Button title="Type bana do" tone="secondary" onPress={generateVariants} />
               </FormSection>
             ) : (
               <Card tone="alt">
                 <Text variant="small" color="textMuted">
                   This family has no variant axes, so the product has a single SKU.
                 </Text>
-                {variants.length === 0 ? <Button title="Create the SKU" tone="secondary" onPress={generateVariants} /> : null}
+                {variants.length === 0 ? <Button title="SKU bana do" tone="secondary" onPress={generateVariants} /> : null}
               </Card>
             )}
 
             {isNew ? (
-              <SelectField label="Opening stock location" value={openingLocation} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={setOpeningLocation} hint="Opening quantities below are recorded as opening-stock movements at this location." />
+              <SelectField label="Shuruaati stock kahan rakha hai" value={openingLocation} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={setOpeningLocation} hint="Neeche jo qty daaloge wo isi location par shuruaati stock ke roop mein chadh jaayegi." />
             ) : null}
 
             {variants.map((v, i) => (
@@ -566,33 +566,33 @@ export default function ProductWizard() {
                   {v.id ? (
                     <Button title={v.is_active ? 'Deactivate' : 'Restore'} tone="ghost" size="sm" onPress={() => patchVariant(v.key, { is_active: !v.is_active })} />
                   ) : (
-                    <Button title="Remove" tone="ghost" size="sm" onPress={() => setVariants((vs) => vs.filter((x) => x.key !== v.key))} />
+                    <Button title="Hatao" tone="ghost" size="sm" onPress={() => setVariants((vs) => vs.filter((x) => x.key !== v.key))} />
                   )}
                 </Row>
                 <Row gap={12}>
-                  <Input containerStyle={{ flex: 1.2 }} label="Variant name" value={v.variant_name} onChangeText={(x) => patchVariant(v.key, { variant_name: x })} />
+                  <Input containerStyle={{ flex: 1.2 }} label="Type ka naam" value={v.variant_name} onChangeText={(x) => patchVariant(v.key, { variant_name: x })} />
                   <Input containerStyle={{ flex: 1.2 }} label="SKU" value={v.sku} onChangeText={(x) => patchVariant(v.key, { sku: x.toUpperCase() })} autoCapitalize="characters" error={!v.id && takenSkus.has(v.sku) ? 'Already used' : null} />
                   <Input containerStyle={{ flex: 1 }} label="Barcode" value={v.barcode} onChangeText={(x) => patchVariant(v.key, { barcode: x })} keyboardType="number-pad" />
                 </Row>
                 <Row gap={12} wrap>
                   <View style={{ flex: 1, minWidth: 110 }}><NumberField label="MRP" value={v.mrp} onChange={(x) => patchVariant(v.key, { mrp: x })} /></View>
-                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Retail" value={v.retail_price} onChange={(x) => patchVariant(v.key, { retail_price: x })} /></View>
-                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Dealer" value={v.dealer_price} onChange={(x) => patchVariant(v.key, { dealer_price: x })} /></View>
-                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Wholesale" value={v.wholesale_price} onChange={(x) => patchVariant(v.key, { wholesale_price: x })} /></View>
-                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Min. selling" value={v.min_selling_price} onChange={(x) => patchVariant(v.key, { min_selling_price: x })} /></View>
+                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Retail rate" value={v.retail_price} onChange={(x) => patchVariant(v.key, { retail_price: x })} /></View>
+                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Dealer rate" value={v.dealer_price} onChange={(x) => patchVariant(v.key, { dealer_price: x })} /></View>
+                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Thok rate" value={v.wholesale_price} onChange={(x) => patchVariant(v.key, { wholesale_price: x })} /></View>
+                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Isse kam nahi bechna" value={v.min_selling_price} onChange={(x) => patchVariant(v.key, { min_selling_price: x })} /></View>
                 </Row>
                 <Row gap={12} wrap>
-                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Min stock" value={v.min_stock} onChange={(x) => patchVariant(v.key, { min_stock: x })} decimals={0} /></View>
-                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Reorder level" value={v.reorder_level} onChange={(x) => patchVariant(v.key, { reorder_level: x })} decimals={0} /></View>
-                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Reorder qty" value={v.reorder_qty} onChange={(x) => patchVariant(v.key, { reorder_qty: x })} decimals={0} /></View>
+                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Kam se kam stock" value={v.min_stock} onChange={(x) => patchVariant(v.key, { min_stock: x })} decimals={0} /></View>
+                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Itna bache to mangwa lo" value={v.reorder_level} onChange={(x) => patchVariant(v.key, { reorder_level: x })} decimals={0} /></View>
+                  <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Kitna mangwana hai" value={v.reorder_qty} onChange={(x) => patchVariant(v.key, { reorder_qty: x })} decimals={0} /></View>
                   {!v.id ? (
                     <>
-                      <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Opening qty" value={v.opening_qty} onChange={(x) => patchVariant(v.key, { opening_qty: x })} decimals={3} /></View>
-                      <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Unit cost" value={v.opening_cost} onChange={(x) => patchVariant(v.key, { opening_cost: x })} /></View>
+                      <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Shuruaati qty" value={v.opening_qty} onChange={(x) => patchVariant(v.key, { opening_qty: x })} decimals={3} /></View>
+                      <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Kharid rate" value={v.opening_cost} onChange={(x) => patchVariant(v.key, { opening_cost: x })} /></View>
                     </>
                   ) : (
                     <View style={{ flex: 1, minWidth: 110, justifyContent: 'flex-end' }}>
-                      <Text variant="label" color="textMuted">On hand</Text>
+                      <Text variant="label" color="textMuted">Abhi kitna hai</Text>
                       <Text mono>{v.existingQty}</Text>
                     </View>
                   )}
@@ -609,21 +609,21 @@ export default function ProductWizard() {
             <Text variant="small" color="textMuted">
               {universal ? 'This product is universal fit. Fitments are optional and only add it to “fits this model” lists.' : 'Add every vehicle this product fits. Leave the generation blank to cover all years.'}
             </Text>
-            <FormSection title="Add fitment">
+            <FormSection title="Fitment jodo">
               <SelectField label="Model" value={fitModel} options={(models ?? []).map((m) => ({ value: m.id, label: `${m.make_name} ${m.name}` }))} onChange={(v) => { setFitModel(v); setFitGen(null); }} />
-              <SelectField label="Generation / years" value={fitGen} options={(gens ?? []).map((g) => ({ value: g.id, label: `${g.name} (${g.year_from}–${g.year_to ?? 'now'})` }))} onChange={setFitGen} allowClear placeholder="All generations" />
+              <SelectField label="Saal / generation" value={fitGen} options={(gens ?? []).map((g) => ({ value: g.id, label: `${g.name} (${g.year_from}–${g.year_to ?? 'now'})` }))} onChange={setFitGen} allowClear placeholder="Saare saal" />
               <Row gap={12}>
                 <View style={{ flex: 1 }}>
-                  <SelectField label="Position" value={fitPos} options={POSITIONS.map((p) => ({ value: p, label: p.replace('_', ' ') }))} onChange={setFitPos} allowClear placeholder="Any" />
+                  <SelectField label="Jagah" value={fitPos} options={POSITIONS.map((p) => ({ value: p, label: p.replace('_', ' ') }))} onChange={setFitPos} allowClear placeholder="Koi bhi" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <SelectField label="Applies to" value={fitVariant} options={variants.map((v) => ({ value: v.key, label: v.variant_name || v.sku }))} onChange={setFitVariant} allowClear placeholder="All variants" />
+                  <SelectField label="Kispar lagta hai" value={fitVariant} options={variants.map((v) => ({ value: v.key, label: v.variant_name || v.sku }))} onChange={setFitVariant} allowClear placeholder="Saare type" />
                 </View>
               </Row>
-              <Button title="Add fitment" tone="secondary" onPress={addFitment} />
+              <Button title="Fitment jodo" tone="secondary" onPress={addFitment} />
             </FormSection>
             <Card style={{ gap: 0 }}>
-              {fitments.length === 0 ? <Text variant="small" color="textMuted" style={{ padding: 8 }}>No fitments yet.</Text> : null}
+              {fitments.length === 0 ? <Text variant="small" color="textMuted" style={{ padding: 8 }}>Abhi koi gaadi nahi jodi.</Text> : null}
               {fitments.map((f) => (
                 <Row key={f.key} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: t.border }}>
                   <View style={{ flex: 1 }}>
@@ -643,17 +643,17 @@ export default function ProductWizard() {
         {step === 'review' && family ? (
           <>
             <Card>
-              <KV k="Family" v={family.name} />
+              <KV k="Category" v={family.name} />
               <KV k="Brand" v={brand?.name ?? '—'} />
-              <KV k="Name" v={name || '—'} />
-              <KV k="Universal fit" v={universal ? 'Yes' : 'No'} />
+              <KV k="Naam" v={name || '—'} />
+              <KV k="Sab gaadi mein lagta hai" v={universal ? 'Yes' : 'No'} />
               <KV k="HSN / GST" v={`${hsn ?? '—'} / ${taxes?.find((x) => x.id === taxRateId)?.name ?? '—'}`} />
               <Divider />
               {productDefs.map((d) => (
                 <KV key={d.id} k={d.name} v={displayOf(productSpecs[d.id], d) || '—'} />
               ))}
             </Card>
-            <SectionTitle>Variants · {variants.length}</SectionTitle>
+            <SectionTitle>Type · {variants.length}</SectionTitle>
             <Card style={{ gap: 0 }}>
               {variants.map((v) => (
                 <Row key={v.key} style={{ paddingVertical: 6 }}>
@@ -668,7 +668,7 @@ export default function ProductWizard() {
                 </Row>
               ))}
             </Card>
-            <SectionTitle>Fitment · {fitments.length}</SectionTitle>
+            <SectionTitle>Kis gaadi mein lagta hai · {fitments.length}</SectionTitle>
             <Card style={{ gap: 4 }}>
               {fitments.length === 0 ? <Text variant="small" color="textMuted">{universal ? 'Universal fit' : 'None'}</Text> : fitments.map((f) => <Text key={f.key} variant="small">{f.label}</Text>)}
             </Card>
@@ -681,9 +681,9 @@ export default function ProductWizard() {
         ) : null}
 
         <Row gap={8} style={{ marginTop: space.md }}>
-          {stepIndex > 0 ? <Button title="Back" tone="secondary" onPress={back} /> : null}
-          {step !== 'review' ? <Button title="Next" onPress={next} disabled={step === 'family' && !familyId} /> : <Button title={isNew ? 'Create product' : 'Save changes'} onPress={save} loading={saving} disabled={!!validate()} />}
-          {!isNew && active ? <Button title="Deactivate" tone="danger" onPress={deactivate} /> : null}
+          {stepIndex > 0 ? <Button title="Peeche" tone="secondary" onPress={back} /> : null}
+          {step !== 'review' ? <Button title="Aage" onPress={next} disabled={step === 'family' && !familyId} /> : <Button title={isNew ? 'Create product' : 'Save changes'} onPress={save} loading={saving} disabled={!!validate()} />}
+          {!isNew && active ? <Button title="Band kar do" tone="danger" onPress={deactivate} /> : null}
         </Row>
       </Screen>
     </>

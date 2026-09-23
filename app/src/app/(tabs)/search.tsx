@@ -57,7 +57,7 @@ export default function SearchScreen() {
 
   return (
     <Screen>
-      <Text variant="display">Search</Text>
+      <Text variant="display">Dhoondo</Text>
       <Input
         value={q}
         onChangeText={setQ}
@@ -71,7 +71,7 @@ export default function SearchScreen() {
 
       {!active ? (
         <Card tone="alt">
-          <Text variant="heading">One box for everything</Text>
+          <Text variant="heading">Ek hi jagah sab kuch</Text>
           <Text variant="small" color="textMuted">
             Type a socket (H4, 9005), a product, a vehicle with year (Creta 2024), a customer or mobile number, a vehicle registration, or an invoice number.
           </Text>
@@ -80,7 +80,7 @@ export default function SearchScreen() {
 
       {vehicles && vehicles.length > 0 ? (
         <>
-          <SectionTitle>Vehicles{parsed.year ? ` · ${parsed.year}` : ''}</SectionTitle>
+          <SectionTitle>Gaadiyan{parsed.year ? ` · ${parsed.year}` : ''}</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {vehicles.map((v) => (
               <ListRow
@@ -88,7 +88,7 @@ export default function SearchScreen() {
                 title={`${v.make_name} ${v.name}`}
                 subtitle={`${v.fitment_count} fitment${v.fitment_count === 1 ? '' : 's'}${v.body_type ? ` · ${v.body_type}` : ''}`}
                 onPress={() => router.push(`/vehicle/${v.id}${parsed.year ? `?year=${parsed.year}` : ''}`)}
-                right={<Text color="accent">Compatible products</Text>}
+                right={<Text color="accent">Is gaadi mein lagne wala maal</Text>}
               />
             ))}
           </Card>
@@ -97,7 +97,7 @@ export default function SearchScreen() {
 
       {regs && regs.length > 0 ? (
         <>
-          <SectionTitle>Vehicle numbers</SectionTitle>
+          <SectionTitle>Gaadi number</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {regs.map((r) => (
               <ListRow
@@ -113,7 +113,7 @@ export default function SearchScreen() {
 
       {variants && variants.length > 0 ? (
         <>
-          <SectionTitle>Products</SectionTitle>
+          <SectionTitle>Saara maal</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {variants.map((v) => (
               <ListRow
@@ -149,7 +149,7 @@ export default function SearchScreen() {
 
       {customers && customers.length > 0 ? (
         <>
-          <SectionTitle>Customers</SectionTitle>
+          <SectionTitle>Grahak</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {customers.map((c) => (
               <ListRow
@@ -175,7 +175,7 @@ export default function SearchScreen() {
 
       {invoices && invoices.length > 0 ? (
         <>
-          <SectionTitle>Invoices</SectionTitle>
+          <SectionTitle>Bill</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {invoices.map((i) => (
               <ListRow
@@ -195,7 +195,7 @@ export default function SearchScreen() {
         </>
       ) : null}
 
-      {nothing ? <Empty title={`Nothing matches “${q.trim()}”`} hint="Try a socket like H4, a model like Creta, or a customer's mobile number." /> : null}
+      {nothing ? <Empty title={`Nothing matches “${q.trim()}”`} hint="H4 jaisa socket, Creta jaisa model, ya grahak ka mobile number likho." /> : null}
     </Screen>
   );
 }

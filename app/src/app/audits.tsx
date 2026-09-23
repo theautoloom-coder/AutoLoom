@@ -1,3 +1,4 @@
+import { statusLabel } from '@domain';
 import { useQuery } from '@powersync/react';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -34,7 +35,7 @@ export default function AuditsScreen() {
 
   async function start() {
     const location = loc ?? locationId;
-    if (!location) { notify('Choose a location.'); return; }
+    if (!location) { notify('Location chuno.'); return; }
     setBusy(true);
     try {
       let auditId = '';
@@ -53,24 +54,24 @@ export default function AuditsScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Stock audits</Text>
-        {can('stock.count') && !starting ? <Button title="Start count" onPress={() => { setLoc(locationId); setStarting(true); }} /> : null}
+        <Text variant="display">Stock ginti</Text>
+        {can('stock.count') && !starting ? <Button title="Ginti shuru karo" onPress={() => { setLoc(locationId); setStarting(true); }} /> : null}
       </Row>
       {starting ? (
-        <FormSection title="New count session" hint="System quantities are snapshotted when the session starts, so counting can take days while billing continues. Closing applies only the differences.">
-          <Input label="Name" value={name} onChangeText={setName} placeholder="Quarterly count, Lighting rack A…" />
+        <FormSection title="Nayi ginti" hint="Ginti shuru hote hi system ki qty ka photo le liya jaata hai, isliye ginti kai din chal sakti hai aur billing bhi chalti rahegi. Band karne par sirf farak lagta hai.">
+          <Input label="Naam" value={name} onChangeText={setName} placeholder="Teen mahine ki ginti, LED rack A…" />
           <SelectField label="Location" value={loc} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={setLoc} />
-          <SelectField label="Only this family (optional)" value={family} options={(families ?? []).map((f) => ({ value: f.id, label: f.name }))} onChange={setFamily} allowClear placeholder="All families with stock" />
-          <Row gap={8}><Button title="Start" onPress={start} loading={busy} /><Button title="Cancel" tone="ghost" onPress={() => setStarting(false)} /></Row>
+          <SelectField label="Sirf ye category (zaroori nahi)" value={family} options={(families ?? []).map((f) => ({ value: f.id, label: f.name }))} onChange={setFamily} allowClear placeholder="Jis bhi category mein stock hai" />
+          <Row gap={8}><Button title="Shuru karo" onPress={start} loading={busy} /><Button title="Rehne do" tone="ghost" onPress={() => setStarting(false)} /></Row>
         </FormSection>
       ) : null}
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {(rows ?? []).map((a) => (
           <ListRow key={a.id} title={a.name} subtitle={`${a.location_name} · ${new Date(a.started_at).toLocaleDateString('en-IN')} · ${a.counted}/${a.total} counted · ${a.diffs} differences`}
             onPress={() => router.push(`/audit/${a.id}`)}
-            right={<View style={{ alignItems: 'flex-end' }}><Badge tone={a.status === 'closed' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'warn'}>{a.status}</Badge></View>} />
+            right={<View style={{ alignItems: 'flex-end' }}><Badge tone={a.status === 'closed' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'warn'}>{statusLabel(a.status)}</Badge></View>} />
         ))}
-        {(rows ?? []).length === 0 ? <Empty title="No audits yet" /> : null}
+        {(rows ?? []).length === 0 ? <Empty title="Abhi tak koi ginti nahi hui" /> : null}
       </Card>
     </Screen>
   );

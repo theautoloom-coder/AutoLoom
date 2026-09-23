@@ -27,7 +27,7 @@ const DOC_LABEL: Record<string, string> = {
   opening: 'Opening balance',
   sales_invoice: 'Invoice',
   credit_note: 'Credit note',
-  payment_in: 'Payment received',
+  payment_in: 'Payment aaya',
   adjustment: 'Adjustment',
   cancel_reversal: 'Cancellation',
 };
@@ -76,7 +76,7 @@ export default function CustomerScreen() {
   if (!c) {
     return (
       <Screen>
-        <Empty title="Customer not found on this device" />
+        <Empty title="Ye grahak is phone par nahi mila" />
       </Screen>
     );
   }
@@ -134,12 +134,12 @@ export default function CustomerScreen() {
               {c.name}
             </Text>
             <Row gap={6}>
-              {can('sale.create') ? <Button title="New bill" size="sm" onPress={() => router.push(`/invoice/edit?customer=${c.id}`)} /> : null}
+              {can('sale.create') ? <Button title="Naya bill" size="sm" onPress={() => router.push(`/invoice/edit?customer=${c.id}`)} /> : null}
               <Button title="Hisaab bhejo" size="sm" tone="ghost" onPress={sendStatement} />
-              {c.balance > 0 ? <Button title="Remind" size="sm" tone="secondary" onPress={async () => { if (!c.mobile) { notify('No mobile number on this customer.'); return; } await openWhatsApp(c.mobile, reminderMessage(shop.wa, { name: c.name, pending: c.balance })); }} /> : null}
+              {c.balance > 0 ? <Button title="Yaad dilao" size="sm" tone="secondary" onPress={async () => { if (!c.mobile) { notify('Is grahak ka mobile number nahi hai.'); return; } await openWhatsApp(c.mobile, reminderMessage(shop.wa, { name: c.name, pending: c.balance })); }} /> : null}
               {can('jobcard.edit') ? <Button title="Job card" size="sm" tone="secondary" onPress={() => router.push(`/job-card/edit?customer=${c.id}`)} /> : null}
-              {can('payment.receive') ? <Button title="Mark paid" size="sm" tone="secondary" onPress={() => router.push(`/payment/edit?direction=in&party=${c.id}${c.balance > 0 ? `&amount=${c.balance}` : ''}`)} /> : null}
-              {can('party.edit') ? <Button title="Edit" tone="secondary" size="sm" onPress={() => router.push(`/customer/edit?id=${c.id}`)} /> : null}
+              {can('payment.receive') ? <Button title="Paisa aa gaya" size="sm" tone="secondary" onPress={() => router.push(`/payment/edit?direction=in&party=${c.id}${c.balance > 0 ? `&amount=${c.balance}` : ''}`)} /> : null}
+              {can('party.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/customer/edit?id=${c.id}`)} /> : null}
             </Row>
           </Row>
           {c.business_name && c.business_name !== c.name ? (
@@ -173,20 +173,20 @@ export default function CustomerScreen() {
           </Card>
         ) : null}
 
-        <SectionTitle>Contact</SectionTitle>
+        <SectionTitle>Sampark</SectionTitle>
         <Card style={{ gap: 0 }}>
-          {c.owner_name ? <KV k="Owner" v={c.owner_name} /> : null}
+          {c.owner_name ? <KV k="Maalik" v={c.owner_name} /> : null}
           {c.mobile ? <KV k="Mobile" v={c.mobile} mono /> : null}
           {c.alt_phone ? <KV k="Phone" v={c.alt_phone} mono /> : null}
           {c.email ? <KV k="Email" v={c.email} /> : null}
           {c.gstin ? <KV k="GSTIN" v={c.gstin} mono /> : null}
-          <KV k="Address" v={[c.address_line1, c.address_line2, c.city, c.state_name, c.pincode].filter(Boolean).join(', ') || '—'} />
-          {c.notes ? <KV k="Notes" v={c.notes} /> : null}
+          <KV k="Pata" v={[c.address_line1, c.address_line2, c.city, c.state_name, c.pincode].filter(Boolean).join(', ') || '—'} />
+          {c.notes ? <KV k="Note" v={c.notes} /> : null}
         </Card>
 
         {vehicles && vehicles.length > 0 ? (
           <>
-            <SectionTitle>Vehicles</SectionTitle>
+            <SectionTitle>Gaadiyan</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {vehicles.map((v) => (
                 <ListRow
@@ -194,7 +194,7 @@ export default function CustomerScreen() {
                   title={formatRegistration(v.registration_no)}
                   subtitle={[v.make_name, v.model_name, v.generation_name, v.color].filter(Boolean).join(' · ') || 'Model not recorded'}
                   onPress={() => router.push(`/job-cards?vehicle=${v.id}`)}
-                  right={<Row gap={8}>{v.model_id ? <Text color="accent" onPress={() => router.push(`/vehicle/${v.model_id}`)}>Products</Text> : null}<Text color="accent">History</Text></Row>}
+                  right={<Row gap={8}>{v.model_id ? <Text color="accent" onPress={() => router.push(`/vehicle/${v.model_id}`)}>Saara maal</Text> : null}<Text color="accent">Pehle kya liya</Text></Row>}
                 />
               ))}
             </Card>
@@ -203,7 +203,7 @@ export default function CustomerScreen() {
 
         {warranty && warranty.length > 0 ? (
           <>
-            <SectionTitle>Warranty items</SectionTitle>
+            <SectionTitle>Warranty wala maal</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {warranty.map((w) => {
                 const live = w.days_left > 0;
@@ -227,7 +227,7 @@ export default function CustomerScreen() {
 
         {showMoney ? (
           <>
-            <SectionTitle>Top products · last 12 months</SectionTitle>
+            <SectionTitle>Sabse zyada bikne wala maal · pichhle 12 mahine</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {top && top.length > 0 ? (
                 top.map((p) => (
@@ -246,11 +246,11 @@ export default function CustomerScreen() {
                   />
                 ))
               ) : (
-                <Empty title="No purchases in the last 12 months" />
+                <Empty title="Pichhle 12 mahine mein kuch nahi liya" />
               )}
             </Card>
 
-            <SectionTitle>Ledger</SectionTitle>
+            <SectionTitle>Khata</SectionTitle>
             <Card style={{ gap: 0 }}>
               <Row gap={space.sm} style={{ paddingVertical: 6 }}>
                 <Text variant="label" color="textMuted" style={{ flex: 1.6 }}>
@@ -267,7 +267,7 @@ export default function CustomerScreen() {
                 </Text>
               </Row>
               <Divider />
-              {ledgerDesc.length === 0 ? <Empty title="No ledger entries" /> : null}
+              {ledgerDesc.length === 0 ? <Empty title="Khata khaali hai" /> : null}
               {ledgerDesc.map((e) => (
                 <React.Fragment key={e.id}>
                   <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">

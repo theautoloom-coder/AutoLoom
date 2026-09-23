@@ -27,7 +27,7 @@ export default function TransferDetail() {
     try { await fn(); notify(label); } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!t) return <Screen><Empty title="Transfer not found on this device" /></Screen>;
+  if (!t) return <Screen><Empty title="Ye transfer is phone par nahi mila" /></Screen>;
   const tone = t.status === 'received' ? 'ok' : t.status === 'dispatched' ? 'warn' : t.status === 'cancelled' ? 'danger' : 'neutral';
 
   return (
@@ -39,17 +39,17 @@ export default function TransferDetail() {
         <Card style={{ gap: 0 }}>
           <KV k="Number" v={t.doc_no ?? '—'} mono />
           <KV k="Date" v={t.doc_date} />
-          {t.dispatched_at ? <KV k="Dispatched" v={new Date(t.dispatched_at).toLocaleString('en-IN')} /> : null}
-          {t.received_at ? <KV k="Received" v={new Date(t.received_at).toLocaleString('en-IN')} /> : null}
-          {t.notes ? <KV k="Notes" v={t.notes} /> : null}
+          {t.dispatched_at ? <KV k="Bhej diya" v={new Date(t.dispatched_at).toLocaleString('en-IN')} /> : null}
+          {t.received_at ? <KV k="Aa gaya" v={new Date(t.received_at).toLocaleString('en-IN')} /> : null}
+          {t.notes ? <KV k="Note" v={t.notes} /> : null}
         </Card>
         {t.status === 'dispatched' && can('stock.transfer') ? (
           <Row gap={space.sm}>
-            <Button title={`Receive at ${t.to_name}`} size="lg" style={{ flex: 1 }} loading={busy} onPress={async () => { if (await confirm('Receive transfer?', 'Stock arrives at the destination now.')) run('Received.', () => db.writeTransaction((tx) => receiveTransfer(tx, t.id, actor))); }} />
-            <Button title="Cancel" tone="danger" onPress={async () => { if (await confirm('Cancel transfer?', 'Stock returns to the source.')) run('Cancelled.', () => db.writeTransaction((tx) => cancelTransfer(tx, t.id, actor))); }} />
+            <Button title={`Receive at ${t.to_name}`} size="lg" style={{ flex: 1 }} loading={busy} onPress={async () => { if (await confirm('Transfer le lein?', 'Stock arrives at the destination now.')) run('Received.', () => db.writeTransaction((tx) => receiveTransfer(tx, t.id, actor))); }} />
+            <Button title="Rehne do" tone="danger" onPress={async () => { if (await confirm('Transfer cancel karein?', 'Stock returns to the source.')) run('Cancel ho gaya.', () => db.writeTransaction((tx) => cancelTransfer(tx, t.id, actor))); }} />
           </Row>
         ) : null}
-        <SectionTitle>Items</SectionTitle>
+        <SectionTitle>Maal</SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(lines ?? []).map((l) => <ListRow key={l.id} title={l.description} subtitle={l.sku} right={<View style={{ alignItems: 'flex-end' }}><Text mono>{l.qty}</Text></View>} />)}
         </Card>

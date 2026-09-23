@@ -61,7 +61,7 @@ export default function SpecEditor() {
     const name = form.name?.trim();
     const code = (form.code?.trim() || slug(name ?? '', 20).toLowerCase()).toLowerCase().replace(/[^a-z0-9_]+/g, '_');
     if (!name || !code) {
-      notify('Name is required.');
+      notify('Naam likho.');
       return;
     }
     const dup = await db.execute('SELECT id FROM spec_definitions WHERE family_id = ? AND code = ? AND id <> ?', [familyId, code, existing?.id ?? '']);
@@ -86,7 +86,7 @@ export default function SpecEditor() {
     if (existing) {
       await updateRow(db, 'spec_definitions', existing.id, payload);
       setDirty(false);
-      notify('Saved.');
+      notify('Save ho gaya.');
     } else {
       const newId = await insertRow(db, 'spec_definitions', payload);
       router.replace(`/admin/spec/${newId}`);
@@ -98,7 +98,7 @@ export default function SpecEditor() {
     const v = newOption.trim();
     if (!v) return;
     if ((options ?? []).some((o) => o.value.toLowerCase() === v.toLowerCase())) {
-      notify('That value already exists.');
+      notify('Ye value pehle se hai.');
       return;
     }
     await insertRow(db, 'spec_options', {
@@ -114,7 +114,7 @@ export default function SpecEditor() {
 
   async function toggleOption(o: Opt) {
     if (o.is_active && o.used > 0) {
-      const ok = await confirm('Retire this value?', `“${o.value}” is used by ${o.used} product${o.used === 1 ? '' : 's'}. It will stay on them but disappear from new selections.`);
+      const ok = await confirm('Ye value band karein?', `“${o.value}” is used by ${o.used} product${o.used === 1 ? '' : 's'}. It will stay on them but disappear from new selections.`);
       if (!ok) return;
     }
     await updateRow(db, 'spec_options', o.id, { is_active: !o.is_active });
@@ -141,9 +141,9 @@ export default function SpecEditor() {
           {fam ? <Badge>{fam.name}</Badge> : null}
         </Row>
 
-        <FormSection title="Field">
+        <FormSection title="Khaana">
           <Input
-            label="Name"
+            label="Naam"
             value={form.name ?? ''}
             onChangeText={(v) => {
               set('name', v);
@@ -160,19 +160,19 @@ export default function SpecEditor() {
               set('code', v.toLowerCase());
             }}
             autoCapitalize="none"
-            hint="Stable key used in SKU templates and imports. Lowercase, no spaces."
+            hint="SKU template aur import mein isi se pehchana jaata hai. Chhote akshar, beech mein space nahi."
             editable={editable && !existing}
           />
-          <SelectField label="Data type" value={form.data_type} options={TYPES} onChange={(v) => set('data_type', v ?? 'select')} />
+          <SelectField label="Kis type ka data" value={form.data_type} options={TYPES} onChange={(v) => set('data_type', v ?? 'select')} />
           {form.data_type === 'number' ? <Input label="Unit" value={form.unit ?? ''} onChangeText={(v) => set('unit', v)} placeholder="W, V, lm, K, mm, dB" editable={editable} /> : null}
-          <Input label="Help text" value={form.help_text ?? ''} onChangeText={(v) => set('help_text', v)} placeholder="Shown under the field on the product form" editable={editable} />
+          <Input label="Madad ki line" value={form.help_text ?? ''} onChangeText={(v) => set('help_text', v)} placeholder="Item ke form mein khaane ke neeche dikhega" editable={editable} />
         </FormSection>
 
-        <FormSection title="Behaviour">
-          <SwitchRow label="Required" value={!!form.is_required} onChange={(v) => set('is_required', v ? 1 : 0)} />
-          <SwitchRow label="Variant axis" hint="Each value becomes a separate SKU with its own stock and price (Socket, Colour, Size)." value={!!form.is_variant_axis} onChange={(v) => set('is_variant_axis', v ? 1 : 0)} />
-          <SwitchRow label="Show in variant name" hint="“H4 60W Pair” is built from these fields." value={!!form.show_in_variant_name} onChange={(v) => set('show_in_variant_name', v ? 1 : 0)} />
-          <SwitchRow label="Filterable" hint="Appears as a filter chip in search results." value={!!form.is_filterable} onChange={(v) => set('is_filterable', v ? 1 : 0)} />
+        <FormSection title="Kaise chale">
+          <SwitchRow label="Bharna zaroori hai" value={!!form.is_required} onChange={(v) => set('is_required', v ? 1 : 0)} />
+          <SwitchRow label="Isse alag type bante hain" hint="Har value ka apna SKU banta hai, apna stock aur apna rate (Socket, Colour, Size)." value={!!form.is_variant_axis} onChange={(v) => set('is_variant_axis', v ? 1 : 0)} />
+          <SwitchRow label="Type ke naam mein dikhao" hint="“H4 60W Pair” isi tarah ke khaano se banta hai." value={!!form.show_in_variant_name} onChange={(v) => set('show_in_variant_name', v ? 1 : 0)} />
+          <SwitchRow label="Isse chhaant sakte ho" hint="Dhoondne par chip ban kar dikhega." value={!!form.is_filterable} onChange={(v) => set('is_filterable', v ? 1 : 0)} />
           {existing ? <SwitchRow label="Active" value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} /> : null}
         </FormSection>
 
@@ -180,12 +180,12 @@ export default function SpecEditor() {
 
         {existing && isList ? (
           <>
-            <SectionTitle>Allowed values · {(options ?? []).filter((o) => o.is_active).length}</SectionTitle>
+            <SectionTitle>Jo value chal sakti hain · {(options ?? []).filter((o) => o.is_active).length}</SectionTitle>
             {editable ? (
               <Row gap={8} align="flex-end">
                 <Input containerStyle={{ flex: 2 }} label="Value" value={newOption} onChangeText={setNewOption} placeholder="H15" onSubmitEditing={addOption} />
                 <Input containerStyle={{ flex: 1 }} label="SKU code" value={newCode} onChangeText={(v) => setNewCode(v.toUpperCase())} placeholder="H15" autoCapitalize="characters" />
-                <Button title="Add" onPress={addOption} disabled={!newOption.trim()} />
+                <Button title="Jodo" onPress={addOption} disabled={!newOption.trim()} />
               </Row>
             ) : null}
             <Card style={{ gap: 0, paddingVertical: 4 }}>

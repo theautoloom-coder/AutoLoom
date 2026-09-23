@@ -124,7 +124,7 @@ export default function ProductScreen() {
   if (!product) {
     return (
       <Screen>
-        <Empty title="Product not found on this device" hint="It may not have synced yet." />
+        <Empty title="Ye item is phone par nahi mila" hint="Shayad abhi sync nahi hua." />
       </Screen>
     );
   }
@@ -137,13 +137,13 @@ export default function ProductScreen() {
           <Row gap={space.xs} wrap>
             {product.family_name ? <Badge tone="accent">{product.family_name}</Badge> : null}
             {product.brand_name ? <Badge>{product.brand_name}</Badge> : null}
-            {product.is_universal_fit ? <Badge tone="info">Universal fit</Badge> : null}
+            {product.is_universal_fit ? <Badge tone="info">Sab gaadi mein lagta hai</Badge> : null}
           </Row>
           <Row style={{ justifyContent: 'space-between' }} align="flex-start">
             <Text variant="display" style={{ marginTop: space.xs, flex: 1 }}>
               {product.name}
             </Text>
-            {can('catalog.edit') ? <Button title="Edit" tone="secondary" size="sm" onPress={() => router.push(`/admin/product/${product.id}`)} /> : null}
+            {can('catalog.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/admin/product/${product.id}`)} /> : null}
           </Row>
           {product.description ? (
             <Text variant="small" color="textMuted">
@@ -153,7 +153,7 @@ export default function ProductScreen() {
         </View>
 
         {/* Variants */}
-        <SectionTitle>Variants · {variants?.length ?? 0}</SectionTitle>
+        <SectionTitle>Type · {variants?.length ?? 0}</SectionTitle>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.xs }}>
           {(variants ?? []).map((v) => (
             <Chip key={v.id} label={`${v.variant_name} · ${v.qty}`} selected={v.id === variant?.id} onPress={() => setSelectedId(v.id)} />
@@ -190,11 +190,11 @@ export default function ProductScreen() {
               {can('stock.adjust') ? (
                 <Button title="Maal aaya" size="sm" onPress={() => router.push(`/stock/add?variant=${variant.id}` as never)} />
               ) : null}
-              <Button title="Movement history" tone="ghost" size="sm" onPress={() => router.push(`/stock/ledger/${variant.id}`)} />
+              <Button title="Aana-jaana ka hisaab" tone="ghost" size="sm" onPress={() => router.push(`/stock/ledger/${variant.id}`)} />
             </Row>
             {variant.min_stock || variant.reorder_level ? (
               <Text variant="small" color="textFaint">
-                Minimum {variant.min_stock} · reorder at {variant.reorder_level} · suggested order {variant.reorder_qty}
+                Kam se kam {variant.min_stock} · {variant.reorder_level} par mangwao · sujhaav {variant.reorder_qty}
               </Text>
             ) : null}
 
@@ -205,10 +205,10 @@ export default function ProductScreen() {
                   Prices
                 </Text>
                 {variant.mrp ? <KV k="MRP" v={formatINR(variant.mrp)} mono /> : null}
-                <KV k="Retail" v={formatINR(variant.retail_price)} mono />
-                {variant.dealer_price ? <KV k="Dealer" v={formatINR(variant.dealer_price)} mono /> : null}
-                {variant.wholesale_price ? <KV k="Wholesale" v={formatINR(variant.wholesale_price)} mono /> : null}
-                {variant.min_selling_price ? <KV k="Minimum selling price" v={formatINR(variant.min_selling_price)} mono /> : null}
+                <KV k="Retail rate" v={formatINR(variant.retail_price)} mono />
+                {variant.dealer_price ? <KV k="Dealer rate" v={formatINR(variant.dealer_price)} mono /> : null}
+                {variant.wholesale_price ? <KV k="Thok rate" v={formatINR(variant.wholesale_price)} mono /> : null}
+                {variant.min_selling_price ? <KV k="Isse kam nahi bechna" v={formatINR(variant.min_selling_price)} mono /> : null}
               </>
             ) : null}
 
@@ -218,11 +218,11 @@ export default function ProductScreen() {
                 <Text variant="label" color="textMuted">
                   Cost & margin
                 </Text>
-                <KV k="Last purchase cost" v={formatINR(variant.last_purchase_cost)} mono />
-                <KV k="Average cost" v={formatINR(variant.avg_cost)} mono />
+                <KV k="Pichhla kharid rate" v={formatINR(variant.last_purchase_cost)} mono />
+                <KV k="Average kharid rate" v={formatINR(variant.avg_cost)} mono />
                 {(() => {
                   const m = margin(variant.dealer_price ?? variant.retail_price, variant.avg_cost);
-                  return <KV k="Margin at dealer price" v={`${formatINR(m.amount)} · ${m.pct}%`} mono />;
+                  return <KV k="Dealer rate par margin" v={`${formatINR(m.amount)} · ${m.pct}%`} mono />;
                 })()}
               </>
             ) : null}
@@ -232,7 +232,7 @@ export default function ProductScreen() {
         {/* Customer pricing */}
         {showPrice && variant ? (
           <>
-            <SectionTitle>Price for a customer</SectionTitle>
+            <SectionTitle>Kisi grahak ka rate</SectionTitle>
             <Card>
               {customer ? (
                 <Row style={{ justifyContent: 'space-between' }}>
@@ -250,7 +250,7 @@ export default function ProductScreen() {
                 </Row>
               ) : (
                 <>
-                  <Input value={customerQuery} onChangeText={setCustomerQuery} placeholder="Customer name or mobile" autoCapitalize="none" />
+                  <Input value={customerQuery} onChangeText={setCustomerQuery} placeholder="Grahak ka naam ya mobile" autoCapitalize="none" />
                   {tokenize(customerQuery).length > 0
                     ? (customerHits ?? []).map((c) => (
                         <ListRow
@@ -284,8 +284,8 @@ export default function ProductScreen() {
                   </Row>
                   {can('catalog.edit_price') ? (
                     <Row gap={8} align="flex-end">
-                      <View style={{ flex: 1 }}><NumberField label="Set special price for this customer" value={specialPrice} onChange={setSpecialPrice} placeholder={String(resolved.price)} /></View>
-                      <Button title="Save" size="sm" tone="secondary" disabled={!specialPrice} onPress={async () => {
+                      <View style={{ flex: 1 }}><NumberField label="Is grahak ke liye special rate" value={specialPrice} onChange={setSpecialPrice} placeholder={String(resolved.price)} /></View>
+                      <Button title="Save karo" size="sm" tone="secondary" disabled={!specialPrice} onPress={async () => {
                         if (!specialPrice || !variant) return;
                         await insertRow(db, 'customer_prices', { customer_id: customer.id, variant_id: variant.id, price: specialPrice, effective_from: new Date().toISOString().slice(0, 10), approved_by: profile?.id ?? null }, actor);
                         setSpecialPrice(null);
@@ -313,9 +313,9 @@ export default function ProductScreen() {
         ) : null}
 
         {/* Specifications */}
-        <SectionTitle>Specifications</SectionTitle>
+        <SectionTitle>Spec</SectionTitle>
         <Card style={{ gap: 0 }}>
-          {productSpecs.length === 0 && axisDefs.length === 0 ? <Empty title="No specifications recorded" /> : null}
+          {productSpecs.length === 0 && axisDefs.length === 0 ? <Empty title="Koi spec nahi likha" /> : null}
           {variant
             ? axisDefs.map((d) => <KV key={d.spec_definition_id} k={d.name} v={specFor(variant.id, d.spec_definition_id)} />)
             : null}
@@ -332,7 +332,7 @@ export default function ProductScreen() {
         {/* Compare variants */}
         {variants && variants.length > 1 && axisDefs.length > 0 ? (
           <>
-            <SectionTitle>Compare variants</SectionTitle>
+            <SectionTitle>Alag-alag type mila ke dekho</SectionTitle>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <Card style={{ gap: 0, minWidth: 320 }}>
                 <Row gap={space.md} style={{ paddingVertical: 6 }}>
@@ -382,12 +382,12 @@ export default function ProductScreen() {
         ) : null}
 
         {/* Fitment */}
-        <SectionTitle>Compatible vehicles</SectionTitle>
+        <SectionTitle>Kis gaadi mein lagta hai</SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {product.is_universal_fit && effectiveFitments.length === 0 ? (
-            <Empty title="Universal fit" hint="Sold by specification (socket, size) rather than by vehicle." />
+            <Empty title="Sab gaadi mein lagta hai" hint="Ye spec se bikta hai (socket, size), gaadi se nahi." />
           ) : effectiveFitments.length === 0 ? (
-            <Empty title="No fitment recorded" />
+            <Empty title="Koi gaadi nahi jodi" />
           ) : (
             effectiveFitments.map((f) => (
               <ListRow
@@ -404,14 +404,14 @@ export default function ProductScreen() {
         {/* History */}
         {showCost ? (
           <>
-            <SectionTitle>Purchase history · {variant?.variant_name}</SectionTitle>
+            <SectionTitle>Kharid ka hisaab · {variant?.variant_name}</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {purchases && purchases.length > 0 ? (
                 purchases.map((p) => (
                   <ListRow key={p.id} title={p.supplier_name} subtitle={`${p.doc_no} · ${p.doc_date}`} right={<Text mono>{p.qty} @ {formatINR(p.rate)}</Text>} />
                 ))
               ) : (
-                <Empty title="No purchases recorded" hint="Opening stock came from the go-live import." />
+                <Empty title="Koi purchase nahi mila" hint="Shuruaati stock import se aaya tha." />
               )}
             </Card>
           </>
@@ -419,14 +419,14 @@ export default function ProductScreen() {
 
         {showPrice ? (
           <>
-            <SectionTitle>Sales history · {variant?.variant_name}</SectionTitle>
+            <SectionTitle>Bikri ka hisaab · {variant?.variant_name}</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {sales && sales.length > 0 ? (
                 sales.map((s) => (
                   <ListRow key={s.id} title={s.customer_name} subtitle={`${s.doc_no} · ${s.doc_date}`} right={<Text mono>{s.qty} @ {formatINR(s.rate)}</Text>} />
                 ))
               ) : (
-                <Empty title="Not sold yet" />
+                <Empty title="Abhi tak nahi bika" />
               )}
             </Card>
           </>

@@ -90,11 +90,11 @@ function useNavItems(): NavItem[] {
   const { permissions } = useSession();
   const sections = visibleSections(permissions);
   return [
-    { key: 'index', href: '/', title: 'Home', symbol: 'home' },
-    { key: 'search', href: '/search', title: 'Search', symbol: 'search' },
-    { key: 'sell', href: '/sell', title: 'Billing', symbol: 'receipt-outline', visible: sections.sell },
+    { key: 'index', href: '/', title: 'Ghar', symbol: 'home' },
+    { key: 'search', href: '/search', title: 'Dhoondo', symbol: 'search' },
+    { key: 'sell', href: '/sell', title: 'Bill', symbol: 'receipt-outline', visible: sections.sell },
     { key: 'stock', href: '/stock', title: 'Stock', symbol: 'cube-outline', visible: sections.stock },
-    { key: 'more', href: '/more', title: 'More', symbol: 'ellipsis-horizontal' },
+    { key: 'more', href: '/more', title: 'Aur', symbol: 'ellipsis-horizontal' },
   ];
 }
 

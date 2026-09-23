@@ -24,13 +24,13 @@ export default function SuppliersScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Suppliers</Text>
-        {can('party.edit') ? <Button title="New supplier" onPress={() => router.push('/supplier/edit')} /> : null}
+        <Text variant="display">Supplier</Text>
+        {can('party.edit') ? <Button title="Naya supplier" onPress={() => router.push('/supplier/edit')} /> : null}
       </Row>
-      <Input value={q} onChangeText={setQ} placeholder="Name, company, mobile, GSTIN, city" autoCapitalize="none" />
+      <Input value={q} onChangeText={setQ} placeholder="Naam, firm, mobile, GSTIN, shehar" autoCapitalize="none" />
       {can('reports.view') || can('payment.pay_supplier') ? (
         <Text variant="small" color="textMuted">
-          Payable across {visible.length} suppliers: <Text variant="small" mono>{formatINR(payable)}</Text>
+          {visible.length} supplier ko kul dena: <Text variant="small" mono>{formatINR(payable)}</Text>
         </Text>
       ) : null}
       <Card style={{ gap: 0, paddingVertical: 4 }}>
@@ -43,12 +43,12 @@ export default function SuppliersScreen() {
             onPress={() => router.push(`/supplier/${s.id}`)}
             right={
               <View style={{ alignItems: 'flex-end' }}>
-                {s.balance ? <Text mono color={s.balance > 0 ? 'warn' : 'ok'}>{formatINR(s.balance)}</Text> : <Text variant="small" color="textFaint">settled</Text>}
+                {s.balance ? <Text mono color={s.balance > 0 ? 'warn' : 'ok'}>{formatINR(s.balance)}</Text> : <Text variant="small" color="textFaint">chukta</Text>}
               </View>
             }
           />
         ))}
-        {visible.length === 0 ? <Empty title="No suppliers match" /> : null}
+        {visible.length === 0 ? <Empty title="Koi supplier nahi mila" /> : null}
       </Card>
     </Screen>
   );

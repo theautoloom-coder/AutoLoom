@@ -1,3 +1,4 @@
+import { statusLabel } from '@domain';
 /**
  * Count sheet. Anyone with stock.count enters counts (scan or search, type
  * the number). Differences show live. Close needs stock.adjust and writes one
@@ -73,7 +74,7 @@ export default function AuditSheet() {
     if (!a) return;
     const uncounted = (lines ?? []).length - counted;
     const msg = `${diffs.length} SKU${diffs.length === 1 ? '' : 's'} differ and will be adjusted.${uncounted ? ` ${uncounted} uncounted SKUs are left as they are.` : ''}`;
-    if (!(await confirm('Close audit?', msg))) return;
+    if (!(await confirm('Ginti band karein?', msg))) return;
     setBusy(true);
     try {
       let res: { docNo: string | null; lines: number } = { docNo: null, lines: 0 };
@@ -82,7 +83,7 @@ export default function AuditSheet() {
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!a) return <Screen><Empty title="Audit not found on this device" /></Screen>;
+  if (!a) return <Screen><Empty title="Ye ginti is phone par nahi mili" /></Screen>;
 
   return (
     <>
@@ -90,7 +91,7 @@ export default function AuditSheet() {
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}>
           <View><Text variant="display">{a.name}</Text><Text color="textMuted">{a.location_name}{a.doc_no ? ` · ${a.doc_no}` : ''}</Text></View>
-          <Badge tone={a.status === 'closed' ? 'ok' : 'warn'}>{a.status}</Badge>
+          <Badge tone={a.status === 'closed' ? 'ok' : 'warn'}>{statusLabel(a.status)}</Badge>
         </Row>
         <Card tone="alt">
           <Row gap={space.lg} wrap>
@@ -98,13 +99,13 @@ export default function AuditSheet() {
             <View><Text variant="label" color="textMuted">Differences</Text><Text variant="number" style={{ color: diffs.length ? t.warn : t.ok }}>{diffs.length}</Text></View>
           </Row>
           {open && can('stock.adjust') ? <Button title="Close audit & post differences" onPress={close} loading={busy} /> : null}
-          {open && !can('stock.adjust') ? <Text variant="small" color="textMuted">Counting is open. An owner or admin closes the audit to apply differences.</Text> : null}
-          {a.status === 'closed' && a.adjustment_id ? <Button title="View adjustment" tone="secondary" onPress={() => router.push(`/adjustment/${a.adjustment_id}`)} /> : null}
+          {open && !can('stock.adjust') ? <Text variant="small" color="textMuted">Ginti chal rahi hai. Owner ya admin band karega tabhi farak lagega.</Text> : null}
+          {a.status === 'closed' && a.adjustment_id ? <Button title="Adjustment dekho" tone="secondary" onPress={() => router.push(`/adjustment/${a.adjustment_id}`)} /> : null}
         </Card>
 
         {open && can('stock.count') ? (
           <Card>
-            <Text variant="label" color="textMuted">Scan or search</Text>
+            <Text variant="label" color="textMuted">Scan karo ya dhoondo</Text>
             <VariantPicker onPick={addUnlisted} locationId={a.location_id} autoFocus={false} />
           </Card>
         ) : null}
@@ -112,7 +113,7 @@ export default function AuditSheet() {
         <Row gap={space.xs} wrap>
           <Chip label={`Uncounted · ${(lines ?? []).length - counted}`} selected={filter === 'uncounted'} onPress={() => setFilter('uncounted')} />
           <Chip label={`Differences · ${diffs.length}`} selected={filter === 'diff'} onPress={() => setFilter('diff')} />
-          <Chip label="All" selected={filter === 'all'} onPress={() => setFilter('all')} />
+          <Chip label="Sab" selected={filter === 'all'} onPress={() => setFilter('all')} />
         </Row>
         <Input value={q} onChangeText={setQ} placeholder="Filter sheet" autoCapitalize="none" />
 

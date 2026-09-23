@@ -267,7 +267,7 @@ export default function ItemForm() {
               <NumberField label="Qty" value={qty} onChange={setQty} decimals={0} placeholder="10" hint={isNew ? undefined : 'Stock yahan se nahi badalta'} />
             </View>
             <View style={{ flex: 1 }}>
-              <NumberField label="Selling price" value={price} onChange={setPrice} placeholder="1550" />
+              <NumberField label="Bechne ka rate" value={price} onChange={setPrice} placeholder="1550" />
             </View>
           </Row>
         </FormSection>
@@ -284,7 +284,7 @@ export default function ItemForm() {
             <Input containerStyle={{ flex: 1 }} label="Colour" value={colour} onChangeText={setColour} placeholder="Black" />
           </Row>
           <SelectField
-            label="Car"
+            label="Gaadi"
             value={modelId}
             options={(models ?? []).map((m) => ({ value: m.id, label: `${m.make_name} ${m.name}` }))}
             onChange={setModelId}
@@ -318,7 +318,7 @@ export default function ItemForm() {
             loading={saving}
             style={{ flex: 1 }}
           />
-          <Button title="Cancel" tone="secondary" onPress={() => router.back()} />
+          <Button title="Rehne do" tone="secondary" onPress={() => router.back()} />
         </Row>
       </Screen>
     </>

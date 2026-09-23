@@ -1,3 +1,4 @@
+import { statusLabel } from '@domain';
 import { useQuery } from '@powersync/react';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -20,17 +21,17 @@ export default function AdjustmentsScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Adjustments</Text>
-        {can('stock.count') || can('stock.adjust') ? <Button title="New adjustment" onPress={() => router.push('/adjustment/edit')} /> : null}
+        <Text variant="display">Adjustment</Text>
+        {can('stock.count') || can('stock.adjust') ? <Button title="Naya adjustment" onPress={() => router.push('/adjustment/edit')} /> : null}
       </Row>
-      <Text variant="small" color="textMuted">Damage, missing, found, wrong entry. Anyone who counts can draft one; posting needs the stock.adjust permission and is logged.</Text>
+      <Text variant="small" color="textMuted">Damage, kam nikla, extra mila, galat entry. Ginti karne wala koi bhi draft bana sakta hai; post karne ke liye permission chahiye aur record rehta hai.</Text>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {(rows ?? []).map((a) => (
           <ListRow key={a.id} title={`${a.reason.replace('_', ' ')} · ${a.location_name}`} subtitle={`${a.doc_no ?? 'Draft'} · ${a.doc_date} · ${a.lines} lines${a.notes ? ` · ${a.notes}` : ''}`}
             onPress={() => router.push(a.status === 'draft' ? `/adjustment/edit?id=${a.id}` : `/adjustment/${a.id}`)}
-            right={<View style={{ alignItems: 'flex-end' }}><Text mono color={a.delta < 0 ? 'danger' : 'ok'}>{a.delta > 0 ? '+' : ''}{a.delta}</Text><Badge tone={a.status === 'posted' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'neutral'}>{a.status}</Badge></View>} />
+            right={<View style={{ alignItems: 'flex-end' }}><Text mono color={a.delta < 0 ? 'danger' : 'ok'}>{a.delta > 0 ? '+' : ''}{a.delta}</Text><Badge tone={a.status === 'posted' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'neutral'}>{statusLabel(a.status)}</Badge></View>} />
         ))}
-        {(rows ?? []).length === 0 ? <Empty title="No adjustments" /> : null}
+        {(rows ?? []).length === 0 ? <Empty title="Koi adjustment nahi" /> : null}
       </Card>
     </Screen>
   );

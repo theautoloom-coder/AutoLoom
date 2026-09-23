@@ -11,7 +11,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { checkCredit, checkPrice, formatINR, isInterstate, resolvePrice, toDateString } from '@domain';
+import { checkCredit, checkPrice, formatINR, isInterstate, resolvePrice, statusLabel, toDateString } from '@domain';
 
 import { CUSTOMER_LAST_RATE, CUSTOMER_PRICE_CONTEXT } from '@/lib/queries';
 import { postInvoice, totalLines, type DraftLine } from '@/lib/posting';
@@ -141,8 +141,8 @@ export default function InvoiceEdit() {
 
   async function post() {
     if (!id || !doc) return;
-    if (!doc.customer_id) { notify('Choose the customer.'); return; }
-    if (!(lines ?? []).length) { notify('Add at least one item.'); return; }
+    if (!doc.customer_id) { notify('Grahak chuno.'); return; }
+    if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
     for (const l of lines ?? []) {
       if (l.qty <= 0) { notify(`${l.description}: quantity must be positive.`); return; }
       if (l.rate <= 0 && doc.doc_type === 'invoice') { notify(`${l.description}: enter the price.`); return; }
@@ -157,7 +157,7 @@ export default function InvoiceEdit() {
     let creditOverrideBy: string | null = null;
     if (doc.doc_type === 'invoice' && credit.exceeded) {
       if (!can('sale.override_credit')) { notify(`${credit.message} Owner/admin approval needed.`); return; }
-      if (!(await confirm('Credit limit exceeded', `${credit.message}\n\nPost anyway with your approval?`))) return;
+      if (!(await confirm('Udhaar ki limit paar ho gayi', `${credit.message}\n\nPost anyway with your approval?`))) return;
       creditOverrideBy = profile?.id ?? null;
     }
     const isCN = doc.doc_type === 'credit_note';
@@ -190,12 +190,12 @@ export default function InvoiceEdit() {
   }
 
   async function discard() {
-    if (!id || !(await confirm('Discard draft?', 'The draft and its lines will be deleted.'))) return;
+    if (!id || !(await confirm('Adhoora bill chhod dein?', 'The draft and its lines will be deleted.'))) return;
     await db.writeTransaction(async (tx) => { await tx.execute('DELETE FROM sales_invoice_lines WHERE invoice_id = ?', [id]); await deleteRow(tx, 'sales_invoices', id); });
     router.back();
   }
 
-  if (!can('sale.create')) return <Screen><Text>You do not have permission to bill.</Text></Screen>;
+  if (!can('sale.create')) return <Screen><Text>Aapko bill banane ki permission nahi hai.</Text></Screen>;
   if (!doc) return <PreparingDraft what="bill" />;
   if (doc.status !== 'draft') { router.replace(`/invoice/${doc.id}`); return null; }
   const isCN = doc.doc_type === 'credit_note';
@@ -208,21 +208,21 @@ export default function InvoiceEdit() {
       <Screen>
         <Row style={{ justifyContent: 'space-between' }} align="flex-start">
           <Text variant="display">{isCN ? 'Return / credit' : gst ? 'Naya invoice' : 'Naya bill'}</Text>
-          <Text variant="mono" color="textFaint">{doc.status}</Text>
+          <Text variant="mono" color="textFaint">{statusLabel(doc.status)}</Text>
         </Row>
         {isCN && original?.[0] ? <Text variant="small" color="textMuted">Against {original[0].doc_no}. Reduce quantities to what came back and mark faulty items so they stay out of sellable stock.</Text> : null}
 
-        <FormSection title="Customer">
-          <SelectField label="Customer" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${c.customer_type}${c.balance ? ` · ${formatINR(c.balance)} pending` : ''}` }))} onChange={chooseCustomer} onCreate={() => router.push('/customer/edit')} />
+        <FormSection title="Grahak">
+          <SelectField label="Grahak" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${c.customer_type}${c.balance ? ` · ${formatINR(c.balance)} pending` : ''}` }))} onChange={chooseCustomer} onCreate={() => router.push('/customer/edit')} />
           {customer ? <CreditBlock customer={customer} credit={credit} gst={gst} interstate={interstate} /> : null}
-          {customer && (vehicles ?? []).length ? <SelectField label="Vehicle (optional)" value={doc.customer_vehicle_id} options={(vehicles ?? []).map((v) => ({ value: v.id, label: v.registration_no, sublabel: v.model_name ?? undefined }))} onChange={(v) => patch({ customer_vehicle_id: v })} allowClear /> : null}
+          {customer && (vehicles ?? []).length ? <SelectField label="Gaadi (zaroori nahi)" value={doc.customer_vehicle_id} options={(vehicles ?? []).map((v) => ({ value: v.id, label: v.registration_no, sublabel: v.model_name ?? undefined }))} onChange={(v) => patch({ customer_vehicle_id: v })} allowClear /> : null}
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} />
-            <View style={{ flex: 1 }}><SelectField label="Stock from" value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} /></View>
+            <View style={{ flex: 1 }}><SelectField label="Maal kahan se" value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} /></View>
           </Row>
         </FormSection>
 
-        <SectionTitle>Items · {(lines ?? []).length}</SectionTitle>
+        <SectionTitle>Maal · {(lines ?? []).length}</SectionTitle>
         {!isCN ? <Card><VariantPicker onPick={addLine} showPrice locationId={doc.location_id} autoFocus={false}
                 canCreate={can('catalog.edit')}
                 onCreate={(text) =>
@@ -239,18 +239,18 @@ export default function InvoiceEdit() {
               right={l.price_source && l.price_source !== 'manual' ? <Badge tone={l.price_source === 'last' ? 'info' : 'accent'}>{sourceLabel[l.price_source] ?? l.price_source}</Badge> : l.override_approved_by ? <Badge tone="warn">approved</Badge> : null}>
               <Row gap={12} wrap>
                 <View style={{ flex: 1, minWidth: 90 }}><NumberField label={`Qty${l.unit_code ? ` (${l.unit_code})` : ''}`} value={l.qty} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { qty: v ?? 0 })} decimals={3} error={!isCN && !negativeOk && l.qty > l.here ? `Only ${l.here} here` : null} /></View>
-                <View style={{ flex: 1.2, minWidth: 120 }}><NumberField label="Price" value={l.rate} onChange={(v) => setRate(l, v)} error={check.severity === 'floor' || check.severity === 'cost' ? check.message : null} hint={l.list_price != null && Math.abs(l.rate - l.list_price) > 0.005 ? `Was ${formatINR(l.list_price)}` : undefined} /></View>
-                <View style={{ flex: 1, minWidth: 90 }}><NumberField label="Disc %" value={l.discount_pct} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { discount_pct: v ?? 0 })} /></View>
+                <View style={{ flex: 1.2, minWidth: 120 }}><NumberField label="Rate" value={l.rate} onChange={(v) => setRate(l, v)} error={check.severity === 'floor' || check.severity === 'cost' ? check.message : null} hint={l.list_price != null && Math.abs(l.rate - l.list_price) > 0.005 ? `Was ${formatINR(l.list_price)}` : undefined} /></View>
+                <View style={{ flex: 1, minWidth: 90 }}><NumberField label="Chhoot %" value={l.discount_pct} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { discount_pct: v ?? 0 })} /></View>
                 {gst ? <View style={{ flex: 1, minWidth: 80 }}><NumberField label="GST %" value={l.tax_rate_pct} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { tax_rate_pct: v ?? 0 })} /></View> : null}
               </Row>
               {isCN ? (
                 <>
                   <Row gap={8} align="center" wrap>
-                    <Text variant="label" color="textMuted">Condition</Text>
+                    <Text variant="label" color="textMuted">Maal ki haalat</Text>
                     <Chip label="Good · back to stock" selected={l.return_condition !== 'damaged'} onPress={() => updateRow(db, 'sales_invoice_lines', l.id, { return_condition: 'sellable' })} />
-                    <Chip label="Faulty / damaged" selected={l.return_condition === 'damaged'} onPress={() => updateRow(db, 'sales_invoice_lines', l.id, { return_condition: 'damaged' })} />
+                    <Chip label="Kharab / toota hua" selected={l.return_condition === 'damaged'} onPress={() => updateRow(db, 'sales_invoice_lines', l.id, { return_condition: 'damaged' })} />
                   </Row>
-                  <Input label="Return note" value={l.return_note ?? ''} onChangeText={(v) => updateRow(db, 'sales_invoice_lines', l.id, { return_note: v || null })} placeholder="Wrong size · one bulb not working · box damaged" />
+                  <Input label="Wapasi ka note" value={l.return_note ?? ''} onChangeText={(v) => updateRow(db, 'sales_invoice_lines', l.id, { return_note: v || null })} placeholder="Size galat · ek bulb nahi chala · dabba toota" />
                 </>
               ) : null}
               {doc.customer_id && !isCN && l.price_source !== 'last' ? <LastRate customerId={doc.customer_id} variantId={l.variant_id} currentRate={l.rate} /> : null}
@@ -262,7 +262,7 @@ export default function InvoiceEdit() {
           );
         })}
 
-        <FormSection title="Payment & total">
+        <FormSection title="Payment aur total">
           {!isCN ? (
             <>
               <Text variant="label" color="textMuted">Payment</Text>
@@ -271,12 +271,12 @@ export default function InvoiceEdit() {
           ) : null}
           {doc.payment_mode === 'credit' && !isCN && customer?.credit_days ? <Text variant="small" color="textFaint">Due in {doc.credit_days || customer.credit_days} days</Text> : null}
           {credit.exceeded && doc.payment_mode === 'credit' ? <Card tone="alt" style={{ borderColor: t.danger }}><Text color="danger">{credit.message}</Text></Card> : null}
-          <NumberField label="Other charges (delivery, fitting)" value={doc.other_charges} onChange={(v) => patch({ other_charges: v ?? 0 })} />
+          <NumberField label="Aur kharcha (delivery, fitting)" value={doc.other_charges} onChange={(v) => patch({ other_charges: v ?? 0 })} />
           <Input label="Note on bill" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} placeholder={isCN ? 'Why returned' : 'Delivered by Ramesh · evening'} />
           <Divider />
-          {totals.totals.discount_total ? <KV k="Discount" v={`- ${formatINR(totals.totals.discount_total)}`} mono /> : null}
+          {totals.totals.discount_total ? <KV k="Chhoot" v={`- ${formatINR(totals.totals.discount_total)}`} mono /> : null}
           {gst ? (<><KV k="Taxable" v={formatINR(totals.totals.taxable_total)} mono />{interstate ? <KV k="IGST" v={formatINR(totals.totals.igst_total)} mono /> : <><KV k="CGST" v={formatINR(totals.totals.cgst_total)} mono /><KV k="SGST" v={formatINR(totals.totals.sgst_total)} mono /></>}</>) : null}
-          {doc.other_charges ? <KV k="Other charges" v={formatINR(doc.other_charges)} mono /> : null}
+          {doc.other_charges ? <KV k="Aur kharcha" v={formatINR(doc.other_charges)} mono /> : null}
           {totals.totals.round_off ? <KV k="Round off" v={formatINR(totals.totals.round_off, { paise: true })} mono /> : null}
           <View style={{ borderTopWidth: 1.5, borderTopColor: t.keyline, paddingTop: space.md, marginTop: space.xs }}>
             <Row style={{ justifyContent: 'space-between' }} align="center">
@@ -287,7 +287,7 @@ export default function InvoiceEdit() {
         </FormSection>
 
         <Row gap={space.sm}>
-          <Button title="Discard" tone="secondary" onPress={discard} />
+          <Button title="Chhod do" tone="secondary" onPress={discard} />
           <Button title={isCN ? 'Post return' : 'Bill post karo'} size="lg" onPress={post} loading={posting} style={{ flex: 1.25 }} />
         </Row>
       </Screen>

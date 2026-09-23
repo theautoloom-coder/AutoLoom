@@ -35,7 +35,7 @@ export default function SupplierScreen() {
     JOIN product_variants pv ON pv.id = pl.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY qty DESC LIMIT 20`, [id]);
   const showMoney = can('purchase.create') || can('reports.view') || can('payment.pay_supplier');
 
-  if (!s) return <Screen><Empty title="Supplier not found on this device" /></Screen>;
+  if (!s) return <Screen><Empty title="Ye supplier is phone par nahi mila" /></Screen>;
 
   let running = 0;
   const asc = [...(ledger ?? [])].reverse().map((e) => { running += e.credit - e.debit; return { ...e, running }; });
@@ -52,8 +52,8 @@ export default function SupplierScreen() {
             {s.company_name && s.company_name !== s.name ? <Text color="textMuted">{s.company_name}</Text> : null}
           </View>
           <Row gap={6}>
-            {can('payment.pay_supplier') && s.balance > 0 ? <Button title="Pay" size="sm" onPress={() => router.push(`/payment/edit?direction=out&party=${s.id}`)} /> : null}
-            {can('party.edit') ? <Button title="Edit" tone="secondary" size="sm" onPress={() => router.push(`/supplier/edit?id=${s.id}`)} /> : null}
+            {can('payment.pay_supplier') && s.balance > 0 ? <Button title="Paisa do" size="sm" onPress={() => router.push(`/payment/edit?direction=out&party=${s.id}`)} /> : null}
+            {can('party.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/supplier/edit?id=${s.id}`)} /> : null}
           </Row>
         </Row>
 
@@ -61,50 +61,50 @@ export default function SupplierScreen() {
           <Card tone="navy">
             <Row gap={space.lg} wrap>
               <View style={{ flex: 1, minWidth: 140 }}>
-                <Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Payable</Text>
+                <Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Inhe dena hai</Text>
                 <Text variant="number" color="navyText">{formatINR(s.balance)}</Text>
               </View>
               <View style={{ flex: 1, minWidth: 140 }}>
-                <Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Payment terms</Text>
+                <Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Kitne din mein dena hai</Text>
                 <Text variant="number" color="navyText">{s.payment_terms_days} days</Text>
               </View>
             </Row>
           </Card>
         ) : null}
 
-        <SectionTitle>Contact</SectionTitle>
+        <SectionTitle>Sampark</SectionTitle>
         <Card style={{ gap: 0 }}>
-          {s.contact_person ? <KV k="Contact" v={s.contact_person} /> : null}
+          {s.contact_person ? <KV k="Sampark" v={s.contact_person} /> : null}
           {s.mobile ? <KV k="Mobile" v={s.mobile} mono /> : null}
           {s.alt_phone ? <KV k="Phone" v={s.alt_phone} mono /> : null}
           {s.email ? <KV k="Email" v={s.email} /> : null}
           {s.gstin ? <KV k="GSTIN" v={s.gstin} mono /> : null}
-          <KV k="Address" v={[s.address_line1, s.address_line2, s.city, s.state_name, s.pincode].filter(Boolean).join(', ') || '—'} />
-          {s.notes ? <KV k="Notes" v={s.notes} /> : null}
+          <KV k="Pata" v={[s.address_line1, s.address_line2, s.city, s.state_name, s.pincode].filter(Boolean).join(', ') || '—'} />
+          {s.notes ? <KV k="Note" v={s.notes} /> : null}
         </Card>
 
         {showMoney ? (
           <>
-            <SectionTitle>Purchases</SectionTitle>
+            <SectionTitle>Purchase</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(purchases ?? []).map((p) => (
                 <ListRow key={p.id} title={p.doc_no ?? '(draft)'} subtitle={`${p.doc_date}${p.supplier_invoice_no ? ` · their bill ${p.supplier_invoice_no}` : ''}`}
                   right={<View style={{ alignItems: 'flex-end' }}><Text mono>{formatINR(p.grand_total)}</Text><Badge tone={p.status === 'cancelled' ? 'danger' : p.doc_type === 'debit_note' ? 'info' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>{p.status === 'cancelled' ? 'cancelled' : p.doc_type === 'debit_note' ? 'debit note' : p.paid_total >= p.grand_total ? 'paid' : p.status}</Badge></View>} />
               ))}
-              {(purchases ?? []).length === 0 ? <Empty title="No purchases yet" /> : null}
+              {(purchases ?? []).length === 0 ? <Empty title="Abhi tak kuch nahi kharida" /> : null}
             </Card>
 
-            <SectionTitle>Products supplied</SectionTitle>
+            <SectionTitle>Inse aane wala maal</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(top ?? []).map((p) => (
                 <ListRow key={p.id} title={`${p.product_name} · ${p.variant_name}`} subtitle={`${p.sku} · last ${p.last_date}`} right={<View style={{ alignItems: 'flex-end' }}><Text mono>{p.qty} pcs</Text><Text variant="small" color="textMuted" mono>@ {formatINR(p.last_rate)}</Text></View>} />
               ))}
-              {(top ?? []).length === 0 ? <Empty title="Nothing purchased yet" /> : null}
+              {(top ?? []).length === 0 ? <Empty title="Abhi tak kuch nahi kharida" /> : null}
             </Card>
 
-            <SectionTitle>Ledger</SectionTitle>
+            <SectionTitle>Khata</SectionTitle>
             <Card style={{ gap: 0 }}>
-              {desc.length === 0 ? <Empty title="No ledger entries" /> : null}
+              {desc.length === 0 ? <Empty title="Khata khaali hai" /> : null}
               {desc.map((e) => (
                 <React.Fragment key={e.id}>
                   <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">

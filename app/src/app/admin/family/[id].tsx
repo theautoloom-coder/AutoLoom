@@ -47,7 +47,7 @@ export default function FamilyEditor() {
   async function save() {
     if (!fam) return;
     if (!form.name?.trim() || !form.sku_prefix?.trim()) {
-      notify('Name and SKU prefix are required.');
+      notify('Naam aur SKU prefix zaroori hai.');
       return;
     }
     await updateRow(db, 'product_families', fam.id, {
@@ -63,7 +63,7 @@ export default function FamilyEditor() {
       is_active: !!form.is_active,
     });
     setDirty(false);
-    notify('Saved.');
+    notify('Save ho gaya.');
   }
 
   async function move(spec: Spec, dir: -1 | 1) {
@@ -103,18 +103,18 @@ export default function FamilyEditor() {
           <Badge>{fam.code}</Badge>
         </Row>
 
-        <FormSection title="Family">
-          <Input label="Name" value={form.name ?? ''} onChangeText={(v) => set('name', v)} editable={editable} />
-          <Input label="Description" value={form.description ?? ''} onChangeText={(v) => set('description', v)} editable={editable} placeholder="Shown to staff on the product wizard" />
+        <FormSection title="Category">
+          <Input label="Naam" value={form.name ?? ''} onChangeText={(v) => set('name', v)} editable={editable} />
+          <Input label="Detail" value={form.description ?? ''} onChangeText={(v) => set('description', v)} editable={editable} placeholder="Shown to staff on the product wizard" />
           <Row gap={12} align="flex-start">
             <Input containerStyle={{ flex: 1 }} label="SKU prefix" value={form.sku_prefix ?? ''} onChangeText={(v) => set('sku_prefix', v.toUpperCase())} autoCapitalize="characters" editable={editable} />
             <Input containerStyle={{ flex: 2 }} label="SKU template" value={form.sku_template ?? ''} onChangeText={(v) => set('sku_template', v)} autoCapitalize="characters" editable={editable} hint={`Tokens: {FAMILY} {BRAND} {VEHICLE} {AXES} or a spec code like {socket}. Preview: ${preview}`} />
           </Row>
-          <SwitchRow label="Vehicle-specific family" hint="Mats, seat covers, assemblies: the wizard requires a fitment and SKUs include the vehicle." value={!!form.is_fitment_required} onChange={(v) => set('is_fitment_required', v ? 1 : 0)} />
-          <SwitchRow label="Active" hint="Inactive families are hidden from the wizard but existing products remain." value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} />
+          <SwitchRow label="Gaadi ke hisaab se chalne wali category" hint="Mat, seat cover, assembly: inme gaadi batana zaroori hai aur SKU mein gaadi aati hai." value={!!form.is_fitment_required} onChange={(v) => set('is_fitment_required', v ? 1 : 0)} />
+          <SwitchRow label="Active" hint="Band category nayi jagah nahi dikhegi, par purana maal waise hi rahega." value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} />
         </FormSection>
 
-        <FormSection title="Defaults for new products" hint="Pre-filled on every product in this family; editable per product.">
+        <FormSection title="Naye maal ke liye pehle se bhara hua" hint="Is category ke har item mein pehle se bhar jaayega; har item mein badal bhi sakte ho.">
           <SelectField label="Unit" value={form.default_unit_id} options={(units ?? []).map((u) => ({ value: u.id, label: `${u.name} (${u.code})` }))} onChange={(v) => set('default_unit_id', v)} />
           <SelectField label="GST rate" value={form.default_tax_rate_id} options={(taxes ?? []).map((x) => ({ value: x.id, label: x.name }))} onChange={(v) => set('default_tax_rate_id', v)} />
           <SelectField label="HSN code" value={form.default_hsn_code} options={(hsns ?? []).map((h) => ({ value: h.code, label: h.code, sublabel: h.description ?? undefined }))} onChange={(v) => set('default_hsn_code', v)} allowClear />
@@ -122,7 +122,7 @@ export default function FamilyEditor() {
 
         {editable ? <Button title={dirty ? 'Save changes' : 'Saved'} onPress={save} disabled={!dirty} /> : null}
 
-        <SectionTitle right={editable ? <Button title="Add spec" size="sm" tone="secondary" onPress={() => router.push(`/admin/spec/new?family=${fam.id}`)} /> : undefined}>
+        <SectionTitle right={editable ? <Button title="Spec jodo" size="sm" tone="secondary" onPress={() => router.push(`/admin/spec/new?family=${fam.id}`)} /> : undefined}>
           Specification template · {(specs ?? []).filter((s) => s.is_active).length}
         </SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>

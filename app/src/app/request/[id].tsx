@@ -1,3 +1,4 @@
+import { statusLabel } from '@domain';
 /**
  * Review one request.
  *
@@ -131,7 +132,7 @@ export default function RequestReview() {
       <Screen>
         <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Text variant="display">{p?.name || 'Request'}</Text>
-          <Badge tone={tone}>{req.status}</Badge>
+          <Badge tone={tone}>{statusLabel(req.status)}</Badge>
         </Row>
 
         {req.status === 'rejected' && req.review_note ? (
@@ -154,7 +155,7 @@ export default function RequestReview() {
           <KV k="Model / saal" v={p?.year_text || '—'} />
           <Divider />
           <KV k="Qty" v={String(p?.qty ?? 0)} mono />
-          <KV k="Selling price" v={p?.price != null ? `₹${p.price}` : '—'} mono />
+          <KV k="Bechne ka rate" v={p?.price != null ? `₹${p.price}` : '—'} mono />
           <KV k="Kharid rate" v={p?.cost != null ? `₹${p.cost}` : '—'} mono />
           {p?.pack_size && p.pack_size > 1 ? (
             <KV k="Set mein" v={`${p.pack_size} ${p.pack_label || 'pcs'}`} mono />

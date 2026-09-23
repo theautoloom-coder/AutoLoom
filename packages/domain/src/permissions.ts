@@ -42,24 +42,24 @@ export const ROLES = ['admin', 'owner', 'purchase', 'sales', 'warehouse', 'accou
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  admin: 'Administrator',
-  owner: 'Owner',
-  purchase: 'Purchase',
-  sales: 'Sales',
-  warehouse: 'Warehouse',
-  accounts: 'Accounts',
+  admin: 'Admin',
+  owner: 'Maalik',
+  purchase: 'Kharid',
+  sales: 'Counter',
+  warehouse: 'Godown',
+  accounts: 'Hisaab',
   workshop: 'Workshop',
 };
 
 /** What each role does day to day, shown on the user form. */
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  admin: 'Full access including users, settings and the catalogue structure.',
-  owner: 'Everything except user administration. Sees cost and margin.',
-  purchase: 'Creates purchases, receives stock, pays suppliers.',
-  sales: 'Bills customers, receives payments, cannot change master prices.',
-  warehouse: 'Receives, transfers and counts stock. Cannot see or change prices.',
-  accounts: 'Ledgers, collections, payments and reports.',
-  workshop: 'Job cards, consumes stock at the workshop, takes payment.',
+  admin: 'Sab kuch — staff, settings aur maal ka poora dhaancha.',
+  owner: 'Staff ke alawa sab kuch. Kharid rate aur margin dikhta hai.',
+  purchase: 'Purchase banata hai, maal leta hai, supplier ko paisa deta hai.',
+  sales: 'Bill banata hai, payment leta hai. Rate nahi badal sakta.',
+  warehouse: 'Maal leta hai, transfer karta hai, ginti karta hai. Rate nahi dikhte.',
+  accounts: 'Khata, vasooli, payment aur hisaab-kitab.',
+  workshop: 'Job card, workshop ka maal lagata hai, paisa leta hai.',
 };
 
 export function can(permissions: Iterable<string>, permission: Permission): boolean {
@@ -92,4 +92,38 @@ export function visibleSections(permissions: Iterable<string>): {
     reports: set.has('reports.view'),
     admin: set.has('admin.settings') || set.has('admin.users') || set.has('catalog.edit'),
   };
+}
+
+/**
+ * What a document's status is called on screen.
+ *
+ * The stored values stay English — they are what every query, policy and
+ * posting function compares against, and renaming them would be a migration
+ * with nothing to gain. This is the display layer only.
+ */
+export const STATUS_LABELS: Record<string, string> = {
+  draft: 'adhoora',
+  posted: 'post ho gaya',
+  open: 'khula hai',
+  closed: 'band',
+  cancelled: 'cancel',
+  dispatched: 'bhej diya',
+  received: 'aa gaya',
+  settled: 'chukta',
+  partial: 'thoda jama',
+  paid: 'jama',
+  pending: 'baaki hai',
+  approved: 'haan',
+  rejected: 'mana',
+  missing: 'kam nikla',
+  ready: 'tayyar',
+  in_progress: 'chal raha hai',
+  active: 'chalu',
+  inactive: 'band',
+};
+
+/** The label for a status, falling back to the raw value for anything new. */
+export function statusLabel(status: string | null | undefined): string {
+  if (!status) return '';
+  return STATUS_LABELS[status] ?? status.replace(/_/g, ' ');
 }

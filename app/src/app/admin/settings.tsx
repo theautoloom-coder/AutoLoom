@@ -32,7 +32,7 @@ const BEHAVIOUR: Array<{ id: string; label: string; kind: 'number' | 'bool'; hin
 const TEMPLATES: Array<{ id: string; label: string; hint: string; def: string }> = [
   { id: 'wa_template_slip', label: 'Bill / slip message', hint: 'Placeholders: {name} {shop} {items} {bill_no} {total} {pending} {upi_line} {date}', def: DEFAULT_TEMPLATES.slip },
   { id: 'wa_template_reminder', label: 'Day-end payment reminder', hint: 'Placeholders: {name} {shop} {pending} {upi_line} {date}', def: DEFAULT_TEMPLATES.reminder },
-  { id: 'wa_template_paid', label: 'Payment received message', hint: 'Placeholders: {name} {shop} {amount} {mode} {pending}', def: DEFAULT_TEMPLATES.paid },
+  { id: 'wa_template_paid', label: 'Payment aane par jo message jaaye', hint: 'Placeholders: {name} {shop} {amount} {mode} {pending}', def: DEFAULT_TEMPLATES.paid },
 ];
 
 export default function SettingsScreen() {
@@ -52,8 +52,8 @@ export default function SettingsScreen() {
   const readSetting = (id: string) => { const r = settings?.find((x) => x.id === id); if (!r) return null; try { return JSON.parse(r.value); } catch { return r.value; } };
 
   async function save() {
-    if (!form.legal_name?.trim() || !form.state_code) { notify('Shop name and state are required.'); return; }
-    if (form.gstin && !isValidGstin(form.gstin)) { notify('GSTIN format is not valid.'); return; }
+    if (!form.legal_name?.trim() || !form.state_code) { notify('Dukan ka naam aur state zaroori hai.'); return; }
+    if (form.gstin && !isValidGstin(form.gstin)) { notify('GSTIN ka format theek nahi hai.'); return; }
     const payload = {
       legal_name: form.legal_name.trim(), trade_name: form.trade_name || null, gstin: form.gstin || null, pan: form.pan || null, state_code: form.state_code, state_name: form.state_name ?? '',
       address_line1: form.address_line1 || null, address_line2: form.address_line2 || null, city: form.city || null, pincode: form.pincode || null, phone: form.phone || null, email: form.email || null,
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
     if (company) await updateRow(db, 'company_settings', company.id, payload);
     else await insertRow(db, 'company_settings', payload);
     setDirty(false);
-    notify('Saved.');
+    notify('Save ho gaya.');
   }
 
   async function saveSetting(id: string, value: unknown) {
@@ -74,59 +74,59 @@ export default function SettingsScreen() {
 
   async function testWhatsApp() {
     const to = form.whatsapp_number || company?.whatsapp_number;
-    if (!to) { notify('Enter the WhatsApp Business number first.'); return; }
+    if (!to) { notify('Pehle WhatsApp Business number daalo.'); return; }
     const ok = await openWhatsApp(to, reminderMessage({ ...shop.wa, whatsappNumber: to, upiId: form.upi_id ?? shop.wa.upiId, upiPayeeName: form.upi_payee_name ?? shop.wa.upiPayeeName }, { name: 'Test', pending: 1250 }));
-    if (!ok) notify('That number does not look valid.');
+    if (!ok) notify('Ye number theek nahi lag raha.');
   }
 
   const upiId = form.upi_id ?? company?.upi_id ?? null;
   const qrPreview = upiId ? paymentQrDataUrl({ upiId, payee: form.upi_payee_name ?? company?.upi_payee_name ?? null }) : null;
 
   async function shareShopQr() {
-    if (!qrPreview) { notify('Add a UPI ID first.'); return; }
+    if (!qrPreview) { notify('Pehle UPI ID daalo.'); return; }
     await shareImageDataUrl(qrPreview, { dialogTitle: 'AutoLoom payment QR', fileName: 'shop-payment-qr.gif' });
   }
 
   return (
     <Screen>
-      <Text variant="display">Settings</Text>
+      <Text variant="display">Dukan settings</Text>
 
-      <FormSection title="WhatsApp & UPI" hint="Slips and reminders open in WhatsApp with the message ready; staff just tap Send. Messages go from the WhatsApp that is logged in on that phone (your Business number on the counter phone).">
-        <Input label="WhatsApp Business number" value={form.whatsapp_number ?? ''} onChangeText={(v) => set('whatsapp_number', v)} keyboardType="phone-pad" placeholder="98110 01100" editable={editable} hint="Printed on slips so customers can reply." />
+      <FormSection title="WhatsApp & UPI" hint="Parchi aur yaad dilane wale message WhatsApp mein pehle se tayyar khulte hain — staff bas bhej deta hai. Message usi WhatsApp se jaata hai jo us phone par logged in hai (counter wale phone par aapka Business number).">
+        <Input label="WhatsApp Business number" value={form.whatsapp_number ?? ''} onChangeText={(v) => set('whatsapp_number', v)} keyboardType="phone-pad" placeholder="98110 01100" editable={editable} hint="Parchi par chhapega taaki grahak jawab de sake." />
         <Row gap={12}>
           <Input containerStyle={{ flex: 1.3 }} label="UPI ID" value={form.upi_id ?? ''} onChangeText={(v) => set('upi_id', v)} autoCapitalize="none" placeholder="autoloom@upi" editable={editable} />
-          <Input containerStyle={{ flex: 1 }} label="Payee name" value={form.upi_payee_name ?? ''} onChangeText={(v) => set('upi_payee_name', v)} placeholder="AutoLoom" editable={editable} />
+          <Input containerStyle={{ flex: 1 }} label="Paisa kiske naam aayega" value={form.upi_payee_name ?? ''} onChangeText={(v) => set('upi_payee_name', v)} placeholder="AutoLoom" editable={editable} />
         </Row>
-        <Text variant="small" color="textFaint">Reminders include the UPI ID and a tap-to-pay link with the pending amount filled in.</Text>
+        <Text variant="small" color="textFaint">Yaad dilane wale message mein UPI ID aur ek link jaata hai jisme baaki paisa pehle se bhara hota hai.</Text>
         <Row gap={8}>
           {editable ? <Button title={dirty ? 'Save' : 'Saved'} onPress={save} disabled={!dirty} /> : null}
-          <Button title="Send test message to my number" tone="secondary" onPress={testWhatsApp} />
+          <Button title="Apne number par test message bhejo" tone="secondary" onPress={testWhatsApp} />
         </Row>
         {qrPreview ? (
           <Row gap={space.md} align="flex-start" style={{ marginTop: 4 }}>
             <Image source={{ uri: qrPreview }} style={{ width: 96, height: 96, borderRadius: radius.md }} />
             <View style={{ flex: 1, gap: 6 }}>
               <Text variant="small" color="textMuted">Your payment QR — the same one reminders can share as an image attachment (WhatsApp text can&apos;t carry an image, so it&apos;s a separate tap on the Reminders screen). Print this and stick it at the counter too.</Text>
-              <Button title="Share / print this QR" size="sm" tone="secondary" onPress={shareShopQr} />
+              <Button title="Ye QR bhejo ya print karo" size="sm" tone="secondary" onPress={shareShopQr} />
             </View>
           </Row>
         ) : null}
       </FormSection>
 
-      <SectionTitle>Message templates (Hinglish / Hindi)</SectionTitle>
+      <SectionTitle>Message ke template</SectionTitle>
       <Card>
         {TEMPLATES.map((t) => {
           const current = tpl[t.id] ?? (readSetting(t.id) as string | null) ?? t.def;
           return (
             <View key={t.id} style={{ gap: 6 }}>
               <Input label={t.label} value={current} onChangeText={(v) => setTpl((x) => ({ ...x, [t.id]: v }))} multiline numberOfLines={5} hint={t.hint} editable={editable} style={{ minHeight: 110 }} />
-              {editable ? <Row gap={8}><Button title="Save template" size="sm" tone="secondary" onPress={() => saveSetting(t.id, current).then(() => notify('Template saved.'))} /><Button title="Reset to default" size="sm" tone="ghost" onPress={() => setTpl((x) => ({ ...x, [t.id]: t.def }))} /></Row> : null}
+              {editable ? <Row gap={8}><Button title="Template save karo" size="sm" tone="secondary" onPress={() => saveSetting(t.id, current).then(() => notify('Template save ho gaya.'))} /><Button title="Wapas default par le jao" size="sm" tone="ghost" onPress={() => setTpl((x) => ({ ...x, [t.id]: t.def }))} /></Row> : null}
             </View>
           );
         })}
       </Card>
 
-      <SectionTitle>Behaviour</SectionTitle>
+      <SectionTitle>Kaise chale</SectionTitle>
       <Card>
         {BEHAVIOUR.map((s) => {
           const raw = readSetting(s.id);
@@ -135,25 +135,25 @@ export default function SettingsScreen() {
         })}
       </Card>
 
-      <FormSection title="Shop identity" hint="Printed on every bill.">
-        <Input label="Shop name" value={form.legal_name ?? ''} onChangeText={(v) => set('legal_name', v)} editable={editable} />
-        <Input label="Brand / trade name" value={form.trade_name ?? ''} onChangeText={(v) => set('trade_name', v)} editable={editable} placeholder="AutoLoom" />
+      <FormSection title="Dukan ki pehchaan" hint="Har bill par chhapega.">
+        <Input label="Dukan ka naam" value={form.legal_name ?? ''} onChangeText={(v) => set('legal_name', v)} editable={editable} />
+        <Input label="Brand / trade naam" value={form.trade_name ?? ''} onChangeText={(v) => set('trade_name', v)} editable={editable} placeholder="AutoLoom" />
         <Row gap={12}>
           <Input containerStyle={{ flex: 1 }} label="Phone" value={form.phone ?? ''} onChangeText={(v) => set('phone', v)} editable={editable} />
           <Input containerStyle={{ flex: 1 }} label="Email" value={form.email ?? ''} onChangeText={(v) => set('email', v)} editable={editable} autoCapitalize="none" />
         </Row>
-        <Input label="Address line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} editable={editable} />
-        <Input label="Address line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} editable={editable} />
+        <Input label="Pata line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} editable={editable} />
+        <Input label="Pata line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} editable={editable} />
         <Row gap={12}>
-          <Input containerStyle={{ flex: 1 }} label="City" value={form.city ?? ''} onChangeText={(v) => set('city', v)} editable={editable} />
+          <Input containerStyle={{ flex: 1 }} label="Shehar" value={form.city ?? ''} onChangeText={(v) => set('city', v)} editable={editable} />
           <Input containerStyle={{ flex: 1 }} label="PIN" value={form.pincode ?? ''} onChangeText={(v) => set('pincode', v)} editable={editable} />
         </Row>
         <SelectField label="State" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { set('state_code', v ?? ''); set('state_name', INDIAN_STATES.find((s) => s.code === v)?.name ?? ''); }} />
-        <Input label="Bill footer" value={form.invoice_footer ?? ''} onChangeText={(v) => set('invoice_footer', v)} editable={editable} placeholder="Har gaadi ka maal" />
+        <Input label="Bill ke neeche ki line" value={form.invoice_footer ?? ''} onChangeText={(v) => set('invoice_footer', v)} editable={editable} placeholder="Har gaadi ka maal" />
         <Input label="Terms (printed on bill)" value={form.invoice_terms ?? ''} onChangeText={(v) => set('invoice_terms', v)} editable={editable} multiline />
       </FormSection>
 
-      <FormSection title="GST details (only if GST on bills is on)">
+      <FormSection title="GST ki detail (tabhi jab bill par GST on ho)">
         <Input label="GSTIN" value={form.gstin ?? ''} onChangeText={(v) => { const g = v.toUpperCase(); set('gstin', g); const sc = stateCodeFromGstin(g); const st = INDIAN_STATES.find((s) => s.code === sc); if (st) { set('state_code', st.code); set('state_name', st.name); } if (g.length === 15) set('pan', g.slice(2, 12)); }} autoCapitalize="characters" editable={editable} error={form.gstin && !isValidGstin(form.gstin) ? 'Not a valid format' : null} />
         <Input label="PAN" value={form.pan ?? ''} onChangeText={(v) => set('pan', v.toUpperCase())} editable={editable} />
         <Input label="Bank" value={form.bank_name ?? ''} onChangeText={(v) => set('bank_name', v)} editable={editable} />

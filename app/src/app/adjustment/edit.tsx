@@ -63,10 +63,10 @@ export default function AdjustmentEdit() {
 
   async function post() {
     if (!id || !doc) return;
-    if (!(lines ?? []).length) { notify('Add at least one item.'); return; }
-    if ((lines ?? []).some((l) => !l.qty_delta)) { notify('Every line needs a non-zero quantity change.'); return; }
-    if (!can('stock.adjust')) { notify('Saved as draft. An owner or admin must post it.'); router.replace('/adjustments'); return; }
-    if (!(await confirm('Post adjustment?', 'Stock changes immediately and the adjustment is logged with your name.'))) return;
+    if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
+    if ((lines ?? []).some((l) => !l.qty_delta)) { notify('Har line mein qty ka badlav zaroori hai.'); return; }
+    if (!can('stock.adjust')) { notify('Draft save ho gaya. Owner ya admin hi post karega.'); router.replace('/adjustments'); return; }
+    if (!(await confirm('Adjustment post karein?', 'Stock changes immediately and the adjustment is logged with your name.'))) return;
     setBusy(true);
     try {
       await db.writeTransaction(async (tx) => postAdjustment(tx, id, actor));
@@ -75,12 +75,12 @@ export default function AdjustmentEdit() {
   }
 
   async function discard() {
-    if (!id || !(await confirm('Discard draft?', 'Nothing has changed yet.'))) return;
+    if (!id || !(await confirm('Adhoora bill chhod dein?', 'Nothing has changed yet.'))) return;
     await db.writeTransaction(async (tx) => { await tx.execute('DELETE FROM stock_adjustment_lines WHERE adjustment_id = ?', [id]); await deleteRow(tx, 'stock_adjustments', id); });
     router.back();
   }
 
-  if (!can('stock.count') && !can('stock.adjust')) return <Screen><Text>You do not have permission to adjust stock.</Text></Screen>;
+  if (!can('stock.count') && !can('stock.adjust')) return <Screen><Text>Aapko stock badalne ki permission nahi hai.</Text></Screen>;
   if (!doc) return <PreparingDraft what="draft" />;
   if (doc.status !== 'draft') { router.replace(`/adjustment/${doc.id}`); return null; }
 
@@ -89,28 +89,28 @@ export default function AdjustmentEdit() {
       <Stack.Screen options={{ title: 'Stock adjustment' }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}><Text variant="display">Adjustment</Text><Badge>draft</Badge></Row>
-        <FormSection title="Why">
-          <SelectField label="Reason" value={doc.reason} options={REASONS} onChange={(v) => patch({ reason: v ?? 'other' })} />
+        <FormSection title="Kyun">
+          <SelectField label="Wajah" value={doc.reason} options={REASONS} onChange={(v) => patch({ reason: v ?? 'other' })} />
           <Row gap={12}>
             <View style={{ flex: 1 }}><SelectField label="Location" value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ location_id: v })} /></View>
             <Input containerStyle={{ flex: 1 }} label="Date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} />
           </Row>
-          <Input label="Notes" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} placeholder="What happened" />
+          <Input label="Note" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} placeholder="Kya hua tha" />
         </FormSection>
-        <SectionTitle>Items · {(lines ?? []).length}</SectionTitle>
+        <SectionTitle>Maal · {(lines ?? []).length}</SectionTitle>
         <Card><VariantPicker onPick={addLine} locationId={doc.location_id} showCost={can('catalog.view_cost')} autoFocus={false} /></Card>
         {(lines ?? []).map((l) => (
           <LineCard key={l.id} title={l.description} subtitle={`${l.sku} · ${l.here} on hand here`} onRemove={() => deleteRow(db, 'stock_adjustment_lines', l.id)}>
             <Row gap={12}>
-              <View style={{ flex: 1 }}><NumberField label="Change (+ adds, − removes)" value={l.qty_delta} onChange={(v) => updateRow(db, 'stock_adjustment_lines', l.id, { qty_delta: v ?? 0 })} decimals={3} hint={`After: ${l.here + (l.qty_delta || 0)}`} /></View>
-              {can('catalog.view_cost') ? <View style={{ flex: 1 }}><NumberField label="Unit cost" value={l.unit_cost} onChange={(v) => updateRow(db, 'stock_adjustment_lines', l.id, { unit_cost: v ?? 0 })} hint="Defaults to average cost" /></View> : null}
+              <View style={{ flex: 1 }}><NumberField label="Badlav (+ badhao, − ghatao)" value={l.qty_delta} onChange={(v) => updateRow(db, 'stock_adjustment_lines', l.id, { qty_delta: v ?? 0 })} decimals={3} hint={`After: ${l.here + (l.qty_delta || 0)}`} /></View>
+              {can('catalog.view_cost') ? <View style={{ flex: 1 }}><NumberField label="Kharid rate" value={l.unit_cost} onChange={(v) => updateRow(db, 'stock_adjustment_lines', l.id, { unit_cost: v ?? 0 })} hint="Na bharo to average kharid rate lag jaayega" /></View> : null}
             </Row>
-            <Input label="Line note" value={l.note ?? ''} onChangeText={(v) => updateRow(db, 'stock_adjustment_lines', l.id, { note: v || null })} />
+            <Input label="Is line ka note" value={l.note ?? ''} onChangeText={(v) => updateRow(db, 'stock_adjustment_lines', l.id, { note: v || null })} />
           </LineCard>
         ))}
         <Row gap={space.sm}>
           <Button title={can('stock.adjust') ? 'Post adjustment' : 'Save for approval'} size="lg" onPress={post} loading={busy} style={{ flex: 1 }} />
-          <Button title="Discard" tone="danger" onPress={discard} />
+          <Button title="Chhod do" tone="danger" onPress={discard} />
         </Row>
       </Screen>
     </>

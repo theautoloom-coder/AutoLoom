@@ -49,14 +49,14 @@ export default function FamiliesScreen() {
 
   return (
     <Screen>
-      <Text variant="display">Product families</Text>
+      <Text variant="display">Category</Text>
       <Text variant="small" color="textMuted">
         A family owns the specification template, SKU prefix and default GST. Adding one here needs no code change.
       </Text>
       {can('catalog.edit') ? (
         <Row gap={8} align="flex-end">
-          <Input containerStyle={{ flex: 1 }} value={name} onChangeText={setName} placeholder="New family, e.g. Roof Racks" onSubmitEditing={create} />
-          <Button title="Add" onPress={create} disabled={!name.trim()} />
+          <Input containerStyle={{ flex: 1 }} value={name} onChangeText={setName} placeholder="Nayi category, jaise Roof Rack" onSubmitEditing={create} />
+          <Button title="Jodo" onPress={create} disabled={!name.trim()} />
         </Row>
       ) : null}
       <Card style={{ gap: 0, paddingVertical: 4 }}>

@@ -96,12 +96,12 @@ export default function StockScreen() {
 
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {can('purchase.create') ? <ListRow title="Purchase bill" subtitle="Supplier ka bill — rate, udhaar, sab" onPress={() => router.push('/purchase/edit')} /> : null}
-            {can('purchase.create') ? <ListRow title="Purchases" subtitle="Bill, return, kitna baaki hai" onPress={() => router.push('/purchases')} /> : null}
+            {can('purchase.create') ? <ListRow title="Purchase" subtitle="Bill, return, kitna baaki hai" onPress={() => router.push('/purchases')} /> : null}
             {can('stock.transfer') ? <ListRow title="Transfer" subtitle="Godown ↔ dukan ↔ workshop" onPress={() => router.push('/transfers')} /> : null}
             {can('stock.count') || can('stock.adjust') ? <ListRow title="Adjustment" subtitle="Damage, kam nikla, extra mila" onPress={() => router.push('/adjustments')} /> : null}
             {can('stock.count') ? <ListRow title="Stock ginti" subtitle="Poora stock mila ke dekho" onPress={() => router.push('/audits')} /> : null}
             {can('payment.pay_supplier') ? <ListRow title="Payment" subtitle="Aaya hua paisa, supplier ko diya" onPress={() => router.push('/payments')} /> : null}
-            {can('purchase.create') || can('reports.view') ? <ListRow title="Kya mangwana hai" subtitle="Bikri ke hisaab se suggestion" onPress={() => router.push('/reorder')} /> : null}
+            {can('purchase.create') || can('reports.view') ? <ListRow title="Kya mangwana hai" subtitle="Bikri dekh kar batata hai kya mangwana hai" onPress={() => router.push('/reorder')} /> : null}
             {can('jobcard.edit') ? <ListRow title="Job card" subtitle="Gaadi ka kaam — parts + labour" onPress={() => router.push('/job-cards')} /> : null}
           </Card>
 
@@ -110,7 +110,7 @@ export default function StockScreen() {
             {(faulty ?? []).map((f) => (
               <ListRow key={f.id} title={`${f.product_name} · ${f.variant_name}`} subtitle={f.sku} onPress={() => router.push(`/stock/ledger/${f.id}`)} right={<Text mono color="danger">{f.qty}</Text>} />
             ))}
-            {(faulty ?? []).length === 0 ? <Empty title="Koi kharab maal nahi" hint="Returns marked faulty land here and never go back to sellable stock." /> : null}
+            {(faulty ?? []).length === 0 ? <Empty title="Koi kharab maal nahi" hint="Kharab nishaan laga hua wapas maal yahan aata hai aur bechne wale stock mein dobara nahi jaata." /> : null}
           </Card>
 
           <SectionTitle right={<Badge tone={lowFiltered.length ? 'warn' : 'ok'}>{lowFiltered.length} items</Badge>}>Khatam hone wala hai</SectionTitle>

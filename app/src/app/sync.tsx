@@ -41,13 +41,13 @@ export default function SyncScreen() {
       ) : null}
 
       <Card>
-        <KV k="Connection" v={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Connected' : 'Offline'}</Badge>} />
-        <KV k="Signed in as" v={session?.user.email ?? '—'} />
-        <KV k="Last synced" v={status.lastSyncedAt ? status.lastSyncedAt.toLocaleString('en-IN') : 'Never'} />
-        <KV k="Downloading" v={status.dataFlowStatus.downloading ? 'Yes' : 'No'} />
-        <KV k="Uploading" v={status.dataFlowStatus.uploading ? 'Yes' : 'No'} />
-        <KV k="Pending local changes" v={String(pending)} mono />
-        {progress ? <KV k="First download" v={`${progress.downloadedOperations} / ${progress.totalOperations} rows`} mono /> : null}
+        <KV k="Net" v={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Juda hua' : 'Offline'}</Badge>} />
+        <KV k="Kaun logged in hai" v={session?.user.email ?? '—'} />
+        <KV k="Aakhri sync" v={status.lastSyncedAt ? status.lastSyncedAt.toLocaleString('en-IN') : 'Kabhi nahi'} />
+        <KV k="Aa raha hai" v={status.dataFlowStatus.downloading ? 'Haan' : 'Nahi'} />
+        <KV k="Ja raha hai" v={status.dataFlowStatus.uploading ? 'Haan' : 'Nahi'} />
+        <KV k="Jo abhi bheja nahi gaya" v={String(pending)} mono />
+        {progress ? <KV k="Pehli baar aa raha hai" v={`${progress.downloadedOperations} / ${progress.totalOperations} row`} mono /> : null}
         {status.downloadError || status.uploadError ? (
           <>
             <Divider />
@@ -58,18 +58,18 @@ export default function SyncScreen() {
         ) : null}
       </Card>
 
-      <Button title="Sync now" onPress={forceSync} loading={busy} />
+      <Button title="Abhi sync karo" onPress={forceSync} loading={busy} />
 
-      <SectionTitle>How sync works here</SectionTitle>
+      <SectionTitle>Sync kaise chalta hai</SectionTitle>
       <Card tone="alt">
         <Text variant="small" color="textMuted">
-          Every screen reads and writes the database on this device, so the app works with no signal. Each change is queued and uploaded when a connection exists. A posted document, its stock movements and its ledger entries travel together as one unit, so the server never sees half an invoice.
+          Har screen isi phone ke database se padhti aur likhti hai, isliye signal na ho tab bhi app chalti hai. Har badlav ruk kar rakha jaata hai aur net aate hi chala jaata hai. Post hua document, uska stock aur uska khata — teeno saath jaate hain, isliye server ko kabhi aadha bill nahi milta.
         </Text>
       </Card>
 
       {connector.failures.length > 0 ? (
         <>
-          <SectionTitle>Rejected uploads</SectionTitle>
+          <SectionTitle>Jo upload nahi ho paaya</SectionTitle>
           <Card style={{ gap: 0 }}>
             {connector.failures.map((f, i) => (
               <React.Fragment key={`${f.id}-${i}`}>

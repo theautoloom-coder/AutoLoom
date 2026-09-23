@@ -87,7 +87,7 @@ export default function MoreScreen() {
 
   return (
     <Screen>
-      <Text variant="display">More</Text>
+      <Text variant="display">Aur</Text>
 
       <Card>
         <Row gap={space.md} align="flex-start">
@@ -98,13 +98,13 @@ export default function MoreScreen() {
               {profile ? <Badge tone="accent">{ROLE_LABELS[profile.role]}</Badge> : null}
             </Row>
             <Text variant="small" color="textMuted">
-              {profile ? ROLE_DESCRIPTIONS[profile.role] : 'Profile not synced yet. Permissions are read-only until the first sync completes.'}
+              {profile ? ROLE_DESCRIPTIONS[profile.role] : 'Profile abhi sync nahi hua. Pehla sync poora hone tak sirf dekh sakte ho.'}
             </Text>
           </View>
         </Row>
         <Divider />
         <Text variant="label" color="textMuted">
-          Working location
+          Kaam ki jagah
         </Text>
         <Row gap={space.xs} wrap>
           {(locations ?? []).map((l) => (
@@ -136,10 +136,10 @@ export default function MoreScreen() {
       <SectionTitle>Sync</SectionTitle>
       <Card style={{ gap: 0 }}>
         <ListRow
-          title="Sync status"
-          subtitle={status.connected ? (status.lastSyncedAt ? `Last synced ${status.lastSyncedAt.toLocaleTimeString('en-IN')}` : 'Connected') : 'Offline — changes are queued on this device'}
+          title="Sync ka haal"
+          subtitle={status.connected ? (status.lastSyncedAt ? `Aakhri sync ${status.lastSyncedAt.toLocaleTimeString('en-IN')}` : 'Juda hua') : 'Offline — badlav is phone par ruke hue hain'}
           onPress={() => router.push('/sync')}
-          right={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Online' : 'Offline'}</Badge>}
+          right={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Juda hua' : 'Offline'}</Badge>}
         />
       </Card>
 
@@ -172,11 +172,11 @@ export default function MoreScreen() {
 
       {Platform.OS !== 'web' ? (
         <>
-          <SectionTitle>Notifications</SectionTitle>
+          <SectionTitle>Yaad dilane wale</SectionTitle>
           <Card>
             <SwitchRow
-              label="Daily 6:30pm reminder"
-              hint="A notification on this device every evening to check pending payments and send reminders."
+              label="Roz 6:30 baje yaad dilao"
+              hint="Roz shaam is phone par yaad aayega — baaki paisa dekh lo aur yaad dila do."
               value={dailyReminder}
               onChange={toggleDailyReminder}
             />
@@ -186,31 +186,31 @@ export default function MoreScreen() {
 
       {can('reports.view') ? (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
-          <ListRow title="Reports" subtitle="Sales, GST, purchases, outstanding, stock, margin" onPress={() => router.push('/reports')} />
+          <ListRow title="Hisaab-kitab" subtitle="Bikri, GST, purchase, baaki paisa, stock, margin" onPress={() => router.push('/reports')} />
         </Card>
       ) : null}
 
-      <SectionTitle>Catalogue on this device</SectionTitle>
+      <SectionTitle>Is phone par kitna maal</SectionTitle>
       <Card style={{ gap: 0 }}>
-        <KV k="Product families" v={String(counts?.families ?? 0)} mono />
-        <KV k="Specification fields" v={`${counts?.specs ?? 0} with ${counts?.options ?? 0} options`} mono />
-        <KV k="Products / SKUs" v={`${counts?.products ?? 0} / ${counts?.variants ?? 0}`} mono />
-        <KV k="Vehicle models" v={String(counts?.models ?? 0)} mono />
-        <KV k="Fitment records" v={String(counts?.fitments ?? 0)} mono />
-        <KV k="Customers / suppliers" v={`${counts?.customers ?? 0} / ${counts?.suppliers ?? 0}`} mono />
-        <KV k="Stock movements" v={String(counts?.movements ?? 0)} mono />
+        <KV k="Category" v={String(counts?.families ?? 0)} mono />
+        <KV k="Spec ke khaane" v={`${counts?.specs ?? 0} with ${counts?.options ?? 0} options`} mono />
+        <KV k="Item / SKU" v={`${counts?.products ?? 0} / ${counts?.variants ?? 0}`} mono />
+        <KV k="Gaadi ke model" v={String(counts?.models ?? 0)} mono />
+        <KV k="Kis gaadi mein lagta hai" v={String(counts?.fitments ?? 0)} mono />
+        <KV k="Grahak / supplier" v={`${counts?.customers ?? 0} / ${counts?.suppliers ?? 0}`} mono />
+        <KV k="Stock ka aana-jaana" v={String(counts?.movements ?? 0)} mono />
       </Card>
 
       {can('catalog.edit') || can('admin.settings') ? (
         <>
           <SectionTitle>Admin</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
-            <ListRow title="Open Admin" subtitle="Catalogue, vehicles, parties, company settings" onPress={() => router.push('/admin')} />
+            <ListRow title="Admin kholo" subtitle="Maal, gaadi, party, dukan settings" onPress={() => router.push('/admin')} />
           </Card>
         </>
       ) : null}
 
-      <SectionTitle>Permissions</SectionTitle>
+      <SectionTitle>Aap kya kar sakte ho</SectionTitle>
       <Card>
         <Row gap={space.xs} wrap>
           {[...permissions].sort().map((p) => (

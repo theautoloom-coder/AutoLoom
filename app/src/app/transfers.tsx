@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 
+import { statusLabel } from '@domain';
+
 import { useSession } from '@/lib/session';
 import { Badge, Button, Card, Empty, ListRow, Row, Screen, Text } from '@/ui';
 
@@ -22,17 +24,17 @@ export default function TransfersScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Transfers</Text>
-        {can('stock.transfer') ? <Button title="New transfer" onPress={() => router.push('/transfer/edit')} /> : null}
+        <Text variant="display">Transfer</Text>
+        {can('stock.transfer') ? <Button title="Naya transfer" onPress={() => router.push('/transfer/edit')} /> : null}
       </Row>
-      <Text variant="small" color="textMuted">Stock leaves the source when dispatched and arrives at the destination when received, so goods in a van show as in transit.</Text>
+      <Text variant="small" color="textMuted">Bhejte hi maal wahan se nikal jaata hai aur pahunchne par doosri jagah chadh jaata hai — beech mein gaadi ka maal "raste mein" dikhta hai.</Text>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {(rows ?? []).map((t) => (
           <ListRow key={t.id} title={`${t.from_name} → ${t.to_name}`} subtitle={`${t.doc_no ?? 'Draft'} · ${t.doc_date} · ${t.lines} lines · ${Math.round(t.units)} units`}
             onPress={() => router.push(t.status === 'draft' ? `/transfer/edit?id=${t.id}` : `/transfer/${t.id}`)}
-            right={<View style={{ alignItems: 'flex-end' }}><Badge tone={tone(t.status)}>{t.status === 'dispatched' ? 'in transit' : t.status}</Badge></View>} />
+            right={<View style={{ alignItems: 'flex-end' }}><Badge tone={tone(t.status)}>{t.status === 'dispatched' ? 'raste mein' : statusLabel(t.status)}</Badge></View>} />
         ))}
-        {(rows ?? []).length === 0 ? <Empty title="No transfers yet" /> : null}
+        {(rows ?? []).length === 0 ? <Empty title="Abhi koi transfer nahi" /> : null}
       </Card>
     </Screen>
   );

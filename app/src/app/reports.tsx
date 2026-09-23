@@ -58,42 +58,42 @@ const REPORTS: Report[] = [
     sql: `SELECT category, COUNT(*) AS entries, SUM(amount) AS amount
           FROM expenses WHERE expense_date BETWEEN ?1 AND ?2 GROUP BY category ORDER BY amount DESC`,
     cols: [{ key: 'category', label: 'Kis cheez ka', width: 220 }, { key: 'entries', label: 'Entries', num: true }, { key: 'amount', label: 'Amount', money: true }] },
-  { key: 'sales_register', group: 'Sales', title: 'Sales register', permission: 'sale.create', dated: true,
+  { key: 'sales_register', group: 'Bikri', title: 'Bikri ka register', permission: 'sale.create', dated: true,
     sql: `SELECT i.doc_no, i.doc_date, c.name AS customer, i.payment_mode, i.taxable_total, i.cgst_total + i.sgst_total + i.igst_total AS tax, i.grand_total, i.paid_total, i.grand_total - i.paid_total AS due
           FROM sales_invoices i JOIN customers c ON c.id = i.customer_id WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2 ORDER BY i.doc_date, i.doc_no`,
     cols: [{ key: 'doc_no', label: 'Invoice', width: 160 }, { key: 'doc_date', label: 'Date' }, { key: 'customer', label: 'Customer', width: 180 }, { key: 'payment_mode', label: 'Mode' }, { key: 'taxable_total', label: 'Taxable', money: true }, { key: 'tax', label: 'Tax', money: true }, { key: 'grand_total', label: 'Total', money: true }, { key: 'due', label: 'Due', money: true }] },
-  { key: 'sales_by_product', group: 'Sales', title: 'Sales by product', permission: 'reports.view', dated: true,
+  { key: 'sales_by_product', group: 'Bikri', title: 'Item ke hisaab se bikri', permission: 'reports.view', dated: true,
     sql: `SELECT p.name AS product, pv.variant_name, pv.sku, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value, COUNT(DISTINCT i.id) AS invoices
           FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
           JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY value DESC`,
     cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'sku', label: 'SKU' }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }, { key: 'invoices', label: 'Invoices', num: true }] },
-  { key: 'sales_by_family', group: 'Sales', title: 'Sales by family', permission: 'reports.view', dated: true,
+  { key: 'sales_by_family', group: 'Bikri', title: 'Category ke hisaab se bikri', permission: 'reports.view', dated: true,
     sql: `SELECT f.name AS family, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
           JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id LEFT JOIN product_families f ON f.id = p.family_id GROUP BY f.id ORDER BY value DESC`,
     cols: [{ key: 'family', label: 'Family', width: 200 }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'sales_by_brand', group: 'Sales', title: 'Sales by brand', permission: 'reports.view', dated: true,
+  { key: 'sales_by_brand', group: 'Bikri', title: 'Brand ke hisaab se bikri', permission: 'reports.view', dated: true,
     sql: `SELECT COALESCE(b.name,'—') AS brand, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
           JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id GROUP BY b.id ORDER BY value DESC`,
     cols: [{ key: 'brand', label: 'Brand', width: 200 }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'sales_by_customer', group: 'Sales', title: 'Sales by customer', permission: 'reports.view', dated: true,
+  { key: 'sales_by_customer', group: 'Bikri', title: 'Grahak ke hisaab se bikri', permission: 'reports.view', dated: true,
     sql: `SELECT c.name AS customer, c.customer_type, COUNT(*) AS invoices, SUM(i.grand_total) AS total, SUM(i.grand_total - i.paid_total) AS due FROM sales_invoices i JOIN customers c ON c.id = i.customer_id
           WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2 GROUP BY c.id ORDER BY total DESC`,
     cols: [{ key: 'customer', label: 'Customer', width: 200 }, { key: 'customer_type', label: 'Type' }, { key: 'invoices', label: 'Invoices', num: true }, { key: 'total', label: 'Total', money: true }, { key: 'due', label: 'Due', money: true }] },
-  { key: 'sales_by_vehicle', group: 'Sales', title: 'Sales by vehicle model', permission: 'reports.view', dated: true,
+  { key: 'sales_by_vehicle', group: 'Bikri', title: 'Gaadi ke hisaab se bikri', permission: 'reports.view', dated: true,
     sql: `SELECT mk.name || ' ' || vm.name AS model, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
           JOIN product_fitments pf ON pf.product_id = (SELECT product_id FROM product_variants WHERE id = l.variant_id) AND (pf.variant_id IS NULL OR pf.variant_id = l.variant_id)
           JOIN vehicle_models vm ON vm.id = pf.model_id JOIN vehicle_makes mk ON mk.id = vm.make_id GROUP BY vm.id ORDER BY value DESC`,
     cols: [{ key: 'model', label: 'Model', width: 200 }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'sales_by_salesperson', group: 'Sales', title: 'Sales by salesperson', permission: 'reports.view', dated: true,
+  { key: 'sales_by_salesperson', group: 'Bikri', title: 'Kis aadmi ne kitna becha', permission: 'reports.view', dated: true,
     sql: `SELECT COALESCE(pr.full_name,'—') AS salesperson, COUNT(*) AS invoices, SUM(i.grand_total) AS total FROM sales_invoices i LEFT JOIN profiles pr ON pr.id = i.salesperson_id WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2 GROUP BY pr.id ORDER BY total DESC`,
-    cols: [{ key: 'salesperson', label: 'Salesperson', width: 200 }, { key: 'invoices', label: 'Invoices', num: true }, { key: 'total', label: 'Total', money: true }] },
-  { key: 'gst_sales', group: 'GST', title: 'GST sales summary (rate-wise)', permission: 'reports.view', dated: true,
+    cols: [{ key: 'salesperson', label: 'Bechne wala', width: 200 }, { key: 'invoices', label: 'Invoices', num: true }, { key: 'total', label: 'Total', money: true }] },
+  { key: 'gst_sales', group: 'GST', title: 'GST bikri ka hisaab (rate ke hisaab se)', permission: 'reports.view', dated: true,
     sql: `SELECT CASE WHEN i.customer_gstin IS NOT NULL THEN 'B2B' ELSE 'B2C' END AS type, CASE WHEN i.is_interstate THEN 'IGST' ELSE 'CGST+SGST' END AS supply, l.tax_rate_pct AS rate, l.hsn_code,
                  SUM(l.taxable_value) AS taxable, SUM(l.cgst) AS cgst, SUM(l.sgst) AS sgst, SUM(l.igst) AS igst, COUNT(DISTINCT i.id) AS docs
           FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
           GROUP BY type, supply, l.tax_rate_pct, l.hsn_code ORDER BY type, supply, rate`,
     cols: [{ key: 'type', label: 'Type' }, { key: 'supply', label: 'Supply' }, { key: 'rate', label: 'Rate %', num: true }, { key: 'hsn_code', label: 'HSN' }, { key: 'taxable', label: 'Taxable', money: true }, { key: 'cgst', label: 'CGST', money: true }, { key: 'sgst', label: 'SGST', money: true }, { key: 'igst', label: 'IGST', money: true }, { key: 'docs', label: 'Docs', num: true }] },
-  { key: 'gst_purchase', group: 'GST', title: 'GST purchase summary (input credit)', permission: 'reports.view', dated: true,
+  { key: 'gst_purchase', group: 'GST', title: 'GST purchase ka hisaab (input credit)', permission: 'reports.view', dated: true,
     sql: `SELECT s.name AS supplier, s.gstin, p.doc_no, p.supplier_invoice_no, p.doc_date, p.taxable_total, p.cgst_total, p.sgst_total, p.igst_total, p.grand_total
           FROM purchases p JOIN suppliers s ON s.id = p.supplier_id WHERE p.status='posted' AND p.doc_date BETWEEN ?1 AND ?2 ORDER BY p.doc_date`,
     cols: [{ key: 'supplier', label: 'Supplier', width: 180 }, { key: 'gstin', label: 'GSTIN' }, { key: 'doc_no', label: 'Our no.' }, { key: 'supplier_invoice_no', label: 'Their bill' }, { key: 'doc_date', label: 'Date' }, { key: 'taxable_total', label: 'Taxable', money: true }, { key: 'cgst_total', label: 'CGST', money: true }, { key: 'sgst_total', label: 'SGST', money: true }, { key: 'igst_total', label: 'IGST', money: true }, { key: 'grand_total', label: 'Total', money: true }] },
@@ -105,42 +105,42 @@ const REPORTS: Report[] = [
           FROM purchase_lines l JOIN purchases pu ON pu.id = l.purchase_id AND pu.doc_type='purchase' AND pu.status='posted' AND pu.doc_date BETWEEN ?1 AND ?2
           JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY qty DESC`,
     cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'qty', label: 'Qty', num: true }, { key: 'min_rate', label: 'Min', money: true }, { key: 'avg_rate', label: 'Avg', money: true }, { key: 'max_rate', label: 'Max', money: true }, { key: 'current_avg', label: 'Avg cost now', money: true }] },
-  { key: 'receivables', group: 'Finance', title: 'Customer outstanding & ageing', permission: 'reports.view', dated: false,
+  { key: 'receivables', group: 'Paisa', title: 'Grahak se kitna baaki, kitna purana', permission: 'reports.view', dated: false,
     sql: `SELECT c.name AS customer, c.mobile, COALESCE(pb.balance,0) AS outstanding, c.credit_limit,
                  COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) BETWEEN 1 AND 30),0) AS d0_30,
                  COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) BETWEEN 31 AND 60),0) AS d31_60,
                  COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) BETWEEN 61 AND 90),0) AS d61_90,
                  COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) > 90),0) AS d90p
           FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id WHERE COALESCE(pb.balance,0) <> 0 ORDER BY outstanding DESC`,
-    cols: [{ key: 'customer', label: 'Customer', width: 200 }, { key: 'mobile', label: 'Mobile' }, { key: 'outstanding', label: 'Outstanding', money: true }, { key: 'credit_limit', label: 'Limit', money: true }, { key: 'd0_30', label: '1-30', money: true }, { key: 'd31_60', label: '31-60', money: true }, { key: 'd61_90', label: '61-90', money: true }, { key: 'd90p', label: '90+', money: true }] },
-  { key: 'payables', group: 'Finance', title: 'Supplier outstanding', permission: 'reports.view', dated: false,
+    cols: [{ key: 'customer', label: 'Customer', width: 200 }, { key: 'mobile', label: 'Mobile' }, { key: 'outstanding', label: 'Baaki paisa', money: true }, { key: 'credit_limit', label: 'Limit', money: true }, { key: 'd0_30', label: '1-30', money: true }, { key: 'd31_60', label: '31-60', money: true }, { key: 'd61_90', label: '61-90', money: true }, { key: 'd90p', label: '90+', money: true }] },
+  { key: 'payables', group: 'Paisa', title: 'Supplier ko kitna dena hai', permission: 'reports.view', dated: false,
     sql: `SELECT s.name AS supplier, s.mobile, s.payment_terms_days, COALESCE(pb.balance,0) AS payable FROM suppliers s LEFT JOIN party_balance_live pb ON pb.party_type='supplier' AND pb.party_id=s.id WHERE COALESCE(pb.balance,0) <> 0 ORDER BY payable DESC`,
-    cols: [{ key: 'supplier', label: 'Supplier', width: 200 }, { key: 'mobile', label: 'Mobile' }, { key: 'payment_terms_days', label: 'Terms', num: true }, { key: 'payable', label: 'Payable', money: true }] },
-  { key: 'collections', group: 'Finance', title: 'Collections & payments', permission: 'reports.view', dated: true,
+    cols: [{ key: 'supplier', label: 'Supplier', width: 200 }, { key: 'mobile', label: 'Mobile' }, { key: 'payment_terms_days', label: 'Terms', num: true }, { key: 'payable', label: 'Humein dena hai', money: true }] },
+  { key: 'collections', group: 'Paisa', title: 'Collections & payments', permission: 'reports.view', dated: true,
     sql: `SELECT p.payment_date, p.doc_no, p.direction, COALESCE(c.name, s.name) AS party, p.mode, p.reference_no, p.amount FROM payments p LEFT JOIN customers c ON c.id=p.party_id AND p.party_type='customer' LEFT JOIN suppliers s ON s.id=p.party_id AND p.party_type='supplier'
           WHERE p.status='posted' AND p.payment_date BETWEEN ?1 AND ?2 ORDER BY p.payment_date`,
     cols: [{ key: 'payment_date', label: 'Date' }, { key: 'doc_no', label: 'No.' }, { key: 'direction', label: 'In/Out' }, { key: 'party', label: 'Party', width: 180 }, { key: 'mode', label: 'Mode' }, { key: 'reference_no', label: 'Ref' }, { key: 'amount', label: 'Amount', money: true }] },
-  { key: 'margin', group: 'Finance', title: 'Gross margin by product', permission: 'reports.view_margin', dated: true,
+  { key: 'margin', group: 'Paisa', title: 'Kis item par kitna bacha', permission: 'reports.view_margin', dated: true,
     sql: `SELECT p.name AS product, pv.variant_name, SUM(l.qty) AS qty, SUM(l.taxable_value) AS sales, SUM(l.unit_cost_at_sale * l.qty) AS cost, SUM(l.taxable_value) - SUM(l.unit_cost_at_sale * l.qty) AS margin,
                  ROUND((SUM(l.taxable_value) - SUM(l.unit_cost_at_sale * l.qty)) * 100.0 / NULLIF(SUM(l.taxable_value),0), 1) AS margin_pct
           FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
           JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY margin DESC`,
-    cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'qty', label: 'Qty', num: true }, { key: 'sales', label: 'Sales', money: true }, { key: 'cost', label: 'Cost', money: true }, { key: 'margin', label: 'Margin', money: true }, { key: 'margin_pct', label: '%', num: true }] },
-  { key: 'stock_valuation', group: 'Inventory', title: 'Stock valuation', permission: 'catalog.view_cost', dated: false,
+    cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'qty', label: 'Qty', num: true }, { key: 'sales', label: 'Bikri', money: true }, { key: 'cost', label: 'Cost', money: true }, { key: 'margin', label: 'Margin', money: true }, { key: 'margin_pct', label: '%', num: true }] },
+  { key: 'stock_valuation', group: 'Inventory', title: 'Stock ki keemat', permission: 'catalog.view_cost', dated: false,
     sql: `SELECT l.name AS location, f.name AS family, SUM(sl.qty) AS units, SUM(sl.qty * pv.avg_cost) AS value FROM stock_on_hand sl JOIN locations l ON l.id = sl.location_id JOIN product_variants pv ON pv.id = sl.variant_id JOIN products p ON p.id = pv.product_id LEFT JOIN product_families f ON f.id = p.family_id
           WHERE sl.qty <> 0 GROUP BY l.id, f.id ORDER BY l.sort_order, value DESC`,
     cols: [{ key: 'location', label: 'Location' }, { key: 'family', label: 'Family', width: 180 }, { key: 'units', label: 'Units', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'stock_current', group: 'Inventory', title: 'Current stock (all SKUs)', permission: 'sale.create', dated: false,
+  { key: 'stock_current', group: 'Inventory', title: 'Abhi kitna stock hai (saare SKU)', permission: 'sale.create', dated: false,
     sql: `SELECT p.name AS product, pv.variant_name, pv.sku, f.name AS family, COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id=pv.id),0) AS qty, pv.min_stock, pv.reorder_level
           FROM product_variants pv JOIN products p ON p.id = pv.product_id LEFT JOIN product_families f ON f.id = p.family_id WHERE pv.is_active=1 ORDER BY f.sort_order, p.name, pv.variant_name`,
     cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'sku', label: 'SKU' }, { key: 'family', label: 'Family' }, { key: 'qty', label: 'Qty', num: true }, { key: 'min_stock', label: 'Min', num: true }, { key: 'reorder_level', label: 'Reorder', num: true }] },
-  { key: 'dead_stock', group: 'Inventory', title: 'Slow & dead stock', permission: 'reports.view', dated: true,
+  { key: 'dead_stock', group: 'Inventory', title: 'Jo maal nahi bik raha', permission: 'reports.view', dated: true,
     sql: `SELECT p.name AS product, pv.variant_name, pv.sku, COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id=pv.id),0) AS qty, pv.avg_cost, COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id=pv.id),0) * pv.avg_cost AS value,
                  (SELECT MAX(i.doc_date) FROM sales_invoice_lines l JOIN sales_invoices i ON i.id=l.invoice_id AND i.status='posted' WHERE l.variant_id=pv.id) AS last_sold,
                  COALESCE((SELECT SUM(l.qty) FROM sales_invoice_lines l JOIN sales_invoices i ON i.id=l.invoice_id AND i.status='posted' AND i.doc_type='invoice' AND i.doc_date BETWEEN ?1 AND ?2 WHERE l.variant_id=pv.id),0) AS sold_in_period
           FROM product_variants pv JOIN products p ON p.id = pv.product_id WHERE pv.is_active=1 AND qty > 0 ORDER BY sold_in_period ASC, value DESC`,
     cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }, { key: 'last_sold', label: 'Last sold' }, { key: 'sold_in_period', label: 'Sold in period', num: true }] },
-  { key: 'stock_movements', group: 'Inventory', title: 'Stock movement summary', permission: 'reports.view', dated: true,
+  { key: 'stock_movements', group: 'Inventory', title: 'Stock ka aana-jaana', permission: 'reports.view', dated: true,
     sql: `SELECT m.movement_type, l.name AS location, COUNT(*) AS rows_, SUM(CASE WHEN m.qty>0 THEN m.qty ELSE 0 END) AS qty_in, SUM(CASE WHEN m.qty<0 THEN -m.qty ELSE 0 END) AS qty_out, SUM(m.qty*m.unit_cost) AS value
           FROM stock_movements m JOIN locations l ON l.id = m.location_id WHERE date(m.occurred_at) BETWEEN ?1 AND ?2 GROUP BY m.movement_type, l.id ORDER BY l.sort_order, m.movement_type`,
     cols: [{ key: 'movement_type', label: 'Type', width: 160 }, { key: 'location', label: 'Location' }, { key: 'rows_', label: 'Rows', num: true }, { key: 'qty_in', label: 'In', num: true }, { key: 'qty_out', label: 'Out', num: true }, { key: 'value', label: 'Value', money: true }] },
@@ -204,7 +204,7 @@ export default function ReportsScreen() {
       a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
       a.download = `autogrid-${report.key}-${from}-${to}.csv`;
       a.click();
-    } else notify('CSV export is available in the web app. On a phone, share the figures from the screen.');
+    } else notify('CSV export web par milta hai. Phone par screen se hi aankde bhej do.');
   }
 
   async function exportPdf() {
@@ -226,12 +226,12 @@ export default function ReportsScreen() {
     }
   }
 
-  if (!report) return <Screen><Empty title="No reports available for your role" /></Screen>;
+  if (!report) return <Screen><Empty title="Aapke role ke liye koi hisaab nahi hai" /></Screen>;
   const groups = [...new Set(available.map((r) => r.group))];
 
   return (
     <Screen>
-      <Text variant="display">Reports</Text>
+      <Text variant="display">Hisaab-kitab</Text>
       {groups.map((g) => (
         <View key={g} style={{ gap: 4 }}>
           <Text variant="label" color="textMuted">{g}</Text>
@@ -243,7 +243,7 @@ export default function ReportsScreen() {
           <Row gap={space.xs} wrap>
             {[['today', 'Aaj'], ['yesterday', 'Kal'], ['week', 'Is hafte'], ['last_week', 'Pichhle hafte'], ['month', 'Is mahine'], ['last_month', 'Pichhle mahine'], ['30', '30 din'], ['90', '90 din'], ['fy', 'Is saal (FY)'], ['custom', 'Apni date']].map(([k, l]) => <Chip key={k} label={l} selected={preset === k} onPress={() => setPreset(k)} />)}
           </Row>
-          {preset === 'custom' ? <Row gap={12}><Input containerStyle={{ flex: 1 }} label="From" value={custom[0]} onChangeText={(v) => setCustom([v, custom[1]])} /><Input containerStyle={{ flex: 1 }} label="To" value={custom[1]} onChangeText={(v) => setCustom([custom[0], v])} /></Row> : null}
+          {preset === 'custom' ? <Row gap={12}><Input containerStyle={{ flex: 1 }} label="Se" value={custom[0]} onChangeText={(v) => setCustom([v, custom[1]])} /><Input containerStyle={{ flex: 1 }} label="Tak" value={custom[1]} onChangeText={(v) => setCustom([custom[0], v])} /></Row> : null}
         </>
       ) : null}
       <Row style={{ justifyContent: 'space-between' }}>
@@ -269,11 +269,11 @@ export default function ReportsScreen() {
               <Row gap={0} style={{ paddingHorizontal: 8, paddingVertical: 8, backgroundColor: t.surfaceAlt }}>
                 {report.cols.map((c, i) => <Text key={c.key} variant="small" mono style={{ width: c.width ?? 110, textAlign: 'right', paddingHorizontal: 6, fontWeight: '700' }}>{i === 0 ? 'Total' : c.money ? formatINR(totals[c.key] ?? 0) : c.num && c.key !== 'margin_pct' && c.key !== 'rate' ? String(Math.round(totals[c.key] ?? 0)) : ''}</Text>)}
               </Row>
-            ) : !isLoading ? <Empty title="No rows for this period" /> : null}
+            ) : !isLoading ? <Empty title="Is waqt ka koi record nahi" /> : null}
           </View>
         </ScrollView>
       </Card>
-      {(data ?? []).length > 500 ? <Text variant="small" color="textFaint">Showing the first 500 rows; export CSV for all.</Text> : null}
+      {(data ?? []).length > 500 ? <Text variant="small" color="textFaint">Pehli 500 row dikha rahe hain — poora chahiye to CSV export karo.</Text> : null}
     </Screen>
   );
 }

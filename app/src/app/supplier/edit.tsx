@@ -46,8 +46,8 @@ export default function SupplierEdit() {
   }
 
   async function save() {
-    if (!form.name?.trim()) { notify('Supplier name is required.'); return; }
-    if (form.gstin && !isValidGstin(form.gstin)) { notify('GSTIN does not look valid.'); return; }
+    if (!form.name?.trim()) { notify('Supplier ka naam likho.'); return; }
+    if (form.gstin && !isValidGstin(form.gstin)) { notify('GSTIN theek nahi lag raha.'); return; }
 
     // Same trap as customers: one number, two suppliers, two half-ledgers.
     const digits = form.mobile?.replace(/\D/g, '') ?? '';
@@ -86,7 +86,7 @@ Phir bhi naya supplier banayein?`))) return;
     } catch (e) { notify(`Could not save: ${(e as Error).message}`); } finally { setSaving(false); }
   }
 
-  if (!can('party.edit')) return <Screen><Text>You do not have permission to edit suppliers.</Text></Screen>;
+  if (!can('party.edit')) return <Screen><Text>Aapko supplier badalne ki permission nahi hai.</Text></Screen>;
   if (!isNew && !existing) return <Screen><Text>Loading…</Text></Screen>;
 
   return (
@@ -94,36 +94,36 @@ Phir bhi naya supplier banayein?`))) return;
       <Stack.Screen options={{ title: isNew ? 'New supplier' : existing?.name }} />
       <Screen>
         <Text variant="display">{isNew ? 'New supplier' : existing?.name}</Text>
-        <FormSection title="Identity">
-          <Input label="Name" value={form.name ?? ''} onChangeText={(v) => set('name', v)} placeholder="Bright Auto Imports" />
-          <Input label="Company name" value={form.company_name ?? ''} onChangeText={(v) => set('company_name', v)} />
-          <Input label="Contact person" value={form.contact_person ?? ''} onChangeText={(v) => set('contact_person', v)} />
+        <FormSection title="Pehchaan">
+          <Input label="Naam" value={form.name ?? ''} onChangeText={(v) => set('name', v)} placeholder="Bright Auto Imports" />
+          <Input label="Firm ka naam" value={form.company_name ?? ''} onChangeText={(v) => set('company_name', v)} />
+          <Input label="Jisse baat hoti hai" value={form.contact_person ?? ''} onChangeText={(v) => set('contact_person', v)} />
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Mobile" value={form.mobile ?? ''} onChangeText={(v) => set('mobile', v)} keyboardType="phone-pad" />
-            <Input containerStyle={{ flex: 1 }} label="Alt phone" value={form.alt_phone ?? ''} onChangeText={(v) => set('alt_phone', v)} keyboardType="phone-pad" />
+            <Input containerStyle={{ flex: 1 }} label="Doosra number" value={form.alt_phone ?? ''} onChangeText={(v) => set('alt_phone', v)} keyboardType="phone-pad" />
           </Row>
           <Input label="Email" value={form.email ?? ''} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
         </FormSection>
-        <FormSection title="GST & address">
+        <FormSection title="GST aur pata">
           <Input label="GSTIN" value={form.gstin ?? ''} onChangeText={onGstin} autoCapitalize="characters" error={form.gstin && !isValidGstin(form.gstin) ? 'Not a valid GSTIN format' : null} />
           <Input label="PAN" value={form.pan ?? ''} onChangeText={(v) => set('pan', v.toUpperCase())} autoCapitalize="characters" />
-          <Input label="Address line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} />
-          <Input label="Address line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} />
+          <Input label="Pata line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} />
+          <Input label="Pata line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="City" value={form.city ?? ''} onChangeText={(v) => set('city', v)} />
+            <Input containerStyle={{ flex: 1 }} label="Shehar" value={form.city ?? ''} onChangeText={(v) => set('city', v)} />
             <Input containerStyle={{ flex: 1 }} label="PIN code" value={form.pincode ?? ''} onChangeText={(v) => set('pincode', v)} keyboardType="number-pad" />
           </Row>
           <SelectField label="State" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { set('state_code', v); set('state_name', INDIAN_STATES.find((s) => s.code === v)?.name ?? null); }} />
         </FormSection>
-        <FormSection title="Terms">
-          <NumberField label="Payment terms (days)" value={form.payment_terms_days ?? 0} onChange={(v) => set('payment_terms_days', v ?? 0)} decimals={0} />
+        <FormSection title="Shartein">
+          <NumberField label="Kitne din mein paisa dena hai" value={form.payment_terms_days ?? 0} onChange={(v) => set('payment_terms_days', v ?? 0)} decimals={0} />
           {isNew ? (
             <Row gap={12}>
-              <View style={{ flex: 1 }}><NumberField label="Opening balance (₹)" value={form.opening_balance ?? 0} onChange={(v) => set('opening_balance', v ?? 0)} hint="Positive = you owe them." /></View>
-              <Input containerStyle={{ flex: 1 }} label="As of (YYYY-MM-DD)" value={form.opening_balance_date ?? ''} onChangeText={(v) => set('opening_balance_date', v)} />
+              <View style={{ flex: 1 }}><NumberField label="Purana balance (₹)" value={form.opening_balance ?? 0} onChange={(v) => set('opening_balance', v ?? 0)} hint="Plus matlab aapko unhe dena hai." /></View>
+              <Input containerStyle={{ flex: 1 }} label="Kis din tak ka (YYYY-MM-DD)" value={form.opening_balance_date ?? ''} onChangeText={(v) => set('opening_balance_date', v)} />
             </Row>
           ) : null}
-          <Input label="Notes" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} multiline />
+          <Input label="Note" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} multiline />
           {!isNew ? <SwitchRow label="Active" value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} /> : null}
         </FormSection>
         <Button title={isNew ? 'Create supplier' : dirty ? 'Save changes' : 'Saved'} onPress={save} loading={saving} disabled={!isNew && !dirty} />

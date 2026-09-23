@@ -138,7 +138,7 @@ export default function ImportScreen() {
     setPreview(p);
     const fatal = p.issues.filter((i) => !/will be created|will update|not 10 digits/.test(i.message));
     if (fatal.length) {
-      notify('Fix the errors first. Warnings (brand will be created, row will update) are fine.');
+      notify('Pehle galtiyan theek karo. Warning (brand ban jayega, row update hogi) chalti hai.');
       return;
     }
     setBusy(true);
@@ -288,7 +288,7 @@ export default function ImportScreen() {
   }
 
   function pickFile() {
-    if (Platform.OS !== 'web') { notify('On a phone, paste the CSV text. File picking is available in the web app.'); return; }
+    if (Platform.OS !== 'web') { notify('Phone par CSV text paste karo. File chunna web par milta hai.'); return; }
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.csv,text/csv';
@@ -312,7 +312,7 @@ export default function ImportScreen() {
     }
   }
 
-  if (!can('catalog.edit') && !can('party.edit')) return <Screen><Text>Import needs catalogue or party edit permission.</Text></Screen>;
+  if (!can('catalog.edit') && !can('party.edit')) return <Screen><Text>Import ke liye maal ya party edit ki permission chahiye.</Text></Screen>;
 
   return (
     <Screen>
@@ -332,15 +332,15 @@ export default function ImportScreen() {
           </Text>
         ) : null}
         <Row gap={8}>
-          <Button title="Download template" tone="secondary" size="sm" onPress={downloadTemplate} />
-          <Button title="Choose CSV file" tone="secondary" size="sm" onPress={pickFile} />
+          <Button title="Template download karo" tone="secondary" size="sm" onPress={downloadTemplate} />
+          <Button title="CSV file chuno" tone="secondary" size="sm" onPress={pickFile} />
         </Row>
       </Card>
 
-      <Input label="Or paste CSV" value={text} onChangeText={(v) => { setText(v); setPreview(null); setDone(null); }} multiline numberOfLines={8} placeholder="sku,name,…" autoCapitalize="none" autoCorrect={false} style={{ minHeight: 140, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined, fontSize: 13 }} />
+      <Input label="Ya CSV yahan paste karo" value={text} onChangeText={(v) => { setText(v); setPreview(null); setDone(null); }} multiline numberOfLines={8} placeholder="sku,name,…" autoCapitalize="none" autoCorrect={false} style={{ minHeight: 140, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined, fontSize: 13 }} />
 
       <Row gap={8}>
-        <Button title="Check rows" tone="secondary" onPress={() => setPreview(validate())} disabled={!parsed.rows.length} />
+        <Button title="Row check karo" tone="secondary" onPress={() => setPreview(validate())} disabled={!parsed.rows.length} />
         <Button title={`Import ${parsed.rows.length} rows`} onPress={run} loading={busy} disabled={!parsed.rows.length} />
       </Row>
 
@@ -357,7 +357,7 @@ export default function ImportScreen() {
                 Row {i.row}: {i.message}
               </Text>
             ))}
-            {preview.issues.length === 0 ? <Text variant="small" color="ok">Every row passed validation.</Text> : null}
+            {preview.issues.length === 0 ? <Text variant="small" color="ok">Saari row theek hain.</Text> : null}
           </ScrollView>
         </Card>
       ) : null}
@@ -370,7 +370,7 @@ export default function ImportScreen() {
 
       {parsed.rows.length ? (
         <>
-          <SectionTitle>Preview · first 5 rows</SectionTitle>
+          <SectionTitle>Jhalak · pehli 5 row</SectionTitle>
           <ScrollView horizontal>
             <View>
               <Row gap={12} style={{ paddingVertical: 6 }}>

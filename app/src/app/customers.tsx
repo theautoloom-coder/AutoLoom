@@ -32,10 +32,10 @@ export default function CustomersScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Customers</Text>
-        {can('party.edit') ? <Button title="New customer" onPress={() => router.push('/customer/edit')} /> : null}
+        <Text variant="display">Grahak</Text>
+        {can('party.edit') ? <Button title="Naya grahak" onPress={() => router.push('/customer/edit')} /> : null}
       </Row>
-      <Input value={q} onChangeText={setQ} placeholder="Name, business, mobile, GSTIN, city" autoCapitalize="none" />
+      <Input value={q} onChangeText={setQ} placeholder="Naam, firm, mobile, GSTIN, shehar" autoCapitalize="none" />
       <Row gap={space.xs} wrap>
         <Chip label={`All · ${rows.length}`} selected={!type} onPress={() => setType(null)} />
         {TYPES.map((tp) => (
@@ -44,7 +44,7 @@ export default function CustomersScreen() {
       </Row>
       {can('reports.view') || can('payment.receive') ? (
         <Text variant="small" color="textMuted">
-          Receivable across {visible.length} customers: <Text variant="small" mono>{formatINR(totalDue)}</Text>
+          {visible.length} grahak se kul baaki: <Text variant="small" mono>{formatINR(totalDue)}</Text>
         </Text>
       ) : null}
       <Card style={{ gap: 0, paddingVertical: 4 }}>
@@ -63,7 +63,7 @@ export default function CustomersScreen() {
             }
           />
         ))}
-        {visible.length === 0 ? <Empty title="No customers match" /> : null}
+        {visible.length === 0 ? <Empty title="Koi grahak nahi mila" /> : null}
       </Card>
     </Screen>
   );

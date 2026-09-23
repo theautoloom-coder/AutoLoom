@@ -105,7 +105,7 @@ export default function RemindersScreen() {
         <Card keyline>
           <Row style={{ justifyContent: 'space-between' }} align="flex-start">
             <View style={{ flex: 1 }}>
-              <Text variant="label" color="textMuted">Total pending</Text>
+              <Text variant="label" color="textMuted">Kul baaki paisa</Text>
               <Text style={[typeScale.hero, { fontSize: 34, lineHeight: 38, color: t.warn }]}>{formatINR(Math.round(shown))}</Text>
               <Text variant="small" color="textFaint">
                 {visible.length} customer{overdueCount ? ` · ${overdueCount} overdue` : ''}
@@ -189,7 +189,7 @@ export default function RemindersScreen() {
                     onPress={() => remind(p)}
                     android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
                     style={({ pressed }) => [styles.redPill, { backgroundColor: t.accent, paddingHorizontal: 15, transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
-                    <Text variant="small" style={{ color: t.accentText, fontWeight: '700' }}>Remind</Text>
+                    <Text variant="small" style={{ color: t.accentText, fontWeight: '700' }}>Yaad dilao</Text>
                   </Pressable>
                 )}
               </View>

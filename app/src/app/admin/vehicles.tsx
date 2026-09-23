@@ -53,11 +53,11 @@ export default function VehiclesScreen() {
   async function addModel() {
     const n = newName.trim();
     if (!newMake || !n) {
-      notify('Choose a make and enter the model name.');
+      notify('Company chuno aur model ka naam likho.');
       return;
     }
     if ((models ?? []).some((m) => m.make_id === newMake && m.name.toLowerCase() === n.toLowerCase())) {
-      notify('That model already exists for this make.');
+      notify('Is company mein ye model pehle se hai.');
       return;
     }
     const id = await insertRow(db, 'vehicle_models', { make_id: newMake, name: n, code: slug(n, 10), body_type: newBody, search_text: n.toLowerCase(), is_active: true });
@@ -69,14 +69,14 @@ export default function VehiclesScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Vehicle master</Text>
-        {editable && !adding ? <Button title="Add model" onPress={() => setAdding(true)} /> : null}
+        <Text variant="display">Gaadi master</Text>
+        {editable && !adding ? <Button title="Model jodo" onPress={() => setAdding(true)} /> : null}
       </Row>
 
       {adding ? (
-        <FormSection title="New model" hint="Generations (year ranges, facelifts) and aliases are added on the model page.">
+        <FormSection title="Naya model" hint="Saal ke range, facelift aur doosre naam model ke page par jodte hain.">
           <SelectField
-            label="Make"
+            label="Company"
             value={newMake}
             options={(makes ?? []).map((m) => ({ value: m.id, label: m.name }))}
             onChange={setNewMake}
@@ -90,7 +90,7 @@ export default function VehiclesScreen() {
           <SelectField label="Body type" value={newBody} options={BODY_TYPES.map((b) => ({ value: b, label: b }))} onChange={setNewBody} />
           <Row gap={8}>
             <Button title="Create model" onPress={addModel} />
-            <Button title="Cancel" tone="ghost" onPress={() => setAdding(false)} />
+            <Button title="Rehne do" tone="ghost" onPress={() => setAdding(false)} />
           </Row>
         </FormSection>
       ) : null}
@@ -124,7 +124,7 @@ export default function VehiclesScreen() {
 
       {editable ? (
         <>
-          <SectionTitle>Makes</SectionTitle>
+          <SectionTitle>Company</SectionTitle>
           <Row gap={8} align="flex-end">
             <Input containerStyle={{ flex: 1 }} value={newMakeName} onChangeText={setNewMakeName} placeholder="New make, e.g. BYD" onSubmitEditing={addMake} />
             <Button title="Add make" tone="secondary" onPress={addMake} disabled={!newMakeName.trim()} />

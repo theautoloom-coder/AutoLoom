@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { formatINR, formatRegistration } from '@domain';
+import { formatINR, formatRegistration, statusLabel } from '@domain';
 
 import { useSession } from '@/lib/session';
 import { Badge, Button, Card, Chip, Empty, ListRow, Row, Screen, Text } from '@/ui';
@@ -28,11 +28,11 @@ export default function JobCardsScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Job cards</Text>
-        {can('jobcard.edit') ? <Button title="New job card" onPress={() => router.push('/job-card/edit')} /> : null}
+        <Text variant="display">Job card</Text>
+        {can('jobcard.edit') ? <Button title="Naya job card" onPress={() => router.push('/job-card/edit')} /> : null}
       </Row>
       <Row gap={space.xs} wrap>
-        <Chip label="All" selected={!status} onPress={() => setStatus(null)} />
+        <Chip label="Sab" selected={!status} onPress={() => setStatus(null)} />
         {STATUSES.map((s) => <Chip key={s} label={s.replace('_', ' ')} selected={status === s} onPress={() => setStatus(status === s ? null : s)} />)}
       </Row>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
@@ -40,9 +40,9 @@ export default function JobCardsScreen() {
           <ListRow key={j.id} title={`${j.registration_no ? formatRegistration(j.registration_no) : j.customer_name}${j.model_name ? ` · ${j.model_name}` : ''}`}
             subtitle={`${j.doc_no ?? 'Draft'} · ${j.doc_date} · ${j.customer_name}${j.technician_name ? ` · ${j.technician_name}` : ''} · ${j.parts} parts, ${j.labour} labour${j.requirement ? ` · ${j.requirement}` : ''}`}
             onPress={() => router.push(j.status === 'closed' || j.status === 'cancelled' ? `/job-card/${j.id}` : `/job-card/edit?id=${j.id}`)}
-            right={<View style={{ alignItems: 'flex-end' }}>{j.grand_total ? <Text mono>{formatINR(j.grand_total)}</Text> : null}<Badge tone={tone(j.status)}>{j.status.replace('_', ' ')}</Badge></View>} />
+            right={<View style={{ alignItems: 'flex-end' }}>{j.grand_total ? <Text mono>{formatINR(j.grand_total)}</Text> : null}<Badge tone={tone(j.status)}>{statusLabel(j.status)}</Badge></View>} />
         ))}
-        {(rows ?? []).length === 0 ? <Empty title="No job cards" hint="A job card tracks one vehicle's work: parts used, labour, and the invoice it becomes." /> : null}
+        {(rows ?? []).length === 0 ? <Empty title="Koi job card nahi" hint="Job card ek gaadi ke kaam ka hisaab rakhta hai: kaunsa maal laga, labour kitni, aur uska bill." /> : null}
       </Card>
     </Screen>
   );

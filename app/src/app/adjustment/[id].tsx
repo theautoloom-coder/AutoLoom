@@ -3,7 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { formatINR } from '@domain';
+import { formatINR, statusLabel } from '@domain';
 
 import { reverseMovements } from '@/lib/posting';
 import { useSession } from '@/lib/session';
@@ -26,32 +26,32 @@ export default function AdjustmentDetail() {
   const { data: lines } = useQuery<L>(`SELECT l.*, p.name || ' ' || pv.variant_name AS description, pv.sku, pv.product_id FROM stock_adjustment_lines l JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id WHERE l.adjustment_id = ? ORDER BY l.created_at`, [id]);
 
   async function cancel() {
-    if (!a || !(await confirm('Reverse this adjustment?', 'A reversing movement is written for every line. The original stays in the log.'))) return;
+    if (!a || !(await confirm('Ye adjustment wapas lein?', 'A reversing movement is written for every line. The original stays in the log.'))) return;
     setBusy(true);
     try {
       await db.writeTransaction(async (tx) => { await reverseMovements(tx, 'stock_adjustment', a.id, actor); await updateRow(tx, 'stock_adjustments', a.id, { status: 'cancelled' }); });
-      notify('Reversed.');
+      notify('Wapas le liya.');
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!a) return <Screen><Empty title="Adjustment not found on this device" /></Screen>;
+  if (!a) return <Screen><Empty title="Ye adjustment is phone par nahi mila" /></Screen>;
   const value = (lines ?? []).reduce((s, l) => s + l.qty_delta * l.unit_cost, 0);
 
   return (
     <>
       <Stack.Screen options={{ title: a.doc_no ?? 'Adjustment' }} />
       <Screen>
-        <Badge tone={a.status === 'posted' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'neutral'}>{a.status}</Badge>
+        <Badge tone={a.status === 'posted' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'neutral'}>{statusLabel(a.status)}</Badge>
         <Text variant="display">{a.reason.replace('_', ' ')} · {a.location_name}</Text>
         <Card style={{ gap: 0 }}>
           <KV k="Number" v={a.doc_no ?? '—'} mono />
           <KV k="Date" v={a.doc_date} />
-          {a.approved_name ? <KV k="Posted by" v={a.approved_name} /> : null}
-          {a.notes ? <KV k="Notes" v={a.notes} /> : null}
-          {can('catalog.view_cost') ? <KV k="Value change" v={formatINR(value)} mono /> : null}
+          {a.approved_name ? <KV k="Kisne post kiya" v={a.approved_name} /> : null}
+          {a.notes ? <KV k="Note" v={a.notes} /> : null}
+          {can('catalog.view_cost') ? <KV k="Keemat ka farak" v={formatINR(value)} mono /> : null}
         </Card>
-        {a.status === 'posted' && can('stock.adjust') ? <Button title="Reverse adjustment" tone="danger" onPress={cancel} loading={busy} /> : null}
-        <SectionTitle>Lines</SectionTitle>
+        {a.status === 'posted' && can('stock.adjust') ? <Button title="Adjustment wapas lo" tone="danger" onPress={cancel} loading={busy} /> : null}
+        <SectionTitle>Item</SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(lines ?? []).map((l) => (
             <ListRow key={l.id} title={l.description} subtitle={`${l.sku}${l.note ? ` · ${l.note}` : ''}`} onPress={() => router.push(`/product/${l.product_id}?variant=${l.variant_id}`)}

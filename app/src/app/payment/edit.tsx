@@ -80,13 +80,13 @@ export default function PaymentEdit() {
 
   async function save() {
     if (!partyId) { notify(`Choose the ${isIn ? 'customer' : 'supplier'}.`); return; }
-    if (!amount || amount <= 0) { notify('Enter the amount.'); return; }
+    if (!amount || amount <= 0) { notify('Amount daalo.'); return; }
     if (useManual) {
       for (const [id, amt] of Object.entries(manual)) {
         const d = openDocs?.find((x) => x.id === id);
         if (d && amt > d.outstanding + 0.005) { notify(`${d.doc_no}: more than its pending ${formatINR(d.outstanding)}.`); return; }
       }
-      if (manualTotal > amount + 0.005) { notify('Allocations exceed the payment amount.'); return; }
+      if (manualTotal > amount + 0.005) { notify('Baant payment se zyada ho gaya.'); return; }
     }
     if (!(await confirm(isIn ? 'Mark payment received?' : 'Record payment?', `${formatINR(amount)} ${isIn ? 'from' : 'to'} ${party?.name} by ${MODES.find((m) => m.value === mode)?.label}.${unallocated > 0 ? ` ${formatINR(unallocated)} stays as advance.` : ''}`))) return;
     setBusy(true);
@@ -107,7 +107,7 @@ export default function PaymentEdit() {
           const path = await uploadProof(proof, paymentId);
           await updateRow(db, 'payments', paymentId, { proof_path: path });
         } catch (e) {
-          notify(`Payment saved, but the screenshot could not be uploaded now (${(e as Error).message}). Attach it later from Payments.`);
+          notify(`Payment save ho gaya, par screenshot abhi upload nahi hua (${(e as Error).message}). Baad mein Payment se laga dena.`);
         }
       }
       const pendingAfter = round((party?.balance ?? 0) - amount);
@@ -118,17 +118,17 @@ export default function PaymentEdit() {
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (isIn && !can('payment.receive')) return <Screen><Text>You do not have permission to receive payments.</Text></Screen>;
-  if (!isIn && !can('payment.pay_supplier')) return <Screen><Text>You do not have permission to pay suppliers.</Text></Screen>;
+  if (isIn && !can('payment.receive')) return <Screen><Text>Aapko payment lene ki permission nahi hai.</Text></Screen>;
+  if (!isIn && !can('payment.pay_supplier')) return <Screen><Text>Aapko supplier ko paisa dene ki permission nahi hai.</Text></Screen>;
 
   return (
     <>
-      <Stack.Screen options={{ title: isIn ? 'Mark payment' : 'Pay supplier' }} />
+      <Stack.Screen options={{ title: isIn ? 'Mark payment' : 'Supplier ko paisa do' }} />
       <Screen>
-        <Text variant="display">{isIn ? 'Payment received' : 'Pay supplier'}</Text>
+        <Text variant="display">{isIn ? 'Payment aaya' : 'Supplier ko paisa do'}</Text>
         <FormSection title={isIn ? 'From' : 'To'}>
-          <SelectField label={isIn ? 'Customer' : 'Supplier'} value={partyId} options={(parties ?? []).map((p) => ({ value: p.id, label: p.name, sublabel: p.balance ? `${formatINR(p.balance)} ${isIn ? 'pending' : 'payable'}` : 'settled' }))} onChange={setPartyId} />
-          {party ? <Row gap={8}><Badge tone={party.balance > 0 ? 'warn' : 'ok'}>{isIn ? 'Pending' : 'Payable'} {formatINR(party.balance)}</Badge>{party.balance > 0 ? <Button title="Full amount" size="sm" tone="ghost" onPress={() => setAmount(round(party.balance))} /> : null}</Row> : null}
+          <SelectField label={isIn ? 'Grahak' : 'Supplier'} value={partyId} options={(parties ?? []).map((p) => ({ value: p.id, label: p.name, sublabel: p.balance ? `${formatINR(p.balance)} ${isIn ? 'baaki' : 'dena hai'}` : 'chukta' }))} onChange={setPartyId} />
+          {party ? <Row gap={8}><Badge tone={party.balance > 0 ? 'warn' : 'ok'}>{isIn ? 'Baaki' : 'Dena hai'} {formatINR(party.balance)}</Badge>{party.balance > 0 ? <Button title="Poora paisa" size="sm" tone="ghost" onPress={() => setAmount(round(party.balance))} /> : null}</Row> : null}
         </FormSection>
 
         <FormSection title="Payment">
@@ -150,7 +150,7 @@ export default function PaymentEdit() {
 
         {partyId ? (
           <>
-            <SectionTitle right={<Button title={useManual ? 'Auto (oldest first)' : 'Choose bills'} tone="ghost" size="sm" onPress={() => setUseManual((v) => !v)} />}>Settle against · {(openDocs ?? []).length} open</SectionTitle>
+            <SectionTitle right={<Button title={useManual ? 'Auto (oldest first)' : 'Choose bills'} tone="ghost" size="sm" onPress={() => setUseManual((v) => !v)} />}>Kis bill se kaato · {(openDocs ?? []).length} khule hue</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(openDocs ?? []).map((d) => {
                 const auto = autoAlloc.find((a) => a.doc_id === d.id)?.amount ?? 0;
@@ -159,10 +159,10 @@ export default function PaymentEdit() {
                     right={useManual ? <View style={{ width: 110 }}><NumberField value={manual[d.id] ?? null} onChange={(v) => setManual((m) => ({ ...m, [d.id]: v ?? 0 }))} placeholder="0" /></View> : <Text mono color={auto ? 'ok' : 'textFaint'}>{auto ? formatINR(auto) : '—'}</Text>} />
                 );
               })}
-              {(openDocs ?? []).length === 0 ? <Text variant="small" color="textMuted" style={{ padding: 12 }}>No open bills; the amount is kept as advance and used on the next bill.</Text> : null}
+              {(openDocs ?? []).length === 0 ? <Text variant="small" color="textMuted" style={{ padding: 12 }}>Koi khula bill nahi — paisa advance mein rakh liya jaayega aur agle bill mein lag jaayega.</Text> : null}
               <Divider />
               <Row style={{ justifyContent: 'space-between', paddingTop: 8 }}>
-                <Text variant="small" color="textMuted">Settled {formatINR(allocated)}</Text>
+                <Text variant="small" color="textMuted">Laga diya {formatINR(allocated)}</Text>
                 <Text variant="small" color={unallocated > 0 ? 'warn' : 'textMuted'}>Advance {formatINR(Math.max(unallocated, 0))}</Text>
               </Row>
             </Card>

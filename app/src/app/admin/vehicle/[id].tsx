@@ -70,12 +70,12 @@ export default function VehicleModelEditor() {
       is_active: !!form.is_active,
     });
     setDirty(false);
-    notify('Saved.');
+    notify('Save ho gaya.');
   }
 
   async function saveGen() {
     if (!gen || !gen.name?.trim() || !gen.year_from) {
-      notify('Generation name and start year are required.');
+      notify('Generation ka naam aur shuru ka saal zaroori hai.');
       return;
     }
     const payload = {
@@ -102,7 +102,7 @@ export default function VehicleModelEditor() {
   }
 
   async function removeAlias(a: Alias) {
-    if (await confirm('Remove alias?', `“${a.alias}” will no longer find this model in search.`)) {
+    if (await confirm('Ye doosra naam hatayein?', `“${a.alias}” will no longer find this model in search.`)) {
       await db.execute('DELETE FROM vehicle_model_aliases WHERE id = ?', [a.id]);
     }
   }
@@ -110,7 +110,7 @@ export default function VehicleModelEditor() {
   async function addSocket() {
     const opt = (socketOptions ?? []).find((o) => o.id === sock.option_id);
     if (!sock.generation_id || !opt || !sock.position.trim()) {
-      notify('Choose a generation, a position and a socket.');
+      notify('Generation, jagah aur socket chuno.');
       return;
     }
     await insertRow(db, 'vehicle_spec_map', { generation_id: sock.generation_id, spec_definition_id: opt.spec_definition_id, position_label: sock.position.trim(), option_id: opt.id });
@@ -127,14 +127,14 @@ export default function VehicleModelEditor() {
           <Text variant="display">
             {model.make_name} {model.name}
           </Text>
-          <Button title="Products for this model" tone="secondary" size="sm" onPress={() => router.push(`/vehicle/${model.id}`)} />
+          <Button title="Is model ka maal" tone="secondary" size="sm" onPress={() => router.push(`/vehicle/${model.id}`)} />
         </Row>
 
         <FormSection title="Model">
-          <SelectField label="Make" value={form.make_id} options={(makes ?? []).map((m) => ({ value: m.id, label: m.name }))} onChange={(v) => v && set('make_id', v)} />
-          <Input label="Name" value={form.name ?? ''} onChangeText={(v) => set('name', v)} editable={editable} />
+          <SelectField label="Company" value={form.make_id} options={(makes ?? []).map((m) => ({ value: m.id, label: m.name }))} onChange={(v) => v && set('make_id', v)} />
+          <Input label="Naam" value={form.name ?? ''} onChangeText={(v) => set('name', v)} editable={editable} />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="SKU code" value={form.code ?? ''} onChangeText={(v) => set('code', v.toUpperCase())} autoCapitalize="characters" hint="Used in SKUs: MAT-ELG-CRETA-7D-BLK" editable={editable} />
+            <Input containerStyle={{ flex: 1 }} label="SKU code" value={form.code ?? ''} onChangeText={(v) => set('code', v.toUpperCase())} autoCapitalize="characters" hint="SKU mein aata hai: MAT-ELG-CRETA-7D-BLK" editable={editable} />
             <Input containerStyle={{ flex: 1 }} label="Segment" value={form.segment ?? ''} onChangeText={(v) => set('segment', v)} placeholder="compact SUV" editable={editable} />
           </Row>
           <SelectField label="Body type" value={form.body_type} options={BODY_TYPES.map((b) => ({ value: b, label: b }))} onChange={(v) => set('body_type', v)} allowClear />
@@ -142,22 +142,22 @@ export default function VehicleModelEditor() {
           {editable ? <Button title={dirty ? 'Save changes' : 'Saved'} onPress={save} disabled={!dirty} /> : null}
         </FormSection>
 
-        <SectionTitle right={editable && !gen ? <Button title="Add generation" size="sm" tone="secondary" onPress={() => setGen({ is_facelift: 0, is_active: 1 })} /> : undefined}>
+        <SectionTitle right={editable && !gen ? <Button title="Generation jodo" size="sm" tone="secondary" onPress={() => setGen({ is_facelift: 0, is_active: 1 })} /> : undefined}>
           Generations · {gens?.length ?? 0}
         </SectionTitle>
         {gen ? (
-          <FormSection title={gen.id ? 'Edit generation' : 'New generation'} hint="A generation is a year range. Leave the end year blank while the car is still on sale.">
-            <Input label="Name" value={gen.name ?? ''} onChangeText={(v) => setGen((g) => ({ ...g, name: v }))} placeholder="2nd Gen 2020-2023 or Facelift 2024+" />
+          <FormSection title={gen.id ? 'Edit generation' : 'New generation'} hint="Generation matlab saal ka range. Gaadi abhi bik rahi ho to aakhri saal khaali chhod do.">
+            <Input label="Naam" value={gen.name ?? ''} onChangeText={(v) => setGen((g) => ({ ...g, name: v }))} placeholder="2nd Gen 2020-2023 ya Facelift 2024+" />
             <Row gap={12}>
-              <NumberField label="Year from" value={gen.year_from ?? null} onChange={(v) => setGen((g) => ({ ...g, year_from: v ?? undefined }))} decimals={0} />
-              <NumberField label="Year to" value={gen.year_to ?? null} onChange={(v) => setGen((g) => ({ ...g, year_to: v }))} decimals={0} placeholder="blank = current" />
-              <NumberField label="Seats" value={gen.seating ?? null} onChange={(v) => setGen((g) => ({ ...g, seating: v }))} decimals={0} />
+              <NumberField label="Saal se" value={gen.year_from ?? null} onChange={(v) => setGen((g) => ({ ...g, year_from: v ?? undefined }))} decimals={0} />
+              <NumberField label="Year to" value={gen.year_to ?? null} onChange={(v) => setGen((g) => ({ ...g, year_to: v }))} decimals={0} placeholder="khaali = abhi tak" />
+              <NumberField label="Kitni seat" value={gen.seating ?? null} onChange={(v) => setGen((g) => ({ ...g, seating: v }))} decimals={0} />
             </Row>
-            <SwitchRow label="Facelift" hint="A refresh of the same platform, often with different lamps and grille." value={!!gen.is_facelift} onChange={(v) => setGen((g) => ({ ...g, is_facelift: v ? 1 : 0 }))} />
-            <Input label="Notes" value={gen.notes ?? ''} onChangeText={(v) => setGen((g) => ({ ...g, notes: v }))} />
+            <SwitchRow label="Facelift" hint="Wahi gaadi, thoda naya look — aksar lamp aur grille alag." value={!!gen.is_facelift} onChange={(v) => setGen((g) => ({ ...g, is_facelift: v ? 1 : 0 }))} />
+            <Input label="Note" value={gen.notes ?? ''} onChangeText={(v) => setGen((g) => ({ ...g, notes: v }))} />
             <Row gap={8}>
-              <Button title="Save generation" onPress={saveGen} />
-              <Button title="Cancel" tone="ghost" onPress={() => setGen(null)} />
+              <Button title="Generation save karo" onPress={saveGen} />
+              <Button title="Rehne do" tone="ghost" onPress={() => setGen(null)} />
             </Row>
           </FormSection>
         ) : null}
@@ -173,7 +173,7 @@ export default function VehicleModelEditor() {
               }
               subtitle={`${g.year_from}–${g.year_to ?? 'now'} · ${g.fitments} fitments · ${g.sockets} socket entries`}
               onPress={editable ? () => setGen({ ...g }) : undefined}
-              right={editable ? <Text color="accent">Edit</Text> : undefined}
+              right={editable ? <Text color="accent">Badlo</Text> : undefined}
             />
           ))}
           {(gens ?? []).length === 0 ? (
@@ -183,7 +183,7 @@ export default function VehicleModelEditor() {
           ) : null}
         </Card>
 
-        <SectionTitle>Search aliases</SectionTitle>
+        <SectionTitle>Doosre naam jinse dhoondh sakte ho</SectionTitle>
         <Card>
           <Text variant="small" color="textMuted">
             Other spellings staff and customers use: “Wagon R”, “Scorpio-N”, “Grand i10 Nios”.
@@ -196,12 +196,12 @@ export default function VehicleModelEditor() {
           {editable ? (
             <Row gap={8} align="flex-end">
               <Input containerStyle={{ flex: 1 }} value={alias} onChangeText={setAlias} placeholder="Add alias" onSubmitEditing={addAlias} />
-              <Button title="Add" tone="secondary" onPress={addAlias} disabled={!alias.trim()} />
+              <Button title="Jodo" tone="secondary" onPress={addAlias} disabled={!alias.trim()} />
             </Row>
           ) : null}
         </Card>
 
-        <SectionTitle>Bulb sockets by generation</SectionTitle>
+        <SectionTitle>Generation ke hisaab se bulb socket</SectionTitle>
         <Card>
           <Text variant="small" color="textMuted">
             “Creta 2024 low beam = H7” lets a vehicle search surface the right universal bulbs. Confirm against the actual car before selling.
@@ -222,13 +222,13 @@ export default function VehicleModelEditor() {
               <SelectField label="Generation" value={sock.generation_id} options={(gens ?? []).map((g) => ({ value: g.id, label: g.name }))} onChange={(v) => setSock((s) => ({ ...s, generation_id: v }))} />
               <Row gap={8} align="flex-end">
                 <SelectField
-                  label="Position"
+                  label="Jagah"
                   value={sock.position}
                   options={['Low Beam', 'High Beam', 'Fog', 'Parking', 'Indicator', 'Reverse', 'Brake', 'Tail', 'Number Plate', 'DRL'].map((p) => ({ value: p, label: p }))}
                   onChange={(v) => setSock((s) => ({ ...s, position: v ?? 'Low Beam' }))}
                 />
                 <SelectField label="Socket" value={sock.option_id} options={(socketOptions ?? []).map((o) => ({ value: o.id, label: o.value }))} onChange={(v) => setSock((s) => ({ ...s, option_id: v }))} />
-                <Button title="Add" tone="secondary" onPress={addSocket} />
+                <Button title="Jodo" tone="secondary" onPress={addSocket} />
               </Row>
             </>
           ) : null}

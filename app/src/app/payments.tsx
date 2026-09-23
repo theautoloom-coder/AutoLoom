@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
-import { formatINR } from '@domain';
+import { formatINR, statusLabel } from '@domain';
 
 import { cancelPayment } from '@/lib/posting';
 import { proofUrl } from '@/lib/proofs';
@@ -27,17 +27,17 @@ export default function PaymentsScreen() {
 
   async function reverse(p: P) {
     const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Reason (e.g. cheque bounced, entered twice)') : 'Reversed';
-    if (!reason || !(await confirm('Reverse payment?', `${p.doc_no} for ${formatINR(p.amount)} will be reversed in the ledger and its allocations removed.`))) return;
-    try { await db.writeTransaction((tx) => cancelPayment(tx, p.id, reason, actor)); notify('Reversed.'); } catch (e) { notify((e as Error).message); }
+    if (!reason || !(await confirm('Payment wapas lein?', `${p.doc_no} for ${formatINR(p.amount)} will be reversed in the ledger and its allocations removed.`))) return;
+    try { await db.writeTransaction((tx) => cancelPayment(tx, p.id, reason, actor)); notify('Wapas le liya.'); } catch (e) { notify((e as Error).message); }
   }
 
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Payments</Text>
+        <Text variant="display">Payment</Text>
         <Row gap={space.xs}>
-          {can('payment.receive') ? <Button title="Receive" size="sm" onPress={() => router.push('/payment/edit?direction=in')} /> : null}
-          {can('payment.pay_supplier') ? <Button title="Pay" size="sm" tone="secondary" onPress={() => router.push('/payment/edit?direction=out')} /> : null}
+          {can('payment.receive') ? <Button title="Le lo" size="sm" onPress={() => router.push('/payment/edit?direction=in')} /> : null}
+          {can('payment.pay_supplier') ? <Button title="Paisa do" size="sm" tone="secondary" onPress={() => router.push('/payment/edit?direction=out')} /> : null}
         </Row>
       </Row>
       <Row gap={space.xs}>
@@ -47,15 +47,15 @@ export default function PaymentsScreen() {
         {(rows ?? []).map((p) => (
           <ListRow key={p.id} title={`${p.party_name}`} subtitle={`${p.doc_no ?? ''} · ${p.payment_date} · ${p.mode.toUpperCase()}${p.reference_no ? ` ${p.reference_no}` : ''}${p.remarks ? ` · ${p.remarks}` : ''}`}
             onPress={() => router.push(p.party_type === 'customer' ? `/customer/${p.party_id}` : `/supplier/${p.party_id}`)}
-            left={p.proof_path ? <Text onPress={async () => { const u = await proofUrl(p.proof_path!); if (u) { if (Platform.OS === 'web') window.open(u, '_blank'); else Linking.openURL(u); } else notify('Proof not reachable right now.'); }}>📎</Text> : undefined}
+            left={p.proof_path ? <Text onPress={async () => { const u = await proofUrl(p.proof_path!); if (u) { if (Platform.OS === 'web') window.open(u, '_blank'); else Linking.openURL(u); } else notify('Proof abhi khul nahi raha.'); }}>📎</Text> : undefined}
             right={
               <View style={{ alignItems: 'flex-end', gap: 2 }}>
                 <Text mono color={p.status !== 'posted' ? 'textFaint' : p.direction === 'in' ? 'ok' : 'text'}>{p.direction === 'in' ? '+' : '−'}{formatINR(p.amount)}</Text>
-                {p.status !== 'posted' ? <Badge tone="danger">{p.status}</Badge> : ((p.direction === 'in' && can('payment.receive')) || (p.direction === 'out' && can('payment.pay_supplier'))) && can('sale.cancel') ? <Text variant="small" color="danger" onPress={() => reverse(p)}>Reverse</Text> : null}
+                {p.status !== 'posted' ? <Badge tone="danger">{statusLabel(p.status)}</Badge> : ((p.direction === 'in' && can('payment.receive')) || (p.direction === 'out' && can('payment.pay_supplier'))) && can('sale.cancel') ? <Text variant="small" color="danger" onPress={() => reverse(p)}>Wapas lo</Text> : null}
               </View>
             } />
         ))}
-        {(rows ?? []).length === 0 ? <Empty title="No payments yet" /> : null}
+        {(rows ?? []).length === 0 ? <Empty title="Abhi koi payment nahi" /> : null}
       </Card>
     </Screen>
   );

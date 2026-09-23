@@ -148,14 +148,14 @@ export default function UsersScreen() {
             options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], sublabel: ROLE_DESCRIPTIONS[r] }))}
             onChange={(v) => setDraft({ ...draft, roles: v as Role[], role: ((v[0] as Role) ?? 'sales') })}
           />
-          <SelectField label="Default location" value={draft.default_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => setDraft({ ...draft, default_location_id: v })} allowClear />
+          <SelectField label="Roz ki location" value={draft.default_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => setDraft({ ...draft, default_location_id: v })} allowClear />
           <Button title="Staff banao" size="lg" loading={creating} onPress={addStaff} />
         </FormSection>
       ) : null}
 
       {editing ? (
         <FormSection title={editing.full_name}>
-          <Input label="Full name" value={editing.full_name} onChangeText={(v) => setEditing({ ...editing, full_name: v })} />
+          <Input label="Poora naam" value={editing.full_name} onChangeText={(v) => setEditing({ ...editing, full_name: v })} />
           <Input label="Mobile" value={editing.mobile ?? ''} onChangeText={(v) => setEditing({ ...editing, mobile: v })} keyboardType="phone-pad" />
           <MultiSelectField
             label="Role"
@@ -164,8 +164,8 @@ export default function UsersScreen() {
             options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], sublabel: ROLE_DESCRIPTIONS[r] }))}
             onChange={(v) => setEditRoles(v as Role[])}
           />
-          <SelectField label="Default location" value={editing.default_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => setEditing({ ...editing, default_location_id: v })} allowClear />
-          <SwitchRow label="Active" hint="Inactive users cannot read or write anything, on any device." value={!!editing.is_active} onChange={(v) => setEditing({ ...editing, is_active: v ? 1 : 0 })} />
+          <SelectField label="Roz ki location" value={editing.default_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => setEditing({ ...editing, default_location_id: v })} allowClear />
+          <SwitchRow label="Active" hint="Inactive aadmi kisi bhi phone par kuch na dekh sakta hai, na likh sakta hai." value={!!editing.is_active} onChange={(v) => setEditing({ ...editing, is_active: v ? 1 : 0 })} />
 
           {/* Password bhool jaana roz hota hai, aur staff ke email ka koi inbox
               nahi hota — reset link kahin nahi jaata. Isliye owner naya
@@ -188,8 +188,8 @@ export default function UsersScreen() {
           <Divider />
 
           <Row gap={8}>
-            <Button title="Save" onPress={save} />
-            <Button title="Cancel" tone="ghost" onPress={() => setEditing(null)} />
+            <Button title="Save karo" onPress={save} />
+            <Button title="Rehne do" tone="ghost" onPress={() => setEditing(null)} />
           </Row>
         </FormSection>
       ) : null}
@@ -212,12 +212,12 @@ export default function UsersScreen() {
             }
             subtitle={`${(locations ?? []).find((l) => l.id === u.default_location_id)?.name ?? 'no default location'} · ${u.devices} device${u.devices === 1 ? '' : 's'}${u.last_seen ? ` · seen ${new Date(u.last_seen).toLocaleDateString('en-IN')}` : ''}`}
             onPress={editable ? () => { setEditing({ ...u }); setEditRoles(rolesOf(u.id, u.role)); setAdding(false); } : undefined}
-            right={editable ? <Text color="accent">Edit</Text> : undefined}
+            right={editable ? <Text color="accent">Badlo</Text> : undefined}
           />
         ))}
       </Card>
 
-      <Button title={showMatrix ? 'Hide permission matrix' : 'Show permission matrix'} tone="secondary" onPress={() => setShowMatrix((v) => !v)} />
+      <Button title={showMatrix ? 'Permission ki table chhupao' : 'Permission ki table dikhao'} tone="secondary" onPress={() => setShowMatrix((v) => !v)} />
       {showMatrix ? (
         <Card style={{ gap: 0 }}>
           <Row gap={4} style={{ paddingVertical: 6 }}>
@@ -240,7 +240,7 @@ export default function UsersScreen() {
             </Row>
           ))}
           <Text variant="small" color="textFaint" style={{ marginTop: 8 }}>
-            Tap a cell to toggle. Admin permissions are fixed. Changes apply server-side too: row level security reads this same table.
+            Kisi khaane par tap karke on/off karo. Admin ki permission fixed hai. Badlav server par bhi lagta hai — security isi table ko padhti hai.
           </Text>
         </Card>
       ) : null}

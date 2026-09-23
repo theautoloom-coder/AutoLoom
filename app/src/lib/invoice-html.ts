@@ -74,7 +74,7 @@ export function invoiceHtml(inv: InvoiceForPrint, opts: { gst?: boolean } = {}):
   .cancel { position: fixed; top: 40%; left: 20%; font-size: 64px; color: rgba(200,50,50,.25); transform: rotate(-20deg); font-weight: 800; }
   .terms { white-space: pre-wrap; color: #555; font-size: 10px; }
 </style></head><body><div class="wrap">
-${inv.status === 'cancelled' ? '<div class="cancel">CANCELLED</div>' : ''}
+${inv.status === 'cancelled' ? '<div class="cancel">RADD</div>' : ''}
 <div class="head">
   <div>
     <div class="brand">${esc(c.trade_name || c.legal_name)}</div>
@@ -93,7 +93,7 @@ ${inv.status === 'cancelled' ? '<div class="cancel">CANCELLED</div>' : ''}
 </div>
 <div class="parties">
   <div class="box">
-    <h4>Bill to</h4>
+    <h4>Kiske naam</h4>
     <div><b>${esc(inv.customer?.business_name || inv.customer_name)}</b></div>
     ${inv.customer?.business_name && inv.customer_name !== inv.customer?.business_name ? `<div>${esc(inv.customer_name)}</div>` : ''}
     <div>${addr.map(esc).join(', ')}</div>
@@ -108,7 +108,7 @@ ${inv.status === 'cancelled' ? '<div class="cancel">CANCELLED</div>' : ''}
   </div>
 </div>
 <table>
-  <thead><tr><th class="c">#</th><th>Item</th>${gst ? '<th class="c">HSN</th>' : ''}<th class="r">Qty</th><th class="r">Rate</th><th class="r">Disc</th>${gst ? '<th class="r">Taxable</th><th class="c">GST</th>' : ''}<th class="r">Amount</th></tr></thead>
+  <thead><tr><th class="c">#</th><th>Item</th>${gst ? '<th class="c">HSN</th>' : ''}<th class="r">Qty</th><th class="r">Rate</th><th class="r">Chhoot</th>${gst ? '<th class="r">Taxable</th><th class="c">GST</th>' : ''}<th class="r">Amount</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
 <div class="totals">
@@ -123,13 +123,13 @@ ${inv.status === 'cancelled' ? '<div class="cancel">CANCELLED</div>' : ''}
   </div>
   <table>
     <tr><td>Subtotal</td><td class="r">${money(inv.subtotal)}</td></tr>
-    ${inv.discount_total ? `<tr><td>Discount</td><td class="r">- ${money(inv.discount_total)}</td></tr>` : ''}
+    ${inv.discount_total ? `<tr><td>Chhoot</td><td class="r">- ${money(inv.discount_total)}</td></tr>` : ''}
     ${gst ? `<tr><td>Taxable value</td><td class="r">${money(inv.taxable_total)}</td></tr>
     ${inter ? `<tr><td>IGST</td><td class="r">${money(inv.igst_total)}</td></tr>` : `<tr><td>CGST</td><td class="r">${money(inv.cgst_total)}</td></tr><tr><td>SGST</td><td class="r">${money(inv.sgst_total)}</td></tr>`}` : ''}
-    ${inv.other_charges ? `<tr><td>Other charges</td><td class="r">${money(inv.other_charges)}</td></tr>` : ''}
+    ${inv.other_charges ? `<tr><td>Aur kharcha</td><td class="r">${money(inv.other_charges)}</td></tr>` : ''}
     ${inv.round_off ? `<tr><td>Round off</td><td class="r">${money(inv.round_off)}</td></tr>` : ''}
     <tr class="grand"><td>${isCN ? 'Credit' : 'Grand total'}</td><td class="r">₹ ${money(inv.grand_total)}</td></tr>
-    ${!isCN && inv.paid_total ? `<tr><td>Paid</td><td class="r">${money(inv.paid_total)}</td></tr><tr><td>Balance due</td><td class="r">${money(inv.grand_total - inv.paid_total)}</td></tr>` : ''}
+    ${!isCN && inv.paid_total ? `<tr><td>Jama</td><td class="r">${money(inv.paid_total)}</td></tr><tr><td>Baaki paisa</td><td class="r">${money(inv.grand_total - inv.paid_total)}</td></tr>` : ''}
   </table>
 </div>
 <div class="foot">
@@ -137,7 +137,7 @@ ${inv.status === 'cancelled' ? '<div class="cancel">CANCELLED</div>' : ''}
     ${c.bank_name || c.upi_id ? `<div><b>Payment</b></div>${c.bank_name ? `<div>${esc(c.bank_name)} · A/c ${esc(c.bank_account_no)} · IFSC ${esc(c.bank_ifsc)}</div>` : ''}${c.upi_id ? `<div>UPI ${esc(c.upi_id)}</div>` : ''}` : ''}
     ${c.invoice_terms ? `<div class="terms" style="margin-top:6px">${esc(c.invoice_terms)}</div>` : ''}
   </div>
-  <div class="sig">For ${esc(c.trade_name || c.legal_name)}<br/>Authorised signatory</div>
+  <div class="sig">For ${esc(c.trade_name || c.legal_name)}<br/>Dastakhat</div>
 </div>
 ${c.invoice_footer ? `<div class="muted" style="text-align:center;margin-top:12px">${esc(c.invoice_footer)}</div>` : ''}
 </div></body></html>`;

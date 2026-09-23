@@ -27,8 +27,8 @@ export default function PurchasesScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Purchases</Text>
-        {can('purchase.create') ? <Button title="Receive purchase" onPress={() => router.push('/purchase/edit')} /> : null}
+        <Text variant="display">Purchase</Text>
+        {can('purchase.create') ? <Button title="Purchase bill" onPress={() => router.push('/purchase/edit')} /> : null}
       </Row>
       <Row gap={space.xs} wrap>
         {(['all', 'draft', 'unpaid', 'returns'] as const).map((f) => <Chip key={f} label={f} selected={filter === f} onPress={() => setFilter(f)} />)}
@@ -55,7 +55,7 @@ export default function PurchasesScreen() {
             }
           />
         ))}
-        {visible.length === 0 ? <Empty title="No purchases" hint="Receive purchase → choose supplier → scan or search items → post." /> : null}
+        {visible.length === 0 ? <Empty title="Koi purchase nahi" hint="Purchase bill banao → supplier chuno → maal scan ya search karo → post kar do." /> : null}
       </Card>
     </Screen>
   );

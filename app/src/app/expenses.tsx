@@ -163,7 +163,7 @@ export default function ExpensesScreen() {
               <Input containerStyle={{ flex: 1 }} label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
             </Row>
 
-            <Input label="Note" value={note} onChangeText={setNote} placeholder="optional" />
+            <Input label="Note" value={note} onChangeText={setNote} placeholder="zaroori nahi" />
 
             <Button title="Likh do" size="lg" onPress={save} loading={saving} />
           </Card>

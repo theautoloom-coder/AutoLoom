@@ -117,7 +117,7 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
                 )}
               </View>
             ) : (
-              <Empty title="No matching SKU" />
+              <Empty title="Koi SKU nahi mila" />
             )
           ) : null}
         </View>
@@ -148,13 +148,13 @@ function CameraScanner({ onScanned, onClose }: { onScanned: (code: string) => vo
   const [permission, requestPermission] = Camera.useCameraPermissions();
   const [locked, setLocked] = useState(false);
 
-  if (!permission) return <Empty title="Preparing camera…" />;
+  if (!permission) return <Empty title="Camera khul raha hai…" />;
   if (!permission.granted) {
     return (
       <View style={{ padding: space.xl, gap: space.md }}>
         <Text>AutoLoom needs the camera to scan barcodes.</Text>
         <Button title="Allow camera" onPress={requestPermission} />
-        <Button title="Cancel" tone="ghost" onPress={onClose} />
+        <Button title="Rehne do" tone="ghost" onPress={onClose} />
       </View>
     );
   }
@@ -170,7 +170,7 @@ function CameraScanner({ onScanned, onClose }: { onScanned: (code: string) => vo
         }}
       />
       <View style={{ padding: space.lg }}>
-        <Button title="Cancel" tone="secondary" onPress={onClose} />
+        <Button title="Rehne do" tone="secondary" onPress={onClose} />
       </View>
     </View>
   );

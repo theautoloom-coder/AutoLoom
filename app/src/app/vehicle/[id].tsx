@@ -133,7 +133,7 @@ export default function VehicleScreen() {
 
         {gens && gens.length > 0 ? (
           <Row gap={space.xs} wrap>
-            <Chip label="All years" selected={genId === null} onPress={() => setGenOverride(null)} />
+            <Chip label="Saare saal" selected={genId === null} onPress={() => setGenOverride(null)} />
             {gens.map((g) => (
               <Chip
                 key={g.id}
@@ -161,7 +161,7 @@ export default function VehicleScreen() {
         ) : null}
 
         <Row gap={space.xs} wrap>
-          <Chip label="In stock only" selected={inStockOnly} onPress={() => setInStockOnly((v) => !v)} />
+          <Chip label="Sirf jo stock mein hai" selected={inStockOnly} onPress={() => setInStockOnly((v) => !v)} />
           {families.length > 1
             ? families.map((f) => <Chip key={f} label={f} selected={family === f} onPress={() => setFamily(family === f ? null : f)} />)
             : null}
@@ -170,20 +170,20 @@ export default function VehicleScreen() {
         {specificGroups.length === 0 && socketGroups.length === 0 ? (
           <Empty
             title={`No model-specific products for ${model?.name ?? 'this vehicle'}${gen ? ` ${gen.name}` : ''}`}
-            hint="Add fitments to products in Admin, or check the universal products below."
+            hint="Admin mein item ke saath gaadi jodo, ya neeche universal maal dekho."
           />
         ) : null}
 
         {specificGroups.map(([fam, rows]) => (
           <React.Fragment key={`s-${fam}`}>
-            <SectionTitle right={<Badge tone="accent">Fits this model</Badge>}>{fam}</SectionTitle>
+            <SectionTitle right={<Badge tone="accent">Is model mein lagta hai</Badge>}>{fam}</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>{rows.map(renderHit)}</Card>
           </React.Fragment>
         ))}
 
         {socketGroups.map(([fam, rows]) => (
           <React.Fragment key={`k-${fam}`}>
-            <SectionTitle right={<Badge tone="info">Fits by socket</Badge>}>{fam}</SectionTitle>
+            <SectionTitle right={<Badge tone="info">Socket ke hisaab se</Badge>}>{fam}</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>{rows.map(renderHit)}</Card>
           </React.Fragment>
         ))}

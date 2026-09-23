@@ -117,7 +117,7 @@ export default function RequestsScreen() {
                 <ListRow
                 title={title(r)}
                 subtitle={subtitle(r, !isReviewer)}
-                right={r.revision > 1 ? <Badge tone="info">{`${r.revision}x`}</Badge> : <Badge tone="warn">Pending</Badge>}
+                right={r.revision > 1 ? <Badge tone="info">{`${r.revision}x`}</Badge> : <Badge tone="warn">Baaki hai</Badge>}
                 onPress={() => open(r)}
               />
               </React.Fragment>
@@ -135,7 +135,7 @@ export default function RequestsScreen() {
                   <ListRow
                   title={title(r)}
                   subtitle={r.review_note ?? ''}
-                  right={<Badge tone="danger">Rejected</Badge>}
+                  right={<Badge tone="danger">Mana kar diya</Badge>}
                   onPress={() => open(r)}
                 />
                 </React.Fragment>
@@ -156,7 +156,7 @@ export default function RequestsScreen() {
                   subtitle={subtitle(r, !isReviewer)}
                   right={
                     r.status === 'approved'
-                      ? <Badge tone="ok">Approved</Badge>
+                      ? <Badge tone="ok">Haan kar diya</Badge>
                       : <Badge tone="neutral">Wapas li</Badge>
                   }
                   onPress={() => open(r)}

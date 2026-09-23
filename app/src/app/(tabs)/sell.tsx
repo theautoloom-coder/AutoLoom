@@ -28,36 +28,36 @@ export default function BillingScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Billing</Text>
-        {can('sale.create') ? <Button title="New bill" onPress={() => router.push('/invoice/edit')} /> : null}
+        <Text variant="display">Bill</Text>
+        {can('sale.create') ? <Button title="Naya bill" onPress={() => router.push('/invoice/edit')} /> : null}
       </Row>
 
       <Card tone="navy">
         <Row gap={16} wrap>
-          <View style={{ flex: 1, minWidth: 100 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Aaj ka maal</Text><Text variant="number" color="navyText">{formatINR(t?.total ?? 0)}</Text><Text variant="small" color="navyText" style={{ opacity: 0.7 }}>{t?.n ?? 0} bills</Text></View>
+          <View style={{ flex: 1, minWidth: 100 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Aaj ka maal</Text><Text variant="number" color="navyText">{formatINR(t?.total ?? 0)}</Text><Text variant="small" color="navyText" style={{ opacity: 0.7 }}>{t?.n ?? 0} bill</Text></View>
           <View style={{ flex: 1, minWidth: 100 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Aaj ka pending</Text><Text variant="number" color="navyText">{formatINR(t?.pending ?? 0)}</Text></View>
         </Row>
       </Card>
 
       <Card style={{ gap: 0, paddingVertical: 4 }}>
-        {can('payment.receive') ? <ListRow title="Mark payment received" subtitle="Cash / online, screenshot proof, remarks" onPress={() => router.push('/payment/edit?direction=in')} /> : null}
-        <ListRow title="Reminders & slips on WhatsApp" subtitle="Day-end pending list, UPI link, today's slips" onPress={() => router.push('/reminders')} />
-        <ListRow title="Customers (khata)" subtitle="Ledger, pending, last prices" onPress={() => router.push('/customers')} />
-        {can('payment.receive') ? <ListRow title="Payments" subtitle="Receipts, proofs, reversals" onPress={() => router.push('/payments')} /> : null}
-        {can('jobcard.edit') ? <ListRow title="Job cards" subtitle="Workshop: parts + labour → bill" onPress={() => router.push('/job-cards')} /> : null}
-        {can('reports.view') ? <ListRow title="Reports" subtitle="Sales, pending, stock, margin" onPress={() => router.push('/reports')} /> : null}
+        {can('payment.receive') ? <ListRow title="Payment aaya" subtitle="Cash / online, screenshot, remark" onPress={() => router.push('/payment/edit?direction=in')} /> : null}
+        <ListRow title="WhatsApp par yaad dilao aur parchi bhejo" subtitle="Din ke aakhir ki pending list, UPI link, aaj ki parchi" onPress={() => router.push('/reminders')} />
+        <ListRow title="Grahak (khata)" subtitle="Khata, baaki paisa, pichhle rate" onPress={() => router.push('/customers')} />
+        {can('payment.receive') ? <ListRow title="Payment" subtitle="Rasid, proof, wapasi" onPress={() => router.push('/payments')} /> : null}
+        {can('jobcard.edit') ? <ListRow title="Job card" subtitle="Workshop: parts + labour → bill" onPress={() => router.push('/job-cards')} /> : null}
+        {can('reports.view') ? <ListRow title="Hisaab-kitab" subtitle="Bikri, baaki paisa, stock, margin" onPress={() => router.push('/reports')} /> : null}
       </Card>
 
       {drafts.length > 0 ? (
         <>
-          <SectionTitle>Drafts</SectionTitle>
+          <SectionTitle>Adhoore bill</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {drafts.map((i) => <ListRow key={i.id} title={i.customer_name} subtitle={i.doc_date} onPress={() => router.push(`/invoice/edit?id=${i.id}`)} right={<Text mono>{formatINR(i.grand_total)}</Text>} />)}
           </Card>
         </>
       ) : null}
 
-      <SectionTitle>Recent bills</SectionTitle>
+      <SectionTitle>Pichhle bill</SectionTitle>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {posted.length > 0 ? (
           posted.map((i) => (
@@ -72,7 +72,7 @@ export default function BillingScreen() {
               } />
           ))
         ) : (
-          <Empty title="No bills yet" hint="Tap New bill: choose the customer, scan or search items, post." />
+          <Empty title="Abhi koi bill nahi" hint="“Naya bill” dabao: grahak chuno, maal scan ya search karo, post kar do." />
         )}
       </Card>
     </Screen>

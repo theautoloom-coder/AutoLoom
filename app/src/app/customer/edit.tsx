@@ -88,15 +88,15 @@ export default function CustomerEdit() {
 
   async function save() {
     if (!form.name?.trim()) {
-      notify('Customer name is required.');
+      notify('Grahak ka naam likho.');
       return;
     }
     if (form.gstin && !isValidGstin(form.gstin)) {
-      notify('GSTIN does not look valid. It should be 15 characters like 09ABCDE1234F1Z5.');
+      notify('GSTIN theek nahi lag raha. 15 character hone chahiye, jaise 09ABCDE1234F1Z5.');
       return;
     }
     if (form.mobile && !/^\d{10}$/.test(form.mobile.replace(/\D/g, ''))) {
-      notify('Mobile should be 10 digits.');
+      notify('Mobile 10 ank ka hona chahiye.');
       return;
     }
 
@@ -165,7 +165,7 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
     if (!id) return;
     const r = normaliseRegistration(reg);
     if (r.length < 6) {
-      notify('Enter the registration number, e.g. UP16AB1234.');
+      notify('Gaadi number likho, jaise UP16AB1234.');
       return;
     }
     await insertRow(db, 'customer_vehicles', { customer_id: id, registration_no: r, model_id: regModel, generation_id: null }, actor);
@@ -173,10 +173,10 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
   }
 
   async function removeVehicle(v: Vehicle) {
-    if (await confirm('Remove vehicle?', `${v.registration_no} will be removed from this customer.`)) await db.execute('DELETE FROM customer_vehicles WHERE id = ?', [v.id]);
+    if (await confirm('Gaadi hatayein?', `${v.registration_no} will be removed from this customer.`)) await db.execute('DELETE FROM customer_vehicles WHERE id = ?', [v.id]);
   }
 
-  if (!can('party.edit')) return <Screen><Text>You do not have permission to edit customers.</Text></Screen>;
+  if (!can('party.edit')) return <Screen><Text>Aapko grahak badalne ki permission nahi hai.</Text></Screen>;
   if (!isNew && !existing) return <Screen><Text>Loading…</Text></Screen>;
 
   const canEditCredit = can('party.edit_credit_limit');
@@ -187,50 +187,50 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
       <Screen>
         <Text variant="display">{isNew ? 'New customer' : existing?.name}</Text>
 
-        <FormSection title="Identity">
+        <FormSection title="Pehchaan">
           <SelectField label="Type" value={form.customer_type} options={TYPES} onChange={(v) => set('customer_type', v ?? 'retail')} />
-          <Input label="Name" value={form.name ?? ''} onChangeText={(v) => set('name', v)} placeholder="XYZ Accessories" />
-          <Input label="Business name (on invoice)" value={form.business_name ?? ''} onChangeText={(v) => set('business_name', v)} />
-          <Input label="Owner / contact" value={form.owner_name ?? ''} onChangeText={(v) => set('owner_name', v)} />
+          <Input label="Naam" value={form.name ?? ''} onChangeText={(v) => set('name', v)} placeholder="XYZ Accessories" />
+          <Input label="Firm ka naam (bill par chhapega)" value={form.business_name ?? ''} onChangeText={(v) => set('business_name', v)} />
+          <Input label="Maalik / jisse baat hoti hai" value={form.owner_name ?? ''} onChangeText={(v) => set('owner_name', v)} />
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Mobile" value={form.mobile ?? ''} onChangeText={(v) => set('mobile', v)} keyboardType="phone-pad" />
-            <Input containerStyle={{ flex: 1 }} label="Alt phone" value={form.alt_phone ?? ''} onChangeText={(v) => set('alt_phone', v)} keyboardType="phone-pad" />
+            <Input containerStyle={{ flex: 1 }} label="Doosra number" value={form.alt_phone ?? ''} onChangeText={(v) => set('alt_phone', v)} keyboardType="phone-pad" />
           </Row>
           <Input label="Email" value={form.email ?? ''} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
-          {!isNew ? <Input label="Code" value={form.code ?? ''} onChangeText={(v) => set('code', v)} hint="Auto-assigned; change only if you use your own codes." /> : null}
+          {!isNew ? <Input label="Code" value={form.code ?? ''} onChangeText={(v) => set('code', v)} hint="Apne aap ban jaata hai. Apna code chalta ho tabhi badlo." /> : null}
         </FormSection>
 
-        <FormSection title="GST & address" hint="The state decides CGST+SGST versus IGST on every invoice.">
-          <Input label="GSTIN" value={form.gstin ?? ''} onChangeText={onGstin} autoCapitalize="characters" error={form.gstin && !isValidGstin(form.gstin) ? 'Not a valid GSTIN format' : null} hint="Fills the state and PAN automatically." />
+        <FormSection title="GST aur pata" hint="State se tay hota hai ki bill par CGST+SGST lagega ya IGST.">
+          <Input label="GSTIN" value={form.gstin ?? ''} onChangeText={onGstin} autoCapitalize="characters" error={form.gstin && !isValidGstin(form.gstin) ? 'Not a valid GSTIN format' : null} hint="State aur PAN apne aap bhar jaate hain." />
           <Input label="PAN" value={form.pan ?? ''} onChangeText={(v) => set('pan', v.toUpperCase())} autoCapitalize="characters" />
-          <Input label="Address line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} />
-          <Input label="Address line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} />
+          <Input label="Pata line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} />
+          <Input label="Pata line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="City" value={form.city ?? ''} onChangeText={(v) => set('city', v)} />
+            <Input containerStyle={{ flex: 1 }} label="Shehar" value={form.city ?? ''} onChangeText={(v) => set('city', v)} />
             <Input containerStyle={{ flex: 1 }} label="PIN code" value={form.pincode ?? ''} onChangeText={(v) => set('pincode', v)} keyboardType="number-pad" />
           </Row>
           <SelectField label="State" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { const st = INDIAN_STATES.find((s) => s.code === v); set('state_code', v); set('state_name', st?.name ?? null); }} />
         </FormSection>
 
-        <FormSection title="Pricing & credit">
-          <SelectField label="Price list" value={form.price_list_id} options={(priceLists ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => set('price_list_id', v)} hint="Per-SKU negotiated prices are set on the product page." />
+        <FormSection title="Rate aur udhaar">
+          <SelectField label="Rate list" value={form.price_list_id} options={(priceLists ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => set('price_list_id', v)} hint="Kisi ek item ka special rate us item ke page par set hota hai." />
           <Row gap={12}>
             <View style={{ flex: 1 }}>
-              <NumberField label="Credit limit (₹)" value={form.credit_limit ?? 0} onChange={(v) => canEditCredit && set('credit_limit', v ?? 0)} hint={canEditCredit ? '0 = no limit' : 'Only owner/admin can change'} />
+              <NumberField label="Udhaar ki limit (₹)" value={form.credit_limit ?? 0} onChange={(v) => canEditCredit && set('credit_limit', v ?? 0)} hint={canEditCredit ? '0 = no limit' : 'Only owner/admin can change'} />
             </View>
             <View style={{ flex: 1 }}>
-              <NumberField label="Credit days" value={form.credit_days ?? 0} onChange={(v) => canEditCredit && set('credit_days', v ?? 0)} decimals={0} />
+              <NumberField label="Kitne din ka udhaar" value={form.credit_days ?? 0} onChange={(v) => canEditCredit && set('credit_days', v ?? 0)} decimals={0} />
             </View>
           </Row>
           {isNew ? (
             <Row gap={12}>
               <View style={{ flex: 1 }}>
-                <NumberField label="Opening balance (₹)" value={form.opening_balance ?? 0} onChange={(v) => set('opening_balance', v ?? 0)} hint="Positive = they owe you. Written as a ledger entry." />
+                <NumberField label="Purana balance (₹)" value={form.opening_balance ?? 0} onChange={(v) => set('opening_balance', v ?? 0)} hint="Plus matlab unka aapko dena hai. Khata mein entry ban jaayegi." />
               </View>
-              <Input containerStyle={{ flex: 1 }} label="As of (YYYY-MM-DD)" value={form.opening_balance_date ?? ''} onChangeText={(v) => set('opening_balance_date', v)} placeholder="2026-04-01" />
+              <Input containerStyle={{ flex: 1 }} label="Kis din tak ka (YYYY-MM-DD)" value={form.opening_balance_date ?? ''} onChangeText={(v) => set('opening_balance_date', v)} placeholder="2026-04-01" />
             </Row>
           ) : null}
-          <Input label="Notes" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} multiline />
+          <Input label="Note" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} multiline />
           {!isNew ? <SwitchRow label="Active" value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} /> : null}
         </FormSection>
 
@@ -238,17 +238,17 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
 
         {!isNew ? (
           <>
-            <SectionTitle>Vehicles</SectionTitle>
+            <SectionTitle>Gaadiyan</SectionTitle>
             <Card style={{ gap: 0 }}>
               {(vehicles ?? []).map((v) => (
                 <ListRow key={v.id} title={v.registration_no} subtitle={[v.make_name, v.model_name, v.color].filter(Boolean).join(' · ') || 'model not set'} right={<Button title="×" tone="ghost" size="sm" onPress={() => removeVehicle(v)} />} />
               ))}
               <Row gap={8} align="flex-end" style={{ paddingTop: 8 }}>
-                <Input containerStyle={{ flex: 1 }} label="Registration" value={reg} onChangeText={(v) => setReg(v.toUpperCase())} placeholder="UP16AB1234" autoCapitalize="characters" />
+                <Input containerStyle={{ flex: 1 }} label="Gaadi number" value={reg} onChangeText={(v) => setReg(v.toUpperCase())} placeholder="UP16AB1234" autoCapitalize="characters" />
                 <View style={{ flex: 1.4 }}>
                   <SelectField label="Model" value={regModel} options={(models ?? []).map((m) => ({ value: m.id, label: `${m.make_name} ${m.name}` }))} onChange={setRegModel} allowClear />
                 </View>
-                <Button title="Add" tone="secondary" onPress={addVehicle} />
+                <Button title="Jodo" tone="secondary" onPress={addVehicle} />
               </Row>
             </Card>
           </>

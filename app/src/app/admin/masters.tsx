@@ -203,7 +203,7 @@ export default function MastersScreen() {
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}>
           <Text variant="display">{master.title}</Text>
-          {editable && !editing ? <Button title="Add" onPress={startNew} /> : null}
+          {editable && !editing ? <Button title="Jodo" onPress={startNew} /> : null}
         </Row>
 
         {editing ? (
@@ -218,8 +218,8 @@ export default function MastersScreen() {
             })}
             {master.hasActive && editing.id ? <SwitchRow label="Active" value={!!editing.is_active} onChange={(x) => setEditing((e) => e && { ...e, is_active: x })} /> : null}
             <Row gap={8}>
-              <Button title="Save" onPress={save} />
-              <Button title="Cancel" tone="ghost" onPress={() => setEditing(null)} />
+              <Button title="Save karo" onPress={save} />
+              <Button title="Rehne do" tone="ghost" onPress={() => setEditing(null)} />
             </Row>
           </FormSection>
         ) : null}
@@ -239,7 +239,7 @@ export default function MastersScreen() {
               }
               subtitle={master.subtitle(r)}
               onPress={editable ? () => setEditing({ ...r }) : undefined}
-              right={editable ? <Text color="accent">Edit</Text> : undefined}
+              right={editable ? <Text color="accent">Badlo</Text> : undefined}
             />
           ))}
           {visible.length === 0 ? (

@@ -635,7 +635,11 @@ const styles = StyleSheet.create({
   button: { borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 26, alignItems: 'center', justifyContent: 'center' },
   iconButton: { borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },
-  input: { flex: 1, paddingVertical: 12, fontSize: 16, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
+  // minWidth 0 is load-bearing on web: react-native-web renders this as a real
+  // <input>, which carries an intrinsic width of about twenty characters, and
+  // flex:1 will not shrink a box below its intrinsic width. Two fields side by
+  // side then overflowed the card on a 360dp phone.
+  input: { flex: 1, minWidth: 0, paddingVertical: 12, fontSize: 16, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, alignSelf: 'flex-start' },
   badgeDot: { width: 5, height: 5, borderRadius: 3 },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, borderWidth: 1 },

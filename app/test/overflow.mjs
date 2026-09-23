@@ -11,7 +11,7 @@
 import { chromium } from 'playwright';
 
 const [, , base = 'http://127.0.0.1:8208', ...paths] = process.argv;
-const W = 412;
+const W = Number(process.env.WIDTH ?? 412);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: W, height: 900 } });
 

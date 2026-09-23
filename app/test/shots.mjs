@@ -17,7 +17,7 @@ if (!email || !password) {
 }
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 412, height: 900 }, deviceScaleFactor: 2 });
+const page = await browser.newPage({ viewport: { width: Number(process.env.WIDTH ?? 412), height: 900 }, deviceScaleFactor: 2 });
 
 await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.getByPlaceholder('you@shop.in').waitFor({ state: 'visible', timeout: 60000 });
@@ -35,7 +35,7 @@ if (await page.getByPlaceholder('you@shop.in').isVisible().catch(() => false)) {
 for (const p of paths.length ? paths : ['/', '/stock', '/stock/add', '/admin/item']) {
   await page.goto(base + p, { waitUntil: 'domcontentloaded', timeout: 40000 });
   await page.waitForTimeout(6000);
-  const name = 'phone' + p.replace(/[^a-z0-9]+/gi, '-');
+  const name = 'phone' + (process.env.WIDTH ?? '') + p.replace(/[^a-z0-9]+/gi, '-');
   await page.screenshot({ path: `test/screens/${name}.png`, fullPage: true });
   console.log(`  ${p} → test/screens/${name}.png`);
 }

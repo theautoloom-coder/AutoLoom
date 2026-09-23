@@ -72,5 +72,14 @@ EOS
 echo "▸ Uploading to ${SSH_TARGET}:${REMOTE_PATH}"
 tar -czf - -C dist . | ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "$REMOTE_SCRIPT"
 
+# The install page lives in its own directory so a deploy — which wipes and
+# replaces the app — cannot take it with it. It is still shipped here so the
+# two never drift: regenerate with `node scripts/build-install-page.mjs`.
+if [ -f "../deploy/install-page/index.html" ]; then
+  echo "▸ Install page"
+  scp ${SSH_KEY:+-i "$SSH_KEY"} -q ../deploy/install-page/index.html "${SSH_TARGET}:/var/www/autoloom-install/index.html"
+  ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "chown caddy:caddy /var/www/autoloom-install/index.html"
+fi
+
 echo "✓ Live at https://${DOMAIN}"
-echo "  On the iPhone: open it in Safari → Share → Add to Home Screen."
+echo "  Install page: https://${DOMAIN}/install"

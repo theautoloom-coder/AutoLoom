@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AutoLoom — phone par lagao</title>
+<meta name="theme-color" content="#0B0D10">
+<meta name="description" content="AutoLoom ko apne phone par lagane ka tareeka.">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0B0D10; --paper: #FFFFFF; --ground: #EDEEF1;
+    --red: #D2141E; --muted: #6F7883; --line: #DDE0E5;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 16px/1.5 "IBM Plex Sans", system-ui, sans-serif;
+    display: flex; justify-content: center;
+    padding: 24px 16px 56px;
+  }
+  .wrap { width: 100%; max-width: 520px; }
+
+  header { text-align: center; margin-bottom: 26px; }
+  .mark { width: 76px; height: 76px; margin: 0 auto 12px; }
+  .mark svg { width: 100%; height: 100%; display: block; }
+  h1 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800;
+       font-size: 34px; letter-spacing: -0.5px; margin: 0; }
+  .tag { font-family: "IBM Plex Mono", monospace; font-size: 11px;
+         letter-spacing: 3px; color: var(--muted); margin-top: 4px; }
+
+  .card { background: var(--paper); border: 1.5px solid var(--ink);
+          border-radius: 16px; box-shadow: 3px 3px 0 var(--ink);
+          padding: 22px; margin-bottom: 18px; }
+  .card h2 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800;
+             font-size: 21px; margin: 0 0 4px; }
+  .card p.lede { color: var(--muted); margin: 0 0 18px; font-size: 15px; }
+
+  ol { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+  ol li { counter-increment: s; display: flex; gap: 13px; padding: 11px 0;
+          border-top: 1px solid var(--line); align-items: flex-start; }
+  ol li:first-child { border-top: 0; padding-top: 0; }
+  ol li::before {
+    content: counter(s); flex: 0 0 25px; height: 25px; border-radius: 13px;
+    background: var(--ink); color: #fff; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  /* Only the step's own heading is a block. A <b> inside the description is
+     emphasis mid-sentence and must stay inline, or "Allow" and "Settings" break
+     onto lines of their own and the step stops reading as a sentence. */
+  ol li > div > b { display: block; font-weight: 600; }
+  ol li span b { font-weight: 700; }
+  ol li span { color: var(--muted); font-size: 14px; }
+
+  .btn { display: block; width: 100%; text-align: center; text-decoration: none;
+         background: var(--red); color: #fff; font-weight: 700; font-size: 17px;
+         padding: 16px; border-radius: 999px; margin-bottom: 14px; }
+  .btn.ghost { background: var(--paper); color: var(--ink);
+               border: 1.5px solid var(--ink); }
+  .btn[aria-disabled="true"] { background: #C8CCD2; pointer-events: none; }
+
+  /* Size and date under the download button: on a shop phone with limited data
+     the size decides whether this happens now or on wifi tonight. */
+  .meta { text-align: center; color: var(--muted); font-size: 13px;
+          margin: -6px 0 16px; font-family: "IBM Plex Mono", monospace; }
+
+  .warn { background: #FDF0D9; border: 1px solid #E6C68A; color: #7A5312;
+          border-radius: 12px; padding: 13px 15px; font-size: 14px;
+          margin-bottom: 18px; }
+  .warn b { display: block; margin-bottom: 2px; }
+
+  .qr { text-align: center; }
+  .qr img { width: 190px; height: 190px; image-rendering: pixelated;
+            border: 1.5px solid var(--ink); border-radius: 12px; background: #fff; }
+  .url { font-family: "IBM Plex Mono", monospace; font-size: 14px;
+         word-break: break-all; margin-top: 12px; }
+
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  footer a { color: var(--muted); }
+  .hidden { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground: #15171B; --paper: #1C1F24; --ink: #F2F4F7; --line: #2A2E35; --muted: #8A929C; }
+    body { color: #F2F4F7; }
+    .card { box-shadow: 3px 3px 0 #000; border-color: #000; }
+    ol li::before { background: var(--red); }
+    .btn.ghost { border-color: #3A3F47; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="AutoLoom">
+  <defs>
+    <path id="insL" fill-rule="evenodd" d="M 120 24 L 216 216 L 24 216 Z M 120 88 L 165 176 L 75 176 Z M 64.77000000000001 196 L 175.23 196 L 185.45 216 L 54.55 216 Z"/>
+    <mask id="insV">
+      <rect x="0" y="0" width="240" height="240" fill="#fff"/>
+      <rect x="-30" y="107.51" width="300" height="15.98" fill="#000"/>
+      <rect x="-30" y="154.51" width="300" height="15.98" fill="#000"/>
+    </mask>
+    <clipPath id="insC"><use href="#insL"/></clipPath>
+    <linearGradient id="insF" x1="0.12" y1="0" x2="0.5" y2="1">
+      <stop offset="0"    stop-color="#FF6168"/>
+      <stop offset="0.22" stop-color="#F32B36"/>
+      <stop offset="0.55" stop-color="#D2141E"/>
+      <stop offset="0.82" stop-color="#A80D16"/>
+      <stop offset="1"    stop-color="#7C060C"/>
+    </linearGradient>
+    <linearGradient id="insR" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0"    stop-color="#FFFFFF"/>
+      <stop offset="0.18" stop-color="#E7ECF2"/>
+      <stop offset="0.36" stop-color="#9BA4B0"/>
+      <stop offset="0.52" stop-color="#FFFFFF"/>
+      <stop offset="0.7"  stop-color="#AEB7C3"/>
+      <stop offset="1"    stop-color="#79828E"/>
+    </linearGradient>
+    <linearGradient id="insG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#FFFFFF" stop-opacity="0.5"/>
+      <stop offset="0.6"  stop-color="#FFFFFF" stop-opacity="0.1"/>
+      <stop offset="1"    stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g mask="url(#insV)">
+    <g transform="translate(29.92,0) skewX(-14)">
+      <g>
+        <use href="#insL" fill="#2e0409" transform="translate(11,12.1)"/>
+        <use href="#insL" fill="#35050a" transform="translate(10,11.0)"/>
+        <use href="#insL" fill="#3d060c" transform="translate(9,9.9)"/>
+        <use href="#insL" fill="#44070d" transform="translate(8,8.8)"/>
+        <use href="#insL" fill="#4c080e" transform="translate(7,7.7)"/>
+        <use href="#insL" fill="#530910" transform="translate(6,6.6)"/>
+        <use href="#insL" fill="#5b0911" transform="translate(5,5.5)"/>
+        <use href="#insL" fill="#620a13" transform="translate(4,4.4)"/>
+        <use href="#insL" fill="#6a0b14" transform="translate(3,3.3)"/>
+        <use href="#insL" fill="#710c15" transform="translate(2,2.2)"/>
+        <use href="#insL" fill="#790d17" transform="translate(1,1.1)"/>
+      </g>
+      <use href="#insL" fill="url(#insR)" transform="translate(-2.2,-2.6)"/>
+      <use href="#insL" fill="url(#insF)"/>
+      <g clip-path="url(#insC)">
+        <rect x="0" y="20" width="240" height="92" fill="url(#insG)"/>
+      </g>
+    </g>
+  </g>
+</svg></div>
+    <h1>AutoLoom</h1>
+    <div class="tag">HAR GAADI KA MAAL</div>
+  </header>
+
+  <!-- ANDROID -->
+  <section id="android" class="card hidden">
+    <h2>Android phone</h2>
+    <p class="lede">App install karo — signal na ho tab bhi chalega.</p>
+    <a class="btn" id="apk" href="/download/autoloom.apk" download>APK download karo</a>
+    <div id="apk-meta" class="meta hidden"></div>
+    <ol>
+      <li><div><b>Download dabao</b><span>File niche "Downloads" mein aa jayegi.</span></div></li>
+      <li><div><b>File par tap karo</b><span>Phone poochega — "Is source se install karne do?" → <b>Allow</b> ya <b>Settings</b> → on kar do.</span></div></li>
+      <li><div><b>Install</b><span>Ho gaya. Ab AutoLoom home screen par milega.</span></div></li>
+    </ol>
+  </section>
+
+  <!-- iPHONE, in Safari -->
+  <section id="ios" class="card hidden">
+    <h2>iPhone</h2>
+    <p class="lede">iPhone par app store waali app nahi — seedha home screen par lagti hai.</p>
+    <ol>
+      <li><div><b>Neeche Share ka button dabao</b><span>Teer wala nishaan (⬆️), screen ke neeche beech mein.</span></div></li>
+      <li><div><b>Neeche scroll karke "Add to Home Screen"</b><span>Hindi phone par "होम स्क्रीन में जोड़ें".</span></div></li>
+      <li><div><b>Add dabao</b><span>AutoLoom ka icon home screen par aa jayega — poori screen mein khulega.</span></div></li>
+    </ol>
+  </section>
+
+  <!-- iPHONE, wrong browser -->
+  <section id="ios-wrong" class="card hidden">
+    <h2>iPhone — Safari mein kholo</h2>
+    <div class="warn">
+      <b>Ye Chrome hai.</b>
+      iPhone par sirf Safari home screen par app laga sakta hai. Chrome mein ye option aata hi nahi.
+    </div>
+    <p class="lede">Neeche ka link copy karke <b>Safari</b> mein kholo, phir Share → Add to Home Screen.</p>
+    <a class="btn ghost" href="https://app.theautoloom.in/install">app.theautoloom.in/install</a>
+  </section>
+
+  <!-- DESKTOP -->
+  <section id="desktop" class="card">
+    <h2>Phone par kholo</h2>
+    <p class="lede">Ye app phone ke liye hai. Neeche wala QR apne phone ke camera se scan karo.</p>
+    <div class="qr">
+      <img src="data:image/gif;base64,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" alt="QR — https://app.theautoloom.in/install">
+      <div class="url">https://app.theautoloom.in/install</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Computer par chalana hai?</h2>
+    <p class="lede">Counter ke computer par kuch install karne ki zaroorat nahi — browser mein hi poora chalta hai.</p>
+    <a class="btn ghost" href="https://app.theautoloom.in">AutoLoom kholo</a>
+  </section>
+
+  <footer>
+    Dikkat aaye to dukaan se poochho.<br>
+    <a href="https://app.theautoloom.in">app.theautoloom.in</a>
+  </footer>
+
+</div>
+
+<script>
+  // One set of instructions, picked once. A shopkeeper reading three will
+  // follow the wrong one.
+  (function () {
+    var ua = navigator.userAgent || '';
+    var isIOS = /iPad|iPhone|iPod/.test(ua) ||
+      // iPadOS 13+ reports itself as a Mac; the touch points give it away.
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var isAndroid = /Android/.test(ua);
+    // On iOS every browser is Safari underneath, so the engine cannot tell them
+    // apart — only these vendor tokens can, and only Safari proper can install.
+    var iosOtherBrowser = isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+
+    var show = function (id) { document.getElementById(id).classList.remove('hidden'); };
+    var hide = function (id) { document.getElementById(id).classList.add('hidden'); };
+
+    if (isAndroid) { show('android'); hide('desktop'); }
+    else if (isIOS) { show(iosOtherBrowser ? 'ios-wrong' : 'ios'); hide('desktop'); }
+
+    // Already installed? Then this page has nothing to offer.
+    if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) {
+      document.querySelector('.wrap').innerHTML =
+        '<header><div class="mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="AutoLoom">  <defs>    <path id="insL" fill-rule="evenodd" d="M 120 24 L 216 216 L 24 216 Z M 120 88 L 165 176 L 75 176 Z M 64.77000000000001 196 L 175.23 196 L 185.45 216 L 54.55 216 Z"/>    <mask id="insV">      <rect x="0" y="0" width="240" height="240" fill="#fff"/>      <rect x="-30" y="107.51" width="300" height="15.98" fill="#000"/>      <rect x="-30" y="154.51" width="300" height="15.98" fill="#000"/>    </mask>    <clipPath id="insC"><use href="#insL"/></clipPath>    <linearGradient id="insF" x1="0.12" y1="0" x2="0.5" y2="1">      <stop offset="0"    stop-color="#FF6168"/>      <stop offset="0.22" stop-color="#F32B36"/>      <stop offset="0.55" stop-color="#D2141E"/>      <stop offset="0.82" stop-color="#A80D16"/>      <stop offset="1"    stop-color="#7C060C"/>    </linearGradient>    <linearGradient id="insR" x1="0" y1="0" x2="0.35" y2="1">      <stop offset="0"    stop-color="#FFFFFF"/>      <stop offset="0.18" stop-color="#E7ECF2"/>      <stop offset="0.36" stop-color="#9BA4B0"/>      <stop offset="0.52" stop-color="#FFFFFF"/>      <stop offset="0.7"  stop-color="#AEB7C3"/>      <stop offset="1"    stop-color="#79828E"/>    </linearGradient>    <linearGradient id="insG" x1="0" y1="0" x2="0" y2="1">      <stop offset="0"    stop-color="#FFFFFF" stop-opacity="0.5"/>      <stop offset="0.6"  stop-color="#FFFFFF" stop-opacity="0.1"/>      <stop offset="1"    stop-color="#FFFFFF" stop-opacity="0"/>    </linearGradient>  </defs>  <g mask="url(#insV)">    <g transform="translate(29.92,0) skewX(-14)">      <g>        <use href="#insL" fill="#2e0409" transform="translate(11,12.1)"/>        <use href="#insL" fill="#35050a" transform="translate(10,11.0)"/>        <use href="#insL" fill="#3d060c" transform="translate(9,9.9)"/>        <use href="#insL" fill="#44070d" transform="translate(8,8.8)"/>        <use href="#insL" fill="#4c080e" transform="translate(7,7.7)"/>        <use href="#insL" fill="#530910" transform="translate(6,6.6)"/>        <use href="#insL" fill="#5b0911" transform="translate(5,5.5)"/>        <use href="#insL" fill="#620a13" transform="translate(4,4.4)"/>        <use href="#insL" fill="#6a0b14" transform="translate(3,3.3)"/>        <use href="#insL" fill="#710c15" transform="translate(2,2.2)"/>        <use href="#insL" fill="#790d17" transform="translate(1,1.1)"/>      </g>      <use href="#insL" fill="url(#insR)" transform="translate(-2.2,-2.6)"/>      <use href="#insL" fill="url(#insF)"/>      <g clip-path="url(#insC)">        <rect x="0" y="20" width="240" height="92" fill="url(#insG)"/>      </g>    </g>  </g></svg></div>' +
+        '<h1>Lag chuki hai</h1><div class="tag">HAR GAADI KA MAAL</div></header>' +
+        '<section class="card"><h2>App pehle se lagi hai</h2>' +
+        '<p class="lede">Aap isi app ke andar ho.</p>' +
+        '<a class="btn" href="https://app.theautoloom.in">Aage badho</a></section>';
+    }
+
+    // If the APK has not been uploaded yet, say so instead of handing over a
+    // link that downloads a 404 page named autoloom.apk.
+    var apk = document.getElementById('apk');
+    var meta = document.getElementById('apk-meta');
+    if (apk) {
+      fetch('/download/autoloom.apk', { method: 'HEAD' }).then(function (r) {
+        if (!r.ok) {
+          apk.textContent = 'APK abhi taiyaar ho rahi hai';
+          apk.setAttribute('aria-disabled', 'true');
+          apk.removeAttribute('href');
+          return;
+        }
+        var mb = Number(r.headers.get('content-length') || 0) / 1048576;
+        var when = r.headers.get('last-modified');
+        var bits = [];
+        if (mb > 0.5) bits.push(mb.toFixed(0) + ' MB');
+        if (when) {
+          var d = new Date(when);
+          if (!isNaN(d)) bits.push(d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }));
+        }
+        if (bits.length) { meta.textContent = bits.join('  ·  '); meta.classList.remove('hidden'); }
+      }).catch(function () {});
+    }
+  })();
+</script>
+</body>
+</html>

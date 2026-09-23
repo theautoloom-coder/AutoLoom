@@ -12,6 +12,7 @@ import { Loading, useTheme } from '@/ui';
 import { palette } from '@/ui/theme';
 import { useAppFonts } from '@/ui/fonts';
 import { AnimatedSplash } from '@/ui/splash';
+import { InstallPrompt } from '@/ui/install-prompt';
 import { ToastHost } from '@/ui/toast';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -152,6 +153,7 @@ export default function RootLayout() {
               <Stack.Screen name="sync" options={{ title: 'Sync status', presentation: 'modal' }} />
             </Stack>
             <ToastHost />
+            <InstallPrompt />
           </AuthGate>
           {splashDone ? null : <AnimatedSplash onDone={() => setSplashDone(true)} />}
         </ThemeProvider>

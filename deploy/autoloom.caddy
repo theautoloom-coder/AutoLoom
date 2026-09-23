@@ -9,7 +9,6 @@
 
 app.theautoloom.in {
     encode zstd gzip
-    root * /var/www/autoloom
 
     # PowerSync's SQLite engine refuses to start if its wasm arrives as any
     # other type. Caddy normally gets this right; this makes it certain.
@@ -34,8 +33,29 @@ app.theautoloom.in {
         -Server
     }
 
-    # Single-page app: an unknown path is a route, not a missing file. Without
-    # this every deep link 404s the moment somebody refreshes the page.
-    try_files {path} {path}/ /index.html
-    file_server
+    # The APK. Served from its own directory so a deploy of the web app, which
+    # wipes and replaces /var/www/autoloom, can never take the download with it.
+    handle /download/* {
+        root * /var/www/autoloom-download
+        uri strip_prefix /download
+        file_server
+        header Content-Disposition "attachment"
+    }
+
+    # "Lagao" page — how to install on Android and on an iPhone. A plain file,
+    # deliberately outside the app bundle: it has to open before anything is
+    # installed and on a phone with two bars of signal.
+    handle /install* {
+        root * /var/www/autoloom-install
+        rewrite * /index.html
+        file_server
+    }
+
+    # Everything else is the app. Single-page: an unknown path is a route, not
+    # a missing file — without this every deep link 404s on refresh.
+    handle {
+        root * /var/www/autoloom
+        try_files {path} {path}/ /index.html
+        file_server
+    }
 }

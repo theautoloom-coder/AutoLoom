@@ -32,7 +32,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (loading) return;
     SplashScreen.hideAsync().catch(() => {});
     const onSignIn = segments[0] === 'sign-in';
-    if (!session && !onSignIn) router.replace('/sign-in');
+    // The password-recovery link arrives with its own short-lived session, but
+    // it can land a moment before that session is parsed out of the URL. Let
+    // the screen stand either way, or the reset bounces to sign-in and the
+    // link is spent for nothing.
+    const onReset = segments[0] === 'reset-password';
+    if (!session && !onSignIn && !onReset) router.replace('/sign-in');
     if (session && onSignIn) router.replace('/');
   }, [loading, session, segments, router]);
 
@@ -114,6 +119,7 @@ export default function RootLayout() {
                 }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+                <Stack.Screen name="reset-password" options={{ headerShown: false }} />
                 <Stack.Screen name="vehicle/[id]" options={{ title: 'Vehicle' }} />
                 <Stack.Screen name="product/[id]" options={{ title: 'Product' }} />
                 <Stack.Screen name="customer/[id]" options={{ title: 'Customer' }} />

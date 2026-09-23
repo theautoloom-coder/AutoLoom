@@ -7,11 +7,13 @@
  * is quiet — a working tool, not a landing page.
  */
 import React, { useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { Image, StyleSheet, View, type TextInput } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSession } from '@/lib/session';
+import { sendResetLink } from '@/lib/staff';
 import { isConfigured } from '@/lib/supabase';
 import { Button, Input, Stack, Text } from '@/ui';
 import { TAGLINE } from '@/ui/brand';
@@ -26,6 +28,25 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pwRef = useRef<TextInput>(null);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  // Only the owner has a real inbox — staff addresses are invented by the shop
+  // and nothing arrives at them. So this says plainly what it can and cannot
+  // do, instead of claiming a mail was sent and leaving them waiting.
+  async function forgot() {
+    if (!email.trim()) { setError('Pehle apna email likho, phir ye dabao.'); return; }
+    setSending(true);
+    setError(null);
+    const base = Platform.OS === 'web' && typeof window !== 'undefined'
+      ? window.location.origin
+      : 'https://app.theautoloom.in';
+    const err = await sendResetLink(email, `${base}/reset-password`);
+    setSending(false);
+    if (err) { setError(err); return; }
+    setSent(true);
+  }
+
 
   async function submit() {
     if (!email || !password) {
@@ -95,6 +116,20 @@ export default function SignInScreen() {
               />
             </Stack>
             <Button title="Kholo" size="lg" full onPress={submit} loading={busy} />
+
+            {sent ? (
+              <Text variant="small" color="ok">
+                Link bhej diya — apna email kholo. Staff ka password owner hi badalta hai.
+              </Text>
+            ) : (
+              <Button
+                title="Password bhool gaye?"
+                tone="ghost"
+                size="sm"
+                onPress={forgot}
+                loading={sending}
+              />
+            )}
             {!isConfigured() ? (
               <Text variant="small" color="danger">
                 App configured nahi hai — .env mein Supabase aur PowerSync URL daalo.

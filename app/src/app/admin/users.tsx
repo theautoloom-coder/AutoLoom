@@ -1,14 +1,14 @@
 import { useQuery } from '@powersync/react';
 import React, { useState } from 'react';
 
-import { createStaff } from '@/lib/staff';
+import { createStaff, resetStaffPassword } from '@/lib/staff';
 
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type Role } from '@domain';
 
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { insertRow, updateRow } from '@/lib/writes';
-import { Badge, Button, Card, Input, ListRow, Row, Screen, Text } from '@/ui';
+import { Badge, Button, Card, Divider, Input, ListRow, Row, Screen, Text } from '@/ui';
 import { FormSection, MultiSelectField, SelectField, SwitchRow, notify } from '@/ui/forms';
 
 type Profile = { id: string; full_name: string; mobile: string | null; role: Role; default_location_id: string | null; is_active: number; devices: number; last_seen: string | null };
@@ -40,6 +40,8 @@ export default function UsersScreen() {
   const [showMatrix, setShowMatrix] = useState(false);
   const [adding, setAdding] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [newPw, setNewPw] = useState('');
+  const [resetting, setResetting] = useState(false);
   const emptyDraft = { full_name: '', email: '', password: '', mobile: '', role: 'sales' as Role, roles: ['sales'] as Role[], default_location_id: null as string | null };
   const [draft, setDraft] = useState(emptyDraft);
 
@@ -78,6 +80,18 @@ export default function UsersScreen() {
         await db.execute('DELETE FROM profile_roles WHERE profile_id = ? AND role = ?', [profileId, r]);
       }
     }
+  }
+
+  async function resetPassword() {
+    if (!editing) return;
+    setResetting(true);
+    const err = await resetStaffPassword(editing.id, newPw);
+    setResetting(false);
+    if (err) { notify(err); return; }
+    // Deliberately shown, not hidden: the owner has to read it out to the
+    // person standing in front of them. They have no inbox to receive it.
+    notify(`${editing.full_name} ka naya password: ${newPw} — unhe bata do.`);
+    setNewPw('');
   }
 
   async function save() {
@@ -152,6 +166,27 @@ export default function UsersScreen() {
           />
           <SelectField label="Default location" value={editing.default_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => setEditing({ ...editing, default_location_id: v })} allowClear />
           <SwitchRow label="Active" hint="Inactive users cannot read or write anything, on any device." value={!!editing.is_active} onChange={(v) => setEditing({ ...editing, is_active: v ? 1 : 0 })} />
+
+          {/* Password bhool jaana roz hota hai, aur staff ke email ka koi inbox
+              nahi hota — reset link kahin nahi jaata. Isliye owner naya
+              password khud set karta hai aur unhe bata deta hai. */}
+          <Divider />
+          <Text variant="label" color="textMuted">Password bhool gaye?</Text>
+          <Row gap={8} align="flex-end">
+            <Input
+              containerStyle={{ flex: 1 }}
+              label="Naya password"
+              value={newPw}
+              onChangeText={setNewPw}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Kam se kam 8 character"
+              hint="Set karke unhe bata do — email par kuch nahi jayega."
+            />
+            <Button title="Badlo" tone="secondary" onPress={resetPassword} loading={resetting} disabled={newPw.length < 8} />
+          </Row>
+          <Divider />
+
           <Row gap={8}>
             <Button title="Save" onPress={save} />
             <Button title="Cancel" tone="ghost" onPress={() => setEditing(null)} />

@@ -7,8 +7,9 @@ import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@domain';
 
 import { cancelDailyPendingReminder, ensureDailyPendingReminder } from '@/lib/daily-reminder';
 import { useSession } from '@/lib/session';
-import { Avatar, Badge, Button, Card, Chip, Divider, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
-import { confirm, SwitchRow } from '@/ui/forms';
+import { changeMyPassword } from '@/lib/staff';
+import { Avatar, Badge, Button, Card, Chip, Divider, Input, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { confirm, notify, SwitchRow } from '@/ui/forms';
 import { space } from '@/ui/theme';
 
 type Counts = { families: number; specs: number; options: number; products: number; variants: number; models: number; fitments: number; customers: number; suppliers: number; movements: number };
@@ -17,6 +18,24 @@ export default function MoreScreen() {
   const router = useRouter();
   const status = useStatus();
   const { profile, permissions, locationId, setLocationId, signOut, can, session, actor } = useSession();
+
+  // Anyone can change their own password. This needs no Edge Function and no
+  // admin: Supabase lets a signed-in user set their own, which means it keeps
+  // working even where the server half is not deployed.
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw, setPw] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+
+  async function savePassword() {
+    setPwBusy(true);
+    const err = await changeMyPassword(pw);
+    setPwBusy(false);
+    if (err) { notify(err); return; }
+    notify('Password badal gaya. Agli baar isi se sign in karna.');
+    setPw('');
+    setPwOpen(false);
+  }
+
   const isReviewer = can('catalog.edit');
 
   const { data: locations } = useQuery<{ id: string; code: string; name: string }>('SELECT id, code, name FROM locations WHERE is_active = 1 ORDER BY sort_order');
@@ -92,6 +111,26 @@ export default function MoreScreen() {
             <Chip key={l.id} label={l.name} selected={locationId === l.id} onPress={() => setLocationId(l.id)} />
           ))}
         </Row>
+
+        <Divider />
+        {pwOpen ? (
+          <>
+            <Input
+              label="Naya password"
+              value={pw}
+              onChangeText={setPw}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholder="Kam se kam 8 character"
+            />
+            <Row gap={space.sm}>
+              <Button title="Password badlo" onPress={savePassword} loading={pwBusy} disabled={pw.length < 8} />
+              <Button title="Rehne do" tone="ghost" onPress={() => { setPwOpen(false); setPw(''); }} />
+            </Row>
+          </>
+        ) : (
+          <Button title="Apna password badlo" tone="secondary" size="sm" onPress={() => setPwOpen(true)} />
+        )}
       </Card>
 
       <SectionTitle>Sync</SectionTitle>

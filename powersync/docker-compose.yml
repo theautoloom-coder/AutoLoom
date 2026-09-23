@@ -1,0 +1,67 @@
+# Local PowerSync service, replicating from the Supabase local Postgres.
+#
+#   supabase start                        # Postgres + Auth on 54321/54322
+#   docker compose -f powersync/docker-compose.yml up -d
+#
+# The app then points EXPO_PUBLIC_POWERSYNC_URL at http://localhost:8080.
+
+name: autogrid-powersync
+
+services:
+  powersync:
+    image: journeyapps/powersync-service:latest
+    container_name: autogrid_powersync
+    command: ['start', '-r', 'unified']
+    restart: unless-stopped
+    depends_on:
+      mongo-rs-init:
+        condition: service_completed_successfully
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/service.yaml
+      PS_PORT: 8080
+      # supabase_db_<project> is the Supabase local Postgres container.
+      PS_DATABASE_URI: postgresql://powersync_role:powersync_local_dev@supabase_db_Autogrid:5432/postgres
+      PS_MONGO_URI: mongodb://mongo:27017/powersync
+      PS_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      # Supabase's Kong gateway on the shared docker network serves the JWKS.
+      PS_JWKS_URI: http://supabase_kong_Autogrid:8000/auth/v1/.well-known/jwks.json
+      PS_API_TOKEN: autogrid_local_admin_token
+    volumes:
+      - ./service.yaml:/config/service.yaml:ro
+      - ./sync-rules.yaml:/config/sync-rules.yaml:ro
+    ports:
+      - '8080:8080'
+    networks:
+      - default
+      - supabase
+
+  # Bucket storage used internally by PowerSync.
+  mongo:
+    image: mongo:7.0
+    container_name: autogrid_powersync_mongo
+    command: --replSet rs0 --bind_ip_all --quiet
+    restart: unless-stopped
+    volumes:
+      - mongo_storage:/data/db
+    networks:
+      - default
+
+  mongo-rs-init:
+    image: mongo:7.0
+    depends_on:
+      - mongo
+    restart: on-failure
+    networks:
+      - default
+    entrypoint:
+      - bash
+      - -c
+      - 'mongosh --host mongo:27017 --eval "try { rs.status().ok && quit(0) } catch {} rs.initiate({_id: \"rs0\", version: 1, members: [{ _id: 0, host: \"mongo:27017\" }]})"'
+
+volumes:
+  mongo_storage:
+
+networks:
+  supabase:
+    external: true
+    name: supabase_network_Autogrid

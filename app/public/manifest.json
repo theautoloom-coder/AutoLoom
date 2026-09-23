@@ -1,0 +1,22 @@
+{
+  "name": "AutoLoom — khata, billing, stock",
+  "short_name": "AutoLoom",
+  "description": "Car accessories ka khata, bill aur stock — signal ho ya na ho, sab is phone par.",
+  "lang": "en-IN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0D10",
+  "theme_color": "#0B0D10",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    { "src": "/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Naya bill", "url": "/invoice/edit", "icons": [{ "src": "/pwa-192.png", "sizes": "192x192" }] },
+    { "name": "Reminders", "url": "/reminders", "icons": [{ "src": "/pwa-192.png", "sizes": "192x192" }] }
+  ]
+}

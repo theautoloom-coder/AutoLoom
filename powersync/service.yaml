@@ -1,0 +1,34 @@
+# PowerSync service configuration (local development).
+# Production uses PowerSync Cloud with the same sync rules file.
+
+replication:
+  connections:
+    - type: postgresql
+      # Reachable on the Supabase docker network by container name.
+      uri: !env PS_DATABASE_URI
+      sslmode: disable
+
+storage:
+  type: mongodb
+  uri: !env PS_MONGO_URI
+
+port: !env PS_PORT
+
+sync_rules:
+  path: /config/sync-rules.yaml
+
+client_auth:
+  # Accept Supabase-issued JWTs. Newer Supabase (CLI and cloud) signs tokens
+  # with asymmetric keys published at the JWKS URL; the legacy HS256 secret is
+  # kept for projects still on symmetric signing.
+  supabase: true
+  supabase_jwt_secret: !env PS_JWT_SECRET
+  jwks_uri: !env PS_JWKS_URI
+  audience: ['authenticated']
+
+api:
+  tokens:
+    - !env PS_API_TOKEN
+
+telemetry:
+  disable_telemetry_sharing: true

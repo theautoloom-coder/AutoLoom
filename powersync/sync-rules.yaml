@@ -1,0 +1,103 @@
+# =============================================================================
+# AutoGrid sync rules
+#
+# This is a single-business system with a small staff. Everyone who signs in
+# needs the whole catalogue, stock and ledger available offline, so the default
+# bucket ships the business dataset to every authenticated device.
+#
+# What is deliberately NOT synced:
+#   · audit_logs      — server-side record, queried from the web dashboard only
+#   · auth schema     — never leaves the server
+#
+# Cost columns are protected by RLS on the server and by permission checks in
+# the app; splitting them into a separate bucket is a Phase 3 change if the
+# business later wants staff devices to hold no cost data at all.
+# =============================================================================
+
+bucket_definitions:
+  # ---------------------------------------------------------------------------
+  # Master data: catalogue, specifications, vehicles, parties, settings.
+  # Rarely changes, needed by every screen.
+  # ---------------------------------------------------------------------------
+  master_data:
+    data:
+      - SELECT * FROM company_settings
+      - SELECT * FROM app_settings
+      - SELECT * FROM profiles
+      - SELECT * FROM role_permissions
+      - SELECT * FROM devices
+      - SELECT * FROM locations
+      - SELECT * FROM units
+      - SELECT * FROM tax_rates
+      - SELECT * FROM hsn_codes
+      - SELECT * FROM product_families
+      - SELECT * FROM spec_definitions
+      - SELECT * FROM spec_options
+      - SELECT * FROM categories
+      - SELECT * FROM brands
+      - SELECT * FROM products
+      - SELECT * FROM product_variants
+      - SELECT * FROM spec_values
+      - SELECT * FROM product_images
+      - SELECT * FROM vehicle_makes
+      - SELECT * FROM vehicle_models
+      - SELECT * FROM vehicle_model_aliases
+      - SELECT * FROM vehicle_generations
+      - SELECT * FROM vehicle_variants
+      - SELECT * FROM product_fitments
+      - SELECT * FROM vehicle_spec_map
+      - SELECT * FROM price_lists
+      - SELECT * FROM price_list_items
+      - SELECT * FROM customers
+      - SELECT * FROM customer_prices
+      - SELECT * FROM customer_vehicles
+      - SELECT * FROM suppliers
+      - SELECT * FROM supplier_products
+      - SELECT * FROM document_sequences
+      # Staff proposals waiting on an admin. Small, and everyone needs to see
+      # the queue — the submitter to track their own, the admin to act on it.
+      - SELECT * FROM change_requests
+      # Money going out that is not a supplier payment. Small table, needed by
+      # the dashboard and the day's cash tally.
+      - SELECT * FROM expenses
+
+  # ---------------------------------------------------------------------------
+  # Inventory: the movement log and its derived levels.
+  # ---------------------------------------------------------------------------
+  inventory:
+    data:
+      - SELECT * FROM stock_movements
+      - SELECT * FROM stock_levels
+      - SELECT * FROM stock_adjustments
+      - SELECT * FROM stock_adjustment_lines
+      - SELECT * FROM stock_transfers
+      - SELECT * FROM stock_transfer_lines
+      - SELECT * FROM stock_audits
+      - SELECT * FROM stock_audit_lines
+
+  # ---------------------------------------------------------------------------
+  # Who did what. Written only by server triggers and never uploaded (the
+  # connector refuses it), so this is a one-way read for the Activity screen.
+  # It is its own bucket because it is the one table here that grows without
+  # bound — when it gets heavy this is the single place to add a date filter.
+  # ---------------------------------------------------------------------------
+  activity:
+    data:
+      - SELECT * FROM audit_logs
+
+  # ---------------------------------------------------------------------------
+  # Documents and money.
+  # ---------------------------------------------------------------------------
+  transactions:
+    data:
+      - SELECT * FROM sales_invoices
+      - SELECT * FROM sales_invoice_lines
+      - SELECT * FROM purchases
+      - SELECT * FROM purchase_lines
+      - SELECT * FROM payments
+      - SELECT * FROM payment_allocations
+      - SELECT * FROM ledger_entries
+      - SELECT * FROM party_balances
+      - SELECT * FROM job_cards
+      - SELECT * FROM job_card_lines
+      - SELECT * FROM job_card_labour

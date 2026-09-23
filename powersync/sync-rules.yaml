@@ -25,6 +25,9 @@ bucket_definitions:
       - SELECT * FROM app_settings
       - SELECT * FROM profiles
       - SELECT * FROM role_permissions
+      # A person can hold more than one role; this is the set, and the client
+      # unions the permissions of all of them.
+      - SELECT * FROM profile_roles
       - SELECT * FROM devices
       - SELECT * FROM locations
       - SELECT * FROM units

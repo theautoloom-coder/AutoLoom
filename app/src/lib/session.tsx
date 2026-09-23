@@ -30,6 +30,8 @@ export type SessionState = {
   session: Session | null;
   profile: Profile | null;
   permissions: Set<string>;
+  /** Every role held, primary first. */
+  roles: string[];
   can: (p: Permission) => boolean;
   /** Stamped onto every row this device writes. */
   actor: Actor;
@@ -96,10 +98,33 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   );
   const profile = profiles?.[0] ?? null;
 
+  // A person can hold more than one role, so permissions are the union of all
+  // of them. `profiles.role` is folded in alongside `profile_roles` for the
+  // same reason the server does it: an older code path may have written only
+  // the primary, and a staff member whose permissions briefly resolve to
+  // nothing sees every screen empty and assumes the app is broken.
   const { data: permRows } = useQuery<{ permission: string }>(
-    'SELECT permission FROM role_permissions WHERE role = ?',
-    [profile?.role ?? '']
+    `SELECT DISTINCT rp.permission
+       FROM role_permissions rp
+      WHERE rp.role IN (
+        SELECT role FROM profile_roles WHERE profile_id = ?1
+        UNION
+        SELECT role FROM profiles WHERE id = ?1
+      )`,
+    [userId ?? '']
   );
+
+  /** Every role this person holds, primary first. For display. */
+  const { data: roleRows } = useQuery<{ role: string }>(
+    'SELECT role FROM profile_roles WHERE profile_id = ? ORDER BY role',
+    [userId ?? '']
+  );
+  const roles = useMemo(() => {
+    const set = new Set((roleRows ?? []).map((r) => r.role));
+    if (profile?.role) set.add(profile.role);
+    // Primary first, the rest alphabetical — the list is read, not sorted on.
+    return [profile?.role, ...[...set].filter((r) => r !== profile?.role).sort()].filter(Boolean) as string[];
+  }, [roleRows, profile?.role]);
 
   const permissions = useMemo(() => new Set((permRows ?? []).map((r) => r.permission)), [permRows]);
 
@@ -120,6 +145,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       session,
       profile,
       permissions,
+      roles,
       can: (p) => can(permissions, p),
       actor: { userId, deviceId },
       deviceId,
@@ -134,7 +160,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
       },
     }),
-    [loading, session, profile, permissions, locationOverride, firstLocationId, system, userId, deviceId]
+    [loading, session, profile, permissions, roles, locationOverride, firstLocationId, system, userId, deviceId]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

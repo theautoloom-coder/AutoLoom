@@ -501,6 +501,16 @@ export const products = new Table(
   { indexes: { family: ['family_id'], brand: ['brand_id'] } }
 );
 
+export const profile_roles = new Table(
+  {
+    profile_id: column.text,
+    role: column.text,
+    created_at: column.text,
+    updated_at: column.text,
+  },
+  {}
+);
+
 export const profiles = new Table(
   {
     full_name: column.text,
@@ -1043,6 +1053,7 @@ export const AppSchema = new Schema({
   product_images,
   product_variants,
   products,
+  profile_roles,
   profiles,
   purchase_lines,
   purchases,
@@ -1101,6 +1112,7 @@ export type ProductFitmentsRow = Database['product_fitments'];
 export type ProductImagesRow = Database['product_images'];
 export type ProductVariantsRow = Database['product_variants'];
 export type ProductsRow = Database['products'];
+export type ProfileRolesRow = Database['profile_roles'];
 export type ProfilesRow = Database['profiles'];
 export type PurchaseLinesRow = Database['purchase_lines'];
 export type PurchasesRow = Database['purchases'];

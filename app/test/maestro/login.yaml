@@ -21,7 +21,8 @@ appId: in.autoloom.app
 - takeScreenshot: 1-login
 
 - tapOn:
-    below: "EMAIL"
+    below:
+      text: "(?i)email"
 - inputText: ${EMAIL}
 
 # Enter moves focus to the password box (onSubmitEditing). If that works, the
@@ -31,7 +32,8 @@ appId: in.autoloom.app
 
 # With the keyboard open the password field and the button must still be
 # visible. Before the fix they sat behind the keys.
-- assertVisible: "PASSWORD"
+- assertVisible:
+    text: "(?i)password"
 - assertVisible: "Kholo"
 - takeScreenshot: 2-keyboard-up
 

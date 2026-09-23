@@ -56,7 +56,10 @@ export default function SignInScreen() {
         <KeyboardAwareScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
-          bottomOffset={space.xxl}>
+          // Enough room under the password box for the Kholo button to clear
+          // the keyboard too. The keyboard's own go key submits, but a button
+          // you cannot see is a button that is not there.
+          bottomOffset={104}>
           <View style={styles.brand}>
             <Image source={require('../../assets/images/splash-icon.png')} style={styles.mark} resizeMode="contain" />
             <Text style={styles.wordmark}>AutoLoom</Text>

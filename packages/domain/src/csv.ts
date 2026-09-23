@@ -98,8 +98,8 @@ export function parseNumber(v: string | undefined): number | null {
 /** Column reference for each import type, shown on the import screen and used for the templates. */
 export const IMPORT_TEMPLATES = {
   products: {
-    label: 'Products & variants',
-    description: 'One row per SKU. Rows with the same product_name + brand + family are grouped into one product. Spec columns use the spec code (socket, wattage, colour…).',
+    label: 'Maal aur uske type',
+    description: 'Har SKU ki ek row. Jin rows ka product_name + brand + family same hai wo ek hi item mein jud jaati hain. Spec ke column mein spec code likho (socket, wattage, colour…).',
     required: ['family_code', 'product_name', 'variant_name', 'sku', 'retail_price'],
     optional: ['brand', 'description', 'hsn_code', 'gst_rate', 'universal', 'category', 'barcode', 'mrp', 'dealer_price', 'wholesale_price', 'min_selling_price', 'min_stock', 'reorder_level', 'reorder_qty', 'fitment_make', 'fitment_model', 'fitment_year_from', 'fitment_year_to', 'fitment_position', 'opening_qty', 'opening_cost', 'location_code', '<any spec code>'],
     example: [
@@ -108,29 +108,29 @@ export const IMPORT_TEMPLATES = {
     ],
   },
   customers: {
-    label: 'Customers',
-    description: 'One row per customer. Opening balance becomes a ledger entry (positive = they owe you).',
+    label: 'Grahak',
+    description: 'Har grahak ki ek row. Purana balance khata mein entry ban jaata hai (plus matlab unka aapko dena hai).',
     required: ['name'],
     optional: ['code', 'business_name', 'owner_name', 'mobile', 'alt_phone', 'email', 'gstin', 'pan', 'address_line1', 'address_line2', 'city', 'state_code', 'pincode', 'customer_type', 'price_list', 'credit_limit', 'credit_days', 'opening_balance', 'opening_balance_date', 'notes'],
     example: [{ code: 'C0001', name: 'XYZ Accessories', business_name: 'XYZ Accessories', owner_name: 'Rakesh Gupta', mobile: '9811001100', gstin: '09ABCDE1234F1Z5', city: 'Noida', state_code: '09', customer_type: 'dealer', price_list: 'dealer', credit_limit: '100000', credit_days: '30', opening_balance: '28500', opening_balance_date: '2026-04-01' }],
   },
   suppliers: {
-    label: 'Suppliers',
-    description: 'One row per supplier. Opening balance positive = you owe them.',
+    label: 'Supplier',
+    description: 'Har supplier ki ek row. Purana balance plus matlab aapko unhe dena hai.',
     required: ['name'],
     optional: ['code', 'company_name', 'contact_person', 'mobile', 'alt_phone', 'email', 'gstin', 'pan', 'address_line1', 'address_line2', 'city', 'state_code', 'pincode', 'payment_terms_days', 'opening_balance', 'opening_balance_date', 'notes'],
     example: [{ code: 'S0001', name: 'Bright Auto Imports', company_name: 'Bright Auto Imports Pvt Ltd', mobile: '9899001100', gstin: '07AABCU9603R1ZM', city: 'New Delhi', state_code: '07', payment_terms_days: '30', opening_balance: '96000' }],
   },
   opening_stock: {
-    label: 'Opening stock',
-    description: 'One row per SKU per location. Written as opening movements; also sets the average cost when the SKU has none.',
+    label: 'Shuruaati stock',
+    description: 'Har SKU ki har location par ek row. Shuruaati stock ke roop mein chadhta hai, aur jis SKU ka kharid rate nahi hai uska average cost bhi set kar deta hai.',
     required: ['sku', 'location_code', 'qty'],
     optional: ['unit_cost', 'note'],
     example: [{ sku: 'LED-AFY-H4-60W', location_code: 'MAIN', qty: '25', unit_cost: '1450' }],
   },
   vehicles: {
-    label: 'Vehicles',
-    description: 'One row per generation. The make and model are created if missing.',
+    label: 'Gaadiyan',
+    description: 'Har generation ki ek row. Company aur model na hon to apne aap ban jaate hain.',
     required: ['make', 'model', 'generation', 'year_from'],
     optional: ['model_code', 'body_type', 'year_to', 'facelift', 'aliases'],
     example: [{ make: 'Hyundai', model: 'Creta', model_code: 'CRETA', body_type: 'suv', generation: 'Facelift 2024+', year_from: '2024', year_to: '', facelift: 'yes', aliases: '' }],

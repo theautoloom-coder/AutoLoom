@@ -324,8 +324,8 @@ export default function ImportScreen() {
       </Row>
       <Card tone="alt">
         <Text variant="small" color="textMuted">{tpl.description}</Text>
-        <Text variant="small"><Text variant="small" style={{ fontWeight: '600' }}>Required: </Text>{tpl.required.join(', ')}</Text>
-        <Text variant="small" color="textMuted"><Text variant="small" style={{ fontWeight: '600' }}>Optional: </Text>{tpl.optional.join(', ')}</Text>
+        <Text variant="small"><Text variant="small" style={{ fontWeight: '600' }}>Zaroori: </Text>{tpl.required.join(', ')}</Text>
+        <Text variant="small" color="textMuted"><Text variant="small" style={{ fontWeight: '600' }}>Marzi se: </Text>{tpl.optional.join(', ')}</Text>
         {type === 'products' ? (
           <Text variant="small" color="textFaint">
             Spec codes: {[...new Set((defs ?? []).map((d) => d.code))].sort().join(', ')}. Dropdown values must match the option value, code or alias (H4, HB3, 9005). Multi-select values are separated with |.

@@ -8,7 +8,7 @@
 import { PowerSyncContext } from '@powersync/react';
 import { type AbstractPowerSyncDatabase } from '@powersync/react-native';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { ActivityIndicator, Image, Platform, Text, View } from 'react-native';
 
 import { SupabaseConnector } from './connector';
 import { LOCAL_VIEWS_SQL } from './local-views';
@@ -108,6 +108,9 @@ const SystemContext = createContext<System | null>(null);
 
 export function SystemProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
+  // After a few seconds a spinner stops reassuring and starts worrying, so the
+  // boot screen starts explaining itself instead.
+  const [slow, setSlow] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   // The system object is built once, before the setter exists, so it reaches
   // the closure through a ref rather than by capturing it.
@@ -149,6 +152,11 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
     const system = systemRef.current!;
     let cancelled = false;
     system.db
@@ -170,7 +178,33 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
   // themselves stay the same instances.
   const value = useMemo(() => ({ ...systemRef.current!, syncError }), [syncError]);
 
-  if (!ready) return null;
+  // Opening the local database takes a moment — longer on a first visit, when
+  // the SQLite wasm has to be fetched and the schema applied. This used to
+  // render `null`, which is a blank white page: indistinguishable from a broken
+  // app, and the reason the site was reported as "chal hi nahi raha" when it
+  // was only still starting. Show the brand instead, and say plainly if it
+  // stalls, so nobody is left staring at nothing.
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0B0D10', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+        <Image
+          source={require('../../assets/images/splash-icon.png')}
+          style={{ width: 108, height: 108 }}
+          resizeMode="contain"
+        />
+        {slow ? (
+          <View style={{ alignItems: 'center', gap: 6, paddingHorizontal: 32 }}>
+            <Text style={{ color: '#F2F4F7', fontSize: 15, fontWeight: '600' }}>Khul raha hai…</Text>
+            <Text style={{ color: '#8A929C', fontSize: 13, textAlign: 'center' }}>
+              {syncError ?? 'Pehli baar thoda waqt lagta hai. Internet dheema ho to ruk jao.'}
+            </Text>
+          </View>
+        ) : (
+          <ActivityIndicator color="#D2141E" />
+        )}
+      </View>
+    );
+  }
 
   return (
     <SystemContext.Provider value={value}>

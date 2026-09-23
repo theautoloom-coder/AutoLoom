@@ -296,6 +296,49 @@ export function FormSection({ title, children, hint }: { title: string; children
   );
 }
 
+/**
+ * A section that stays shut until asked for.
+ *
+ * Most items a shop adds need a name, a quantity and a rate. Colour, warranty,
+ * pack size and which car it fits matter on maybe one item in ten — but shown
+ * all at once they make a thirty-second job look like paperwork, which is
+ * exactly the complaint this answers. They are all still here, one tap away.
+ */
+export function Disclosure({
+  title,
+  hint,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const t = useTheme();
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <View style={[styles.section, { backgroundColor: t.surface, borderColor: t.border }]}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 4 }}>
+        <Text variant="label" color={open ? 'text' : 'textMuted'} style={{ flex: 1 }}>
+          {title}
+        </Text>
+        <Text color="textFaint">{open ? '▴' : '▾'}</Text>
+      </Pressable>
+      {!open && hint ? (
+        <Text variant="small" color="textFaint">
+          {hint}
+        </Text>
+      ) : null}
+      {open ? children : null}
+    </View>
+  );
+}
+
 /** Sticky footer with the primary action, for long forms. */
 export function FormFooter({ children }: { children: React.ReactNode }) {
   const t = useTheme();

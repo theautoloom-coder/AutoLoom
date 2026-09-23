@@ -1,7 +1,7 @@
 /**
  * Serve `dist/` the way the real server does, for testing.
  *
- *   node scripts/serve-dist.mjs [port]
+ *   node scripts/serve-dist.mjs [port] [dir]
  *
  * The one thing that matters here is the SPA fallback: without it every deep
  * link 404s and a test walk reports the whole app as broken when nothing is.
@@ -13,7 +13,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  process.argv[3] ?? 'dist'
+);
 const port = Number(process.argv[2] ?? 8202);
 
 const TYPES = {

@@ -35,6 +35,7 @@ const SCREENS = [
   ['Activity', '/activity'],
   ['Kharcha', '/expenses'],
   ['Shop settings', '/admin/settings'],
+  ['Maal aaya', '/stock/add'],
   ['New item', '/admin/item'],
   ['All items', '/admin/products'],
   ['CSV import', '/admin/import'],
@@ -90,6 +91,15 @@ await page.getByRole('button', { name: 'Kholo' }).click();
 console.log('▸ waiting for the first full sync');
 await page.waitForTimeout(45000);
 
+// Prove we are actually in. Without this the whole walk has a blind spot: a
+// failed sign-in leaves every screen showing the login page, which is neither
+// blank nor an error, so all of them would be reported as fine.
+if (await page.getByPlaceholder('you@shop.in').isVisible().catch(() => false)) {
+  await page.screenshot({ path: `${out}/walk-signin-failed.png` });
+  console.error('FAIL  sign-in did not go through — still on the login form');
+  process.exit(1);
+}
+
 const bad = [];
 for (const [name, path] of SCREENS) {
   errors = [];
@@ -106,6 +116,7 @@ for (const [name, path] of SCREENS) {
 
   const issues = [];
   if (text.length < 20) issues.push('screen is blank');
+  if (/Har bill, khata aur stock is phone par/.test(text)) issues.push('bounced to the login screen');
   if (STUCK.test(text)) issues.push(`still loading: "${text.split('\n').find((l) => STUCK.test(l))?.trim()}"`);
   if (BROKEN.test(text)) issues.push(`error on screen: "${text.split('\n').find((l) => BROKEN.test(l))?.trim()}"`);
   if (errors.length) issues.push(`console: ${errors[0]}`);

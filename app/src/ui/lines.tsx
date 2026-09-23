@@ -70,7 +70,7 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
           containerStyle={{ flex: 1 }}
           value={q}
           onChangeText={setQ}
-          placeholder="Scan barcode or type SKU / name / socket"
+          placeholder="Scan karo ya SKU / naam likho"
           autoCapitalize="none"
           autoCorrect={false}
           autoFocus={autoFocus}

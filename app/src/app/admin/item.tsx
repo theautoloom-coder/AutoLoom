@@ -26,7 +26,7 @@ import {
 } from '@/lib/requests';
 import { insertRow, searchText, updateRow } from '@/lib/writes';
 import { Button, Input, Row, Screen, Text } from '@/ui';
-import { FormSection, NumberField, SelectField, notify } from '@/ui/forms';
+import { Disclosure, FormSection, NumberField, SelectField, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
 
 type Family = { id: string; name: string; sku_prefix: string };
@@ -245,7 +245,9 @@ export default function ItemForm() {
       <Screen>
         <Text variant="display">{isNew ? 'Naya item' : 'Item edit'}</Text>
 
-        <FormSection title="Maal" hint="Category aur naam zaroori hai, baaki sab optional.">
+        {/* Naam, kitna aaya, kya rate — teen cheezein. Baaki sab neeche
+            folded hai, kyunki das mein se ek item par hi zaroori hoti hai. */}
+        <FormSection title="Maal" hint="Naam, qty aur rate — bas itna kaafi hai.">
           <SelectField
             label="Category"
             value={familyId}
@@ -261,26 +263,6 @@ export default function ItemForm() {
           />
           <Input label="Item ka naam" value={name} onChangeText={setName} placeholder="7D Luxury Mat" />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Type" value={type} onChangeText={setType} placeholder="7D / Premium" />
-            <Input containerStyle={{ flex: 1 }} label="Colour" value={colour} onChangeText={setColour} placeholder="Black" />
-          </Row>
-        </FormSection>
-
-        <FormSection title="Gaadi" hint="Kis car ke liye hai. Sab gaadi ke liye ho to khaali chhod do.">
-          <SelectField
-            label="Car"
-            value={modelId}
-            options={(models ?? []).map((m) => ({ value: m.id, label: `${m.make_name} ${m.name}` }))}
-            onChange={setModelId}
-            onCreate={addCar}
-            allowClear
-            placeholder="Hyundai Creta…"
-          />
-          <Input label="Model / saal" value={yearText} onChangeText={setYearText} placeholder="2020-2024" />
-        </FormSection>
-
-        <FormSection title="Stock aur rate">
-          <Row gap={12}>
             <View style={{ flex: 1 }}>
               <NumberField label="Qty" value={qty} onChange={setQty} decimals={0} placeholder="10" hint={isNew ? undefined : 'Stock yahan se nahi badalta'} />
             </View>
@@ -288,12 +270,30 @@ export default function ItemForm() {
               <NumberField label="Selling price" value={price} onChange={setPrice} placeholder="1550" />
             </View>
           </Row>
-          <NumberField label="Kharid rate (optional)" value={cost} onChange={setCost} placeholder="1200" hint="Margin report ke liye." />
         </FormSection>
 
-        <FormSection
-          title="Set / pair aur warranty"
-          hint="Agar item set ya pair mein bikta hai to yahan daalo — warna khaali chhod do.">
+        {/* Open whenever there is already something in here to look at: an item
+            being edited, or a rejected proposal being fixed. Collapsed over
+            prefilled fields just hides the thing they came back to change. */}
+        <Disclosure
+          title="Aur detail"
+          hint="Gaadi, colour, kharid rate, set/pair, warranty — zaroorat ho to kholo."
+          defaultOpen={!isNew || !!requestId}>
+          <Row gap={12}>
+            <Input containerStyle={{ flex: 1 }} label="Type" value={type} onChangeText={setType} placeholder="7D / Premium" />
+            <Input containerStyle={{ flex: 1 }} label="Colour" value={colour} onChangeText={setColour} placeholder="Black" />
+          </Row>
+          <SelectField
+            label="Car"
+            value={modelId}
+            options={(models ?? []).map((m) => ({ value: m.id, label: `${m.make_name} ${m.name}` }))}
+            onChange={setModelId}
+            onCreate={addCar}
+            allowClear
+            placeholder="Sab gaadi ke liye — khaali chhod do"
+          />
+          <Input label="Model / saal" value={yearText} onChangeText={setYearText} placeholder="2020-2024" />
+          <NumberField label="Kharid rate" value={cost} onChange={setCost} placeholder="1200" hint="Margin report ke liye." />
           <Row gap={12}>
             <View style={{ flex: 1 }}>
               <NumberField label="Ek set mein pieces" value={packSize} onChange={setPackSize} decimals={0} placeholder="7" />
@@ -308,7 +308,7 @@ export default function ItemForm() {
             placeholder="6"
             hint="LED, screen, camera par likho — customer page par apne aap dikhega."
           />
-        </FormSection>
+        </Disclosure>
 
         <Row gap={space.sm}>
           <Button

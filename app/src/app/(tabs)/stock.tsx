@@ -7,7 +7,7 @@ import { formatINRShort, stockStatus } from '@domain';
 
 import { LOW_STOCK, SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
-import { Badge, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Badge, Button, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { space } from '@/ui/theme';
 
 type LowRow = { id: string; sku: string; variant_name: string; product_name: string; family_name: string | null; qty: number; min_stock: number; reorder_level: number; reorder_qty: number };
@@ -38,7 +38,21 @@ export default function StockScreen() {
     <Screen>
       <Text variant="display">Stock</Text>
 
-      <Input value={q} onChangeText={setQ} placeholder="Find a SKU, barcode or product" autoCapitalize="none" autoCorrect={false} />
+      <Input value={q} onChangeText={setQ} placeholder="SKU, barcode ya naam dhoondo" autoCapitalize="none" autoCorrect={false} />
+
+      {/* The two things that actually happen every day, above everything the
+          shop touches once a month. Before this the only way to put stock in
+          was a full purchase bill, which is why nobody could find it. */}
+      {tokens.length === 0 && (can('stock.adjust') || can('catalog.edit')) ? (
+        <Row gap={space.sm}>
+          {can('stock.adjust') ? (
+            <Button title="Maal aaya" size="lg" style={{ flex: 1 }} onPress={() => router.push('/stock/add')} />
+          ) : null}
+          {can('catalog.edit') ? (
+            <Button title="Naya item" tone="secondary" size="lg" style={{ flex: 1 }} onPress={() => router.push('/admin/item')} />
+          ) : null}
+        </Row>
+      ) : null}
 
       {tokens.length > 0 ? (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
@@ -60,12 +74,12 @@ export default function StockScreen() {
               );
             })
           ) : (
-            <Empty title="No matching SKU" />
+            <Empty title="Kuch nahi mila" />
           )}
         </Card>
       ) : (
         <>
-          <SectionTitle>By location</SectionTitle>
+          <SectionTitle>Kahan kitna</SectionTitle>
           <Row gap={space.md} wrap align="stretch">
             {(locations ?? []).map((l) => (
               <Card key={l.id} style={{ flex: 1, minWidth: 140 }}>
@@ -81,28 +95,28 @@ export default function StockScreen() {
           </Row>
 
           <Card style={{ gap: 0, paddingVertical: 4 }}>
-            {can('purchase.create') ? <ListRow title="Receive purchase" subtitle="Supplier bill → scan items → post" onPress={() => router.push('/purchase/edit')} /> : null}
-            {can('purchase.create') ? <ListRow title="Purchases" subtitle="Bills, returns, what is unpaid" onPress={() => router.push('/purchases')} /> : null}
-            {can('stock.transfer') ? <ListRow title="Transfers" subtitle="Warehouse ↔ shop ↔ workshop" onPress={() => router.push('/transfers')} /> : null}
-            {can('stock.count') || can('stock.adjust') ? <ListRow title="Adjustments" subtitle="Damage, missing, found" onPress={() => router.push('/adjustments')} /> : null}
-            {can('stock.count') ? <ListRow title="Stock audits" subtitle="Physical count sessions" onPress={() => router.push('/audits')} /> : null}
-            {can('payment.pay_supplier') ? <ListRow title="Payments" subtitle="Receipts and supplier payments" onPress={() => router.push('/payments')} /> : null}
-            {can('purchase.create') || can('reports.view') ? <ListRow title="Reorder suggestions" subtitle="From recent sales velocity" onPress={() => router.push('/reorder')} /> : null}
-            {can('jobcard.edit') ? <ListRow title="Workshop job cards" subtitle="Parts + labour per vehicle → invoice" onPress={() => router.push('/job-cards')} /> : null}
+            {can('purchase.create') ? <ListRow title="Purchase bill" subtitle="Supplier ka bill — rate, udhaar, sab" onPress={() => router.push('/purchase/edit')} /> : null}
+            {can('purchase.create') ? <ListRow title="Purchases" subtitle="Bill, return, kitna baaki hai" onPress={() => router.push('/purchases')} /> : null}
+            {can('stock.transfer') ? <ListRow title="Transfer" subtitle="Godown ↔ dukan ↔ workshop" onPress={() => router.push('/transfers')} /> : null}
+            {can('stock.count') || can('stock.adjust') ? <ListRow title="Adjustment" subtitle="Damage, kam nikla, extra mila" onPress={() => router.push('/adjustments')} /> : null}
+            {can('stock.count') ? <ListRow title="Stock ginti" subtitle="Poora stock mila ke dekho" onPress={() => router.push('/audits')} /> : null}
+            {can('payment.pay_supplier') ? <ListRow title="Payment" subtitle="Aaya hua paisa, supplier ko diya" onPress={() => router.push('/payments')} /> : null}
+            {can('purchase.create') || can('reports.view') ? <ListRow title="Kya mangwana hai" subtitle="Bikri ke hisaab se suggestion" onPress={() => router.push('/reorder')} /> : null}
+            {can('jobcard.edit') ? <ListRow title="Job card" subtitle="Gaadi ka kaam — parts + labour" onPress={() => router.push('/job-cards')} /> : null}
           </Card>
 
-          <SectionTitle right={<Badge tone={(faulty ?? []).length ? 'danger' : 'ok'}>{(faulty ?? []).reduce((a, f) => a + f.qty, 0)} pcs</Badge>}>Faulty / damaged stock</SectionTitle>
+          <SectionTitle right={<Badge tone={(faulty ?? []).length ? 'danger' : 'ok'}>{(faulty ?? []).reduce((a, f) => a + f.qty, 0)} pcs</Badge>}>Kharab / damaged maal</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {(faulty ?? []).map((f) => (
               <ListRow key={f.id} title={`${f.product_name} · ${f.variant_name}`} subtitle={f.sku} onPress={() => router.push(`/stock/ledger/${f.id}`)} right={<Text mono color="danger">{f.qty}</Text>} />
             ))}
-            {(faulty ?? []).length === 0 ? <Empty title="No faulty stock" hint="Returns marked faulty land here and never go back to sellable stock." /> : null}
+            {(faulty ?? []).length === 0 ? <Empty title="Koi kharab maal nahi" hint="Returns marked faulty land here and never go back to sellable stock." /> : null}
           </Card>
 
-          <SectionTitle right={<Badge tone={lowFiltered.length ? 'warn' : 'ok'}>{lowFiltered.length} items</Badge>}>Reorder required</SectionTitle>
+          <SectionTitle right={<Badge tone={lowFiltered.length ? 'warn' : 'ok'}>{lowFiltered.length} items</Badge>}>Khatam hone wala hai</SectionTitle>
           {families.length > 1 ? (
             <Row gap={space.xs} wrap>
-              <Chip label="All" selected={!family} onPress={() => setFamily(null)} />
+              <Chip label="Sab" selected={!family} onPress={() => setFamily(null)} />
               {families.map((f) => (
                 <Chip key={f} label={f} selected={family === f} onPress={() => setFamily(family === f ? null : f)} />
               ))}
@@ -122,14 +136,14 @@ export default function StockScreen() {
                         {v.qty} / {Math.max(v.min_stock, v.reorder_level)}
                       </Text>
                       <Text variant="small" color="textFaint">
-                        on hand / minimum
+                        hai / kam se kam
                       </Text>
                     </View>
                   }
                 />
               ))
             ) : (
-              <Empty title="Everything is above its minimum" />
+              <Empty title="Sab theek hai — kuch khatam nahi ho raha" />
             )}
           </Card>
         </>

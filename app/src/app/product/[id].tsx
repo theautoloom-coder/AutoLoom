@@ -184,7 +184,14 @@ export default function ProductScreen() {
               <KV key={l.location_id} k={l.name} v={`${l.qty} ${product.unit_code ?? ''}`.trim()} mono />
             ))}
             <KV k="Total" v={`${totalQty} ${product.unit_code ?? ''}`.trim()} mono />
-            <Button title="Movement history" tone="ghost" size="sm" onPress={() => router.push(`/stock/ledger/${variant.id}`)} />
+            <Row gap={space.sm}>
+              {/* Standing on the item's own page is the moment you know its
+                  stock is wrong. Before this the fix was four screens away. */}
+              {can('stock.adjust') ? (
+                <Button title="Maal aaya" size="sm" onPress={() => router.push(`/stock/add?variant=${variant.id}` as never)} />
+              ) : null}
+              <Button title="Movement history" tone="ghost" size="sm" onPress={() => router.push(`/stock/ledger/${variant.id}`)} />
+            </Row>
             {variant.min_stock || variant.reorder_level ? (
               <Text variant="small" color="textFaint">
                 Minimum {variant.min_stock} · reorder at {variant.reorder_level} · suggested order {variant.reorder_qty}

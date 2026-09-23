@@ -20,6 +20,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -126,9 +127,15 @@ export function Screen({
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.screen, { backgroundColor: t.bg }]}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        // Not a plain ScrollView: this is the base every form in the app sits
+        // on, so it is what keeps the field you are typing in above the
+        // keyboard. bottomOffset leaves a thumb's width of room under it.
+        <KeyboardAwareScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          bottomOffset={space.xl}>
           {inner}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       ) : (
         inner
       )}
@@ -171,10 +178,18 @@ export function Grid({
   gap?: number;
 }) {
   const items = React.Children.toArray(children).filter(Boolean);
+  // Measure, because `min` is a wish and the screen is a fact. A Grid asked for
+  // 420 on a 412dp phone used to hand every child a 420 minimum, pushing the
+  // whole row past the right edge — which is why the "Remind" button at the end
+  // of each khata row was sliced in half and could not be tapped.
+  const [width, setWidth] = React.useState(0);
+  const basis = width > 0 ? Math.min(min, width) : min;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
       {items.map((child, i) => (
-        <View key={i} style={{ flexGrow: 1, flexBasis: min, minWidth: min }}>
+        <View key={i} style={{ flexGrow: 1, flexBasis: basis, minWidth: basis }}>
           {child}
         </View>
       ))}

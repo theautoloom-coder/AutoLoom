@@ -18,3 +18,9 @@ app/test/screens/
 # A cloned MCP tool that happens to live in this folder. It carries its own
 # .git and its own node_modules, and it is not part of the product.
 uiverse-mcp/
+
+# Build artefacts fetched for device testing. The APK is 50 MB and is rebuilt
+# by EAS on demand; dist-local/ is a throwaway web build pointed at the local
+# Supabase so write tests never touch the real shop's data.
+*.apk
+app/dist-local/

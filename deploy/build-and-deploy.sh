@@ -26,14 +26,29 @@ export EXPO_PUBLIC_POWERSYNC_URL="https://6aa94f588453e7cf8337416e.powersync.jou
 echo "▸ Building web bundle for ${DOMAIN}"
 cd "$(dirname "$0")/../app"
 rm -rf dist
-npx expo export --platform web
+# --clear is not optional. Metro inlines EXPO_PUBLIC_* at transform time and
+# caches the result per module; src/lib/supabase.ts rarely changes, so without
+# this the export happily reuses a cached transform carrying whatever backend
+# was set last time. That is how a local `.env` build ended up baked into what
+# looked like a production bundle — same content hash and everything.
+npx expo export --platform web --clear
 
 # A build without these is a blank white app on the phone, so fail loudly here
 # rather than after it is live.
 for f in index.html manifest.json sw.js apple-touch-icon.png; do
   [ -f "dist/$f" ] || { echo "✗ dist/$f missing — aborting"; exit 1; }
 done
-echo "▸ Build OK ($(du -sh dist | cut -f1))"
+
+# And prove the bundle really talks to production. Shipping a build that points
+# at 127.0.0.1 would look completely fine here and be dead on every phone.
+entry_js=$(grep -o '_expo/static/js/web/[A-Za-z0-9._-]*\.js' dist/index.html | sed 's|^|dist/|')
+if ! grep -qh "$EXPO_PUBLIC_SUPABASE_URL" $entry_js; then
+  echo "✗ bundle does not contain $EXPO_PUBLIC_SUPABASE_URL — aborting"; exit 1
+fi
+if grep -qh "127\.0\.0\.1:54321" $entry_js; then
+  echo "✗ bundle still points at the local Supabase — aborting"; exit 1
+fi
+echo "▸ Build OK ($(du -sh dist | cut -f1)) → $EXPO_PUBLIC_SUPABASE_URL"
 
 # The remote half is passed as an ssh ARGUMENT, not on stdin, because stdin is
 # carrying the tarball. tar over ssh rather than rsync: Git Bash on Windows has

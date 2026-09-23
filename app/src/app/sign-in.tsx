@@ -6,8 +6,9 @@
  * the card sitting on top of it in paper white. Everything below the button
  * is quiet — a working tool, not a landing page.
  */
-import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Image, StyleSheet, View, type TextInput } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSession } from '@/lib/session';
@@ -24,6 +25,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const pwRef = useRef<TextInput>(null);
 
   async function submit() {
     if (!email || !password) {
@@ -47,50 +49,58 @@ export default function SignInScreen() {
       </View>
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            <View style={styles.brand}>
-              <Image source={require('../../assets/images/splash-icon.png')} style={styles.mark} resizeMode="contain" />
-              <Text style={styles.wordmark}>AutoLoom</Text>
-              <Text style={styles.tagline}>{TAGLINE}</Text>
-            </View>
+        {/* The password box is the last thing on screen and the keyboard is
+            tall. This lifts it clear on both platforms — the old
+            KeyboardAvoidingView was passed no behavior on Android, so it did
+            nothing there and the field stayed hidden behind the keys. */}
+        <KeyboardAwareScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          bottomOffset={space.xxl}>
+          <View style={styles.brand}>
+            <Image source={require('../../assets/images/splash-icon.png')} style={styles.mark} resizeMode="contain" />
+            <Text style={styles.wordmark}>AutoLoom</Text>
+            <Text style={styles.tagline}>{TAGLINE}</Text>
+          </View>
 
-            <View style={[styles.card, shadow.lg]}>
-              <Stack gap={space.md}>
-                <Input
-                  label="Email"
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  textContentType="username"
-                  placeholder="you@shop.in"
-                  returnKeyType="next"
-                />
-                <Input
-                  label="Password"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  textContentType="password"
-                  placeholder="••••••••"
-                  returnKeyType="go"
-                  onSubmitEditing={submit}
-                  error={error}
-                />
-              </Stack>
-              <Button title="Kholo" size="lg" full onPress={submit} loading={busy} />
-              {!isConfigured() ? (
-                <Text variant="small" color="danger">
-                  App configured nahi hai — .env mein Supabase aur PowerSync URL daalo.
-                </Text>
-              ) : null}
-            </View>
+          <View style={[styles.card, shadow.lg]}>
+            <Stack gap={space.md}>
+              <Input
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="username"
+                placeholder="you@shop.in"
+                returnKeyType="next"
+                onSubmitEditing={() => pwRef.current?.focus()}
+                submitBehavior="submit"
+              />
+              <Input
+                ref={pwRef}
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                textContentType="password"
+                placeholder="••••••••"
+                returnKeyType="go"
+                onSubmitEditing={submit}
+                error={error}
+              />
+            </Stack>
+            <Button title="Kholo" size="lg" full onPress={submit} loading={busy} />
+            {!isConfigured() ? (
+              <Text variant="small" color="danger">
+                App configured nahi hai — .env mein Supabase aur PowerSync URL daalo.
+              </Text>
+            ) : null}
+          </View>
 
-            <Text style={styles.foot}>Har bill, khata aur stock is phone par — signal ho ya na ho.</Text>
-          </ScrollView>
-        </KeyboardAvoidingView>
+          <Text style={styles.foot}>Har bill, khata aur stock is phone par — signal ho ya na ho.</Text>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </View>
   );
@@ -98,7 +108,6 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  flex: { flex: 1 },
   safe: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: space.lg, paddingVertical: space.xxl },
   bands: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },

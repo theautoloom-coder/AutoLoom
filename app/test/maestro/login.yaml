@@ -1,0 +1,44 @@
+# Sign in on a real device, with the keyboard up the whole time.
+#
+#   maestro test test/maestro/login.yaml -e EMAIL=... -e PASSWORD=...
+#
+# This exists because driving the login with raw `adb input tap` kept failing,
+# and I spent too long blaming the tooling for what was an app bug: on Android
+# the password box sat behind the keyboard, so there was nothing to tap. Maestro
+# finds views by their text rather than by pixel coordinates, so when this
+# passes it is the app that works, not the coordinates that happened to line up.
+#
+# The fields are addressed by the label above them rather than by placeholder:
+# Android exposes a TextInput's placeholder as a hint, which is not reliably
+# matchable, while "EMAIL" and "PASSWORD" are real text nodes.
+appId: in.autoloom.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Kholo"
+    timeout: 90000
+- takeScreenshot: 1-login
+
+- tapOn:
+    below: "EMAIL"
+- inputText: ${EMAIL}
+
+# Enter moves focus to the password box (onSubmitEditing). If that works, the
+# box must be on screen — which is the whole point of this test.
+- pressKey: Enter
+- inputText: ${PASSWORD}
+
+# With the keyboard open the password field and the button must still be
+# visible. Before the fix they sat behind the keys.
+- assertVisible: "PASSWORD"
+- assertVisible: "Kholo"
+- takeScreenshot: 2-keyboard-up
+
+- hideKeyboard
+- tapOn: "Kholo"
+
+- extendedWaitUntil:
+    visible: "Stock"
+    timeout: 120000
+- takeScreenshot: 3-signed-in

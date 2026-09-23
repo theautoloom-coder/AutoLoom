@@ -23,16 +23,16 @@ type Company = {
 type Setting = { id: string; value: string };
 
 const BEHAVIOUR: Array<{ id: string; label: string; kind: 'number' | 'bool'; hint: string }> = [
-  { id: 'gst_enabled', label: 'GST on bills', kind: 'bool', hint: 'Off = plain bill / slip with no tax. On = GST is added per item and printed with HSN.' },
-  { id: 'allow_negative_stock', label: 'Allow billing when stock shows zero', kind: 'bool', hint: 'Keep on: a phone that was offline may not know the latest stock.' },
-  { id: 'default_credit_days', label: 'Default credit days for new dealers', kind: 'number', hint: '' },
-  { id: 'dead_stock_days', label: 'Dead stock after (days)', kind: 'number', hint: 'No sale for this long with stock on hand.' },
+  { id: 'gst_enabled', label: 'Bill par GST', kind: 'bool', hint: 'Band = saada bill / parchi, koi tax nahi. Chalu = har item par GST lagega aur HSN ke saath chhapega.' },
+  { id: 'allow_negative_stock', label: 'Stock zero dikhe tab bhi bill banane do', kind: 'bool', hint: 'Chalu rakho: jo phone offline tha usko taaza stock pata nahi hota.' },
+  { id: 'default_credit_days', label: 'Naye dealer ko kitne din ka udhaar', kind: 'number', hint: '' },
+  { id: 'dead_stock_days', label: 'Kitne din na bike to dead stock (din)', kind: 'number', hint: 'Itne din se ek bhi bikri nahi, jabki maal pada hai.' },
 ];
 
 const TEMPLATES: Array<{ id: string; label: string; hint: string; def: string }> = [
-  { id: 'wa_template_slip', label: 'Bill / slip message', hint: 'Placeholders: {name} {shop} {items} {bill_no} {total} {pending} {upi_line} {date}', def: DEFAULT_TEMPLATES.slip },
-  { id: 'wa_template_reminder', label: 'Day-end payment reminder', hint: 'Placeholders: {name} {shop} {pending} {upi_line} {date}', def: DEFAULT_TEMPLATES.reminder },
-  { id: 'wa_template_paid', label: 'Payment aane par jo message jaaye', hint: 'Placeholders: {name} {shop} {amount} {mode} {pending}', def: DEFAULT_TEMPLATES.paid },
+  { id: 'wa_template_slip', label: 'Bill / parchi ka message', hint: 'Ye apne aap bhar jaate hain: {name} {shop} {items} {bill_no} {total} {pending} {upi_line} {date}', def: DEFAULT_TEMPLATES.slip },
+  { id: 'wa_template_reminder', label: 'Din ke aakhir mein paise ki yaad', hint: 'Ye apne aap bhar jaate hain: {name} {shop} {pending} {upi_line} {date}', def: DEFAULT_TEMPLATES.reminder },
+  { id: 'wa_template_paid', label: 'Payment aane par jo message jaaye', hint: 'Ye apne aap bhar jaate hain: {name} {shop} {amount} {mode} {pending}', def: DEFAULT_TEMPLATES.paid },
 ];
 
 export default function SettingsScreen() {

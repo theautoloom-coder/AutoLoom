@@ -61,7 +61,11 @@ const SCREENS = [
 
 /** Words that mean the screen gave up or never arrived. */
 const STUCK = /preparing|loading…|khul raha hai|ban raha hai/i;
-const BROKEN = /nahi ban paaya|nahi mil|error|unable|failed|something went wrong/i;
+// Now that the whole app is Hinglish, "kuch nahi mila" is an ordinary empty
+// state, not a failure — matching on it flagged the sync screen's own
+// explanation as an error. These are phrasings that only appear when something
+// actually went wrong, plus the tells of a value that was never resolved.
+const BROKEN = /nahi ban paaya|nahi hua:|nahi badla|nahi chadha|something went wrong|unhandled|undefined|NaN|\[object Object\]/i;
 
 const out = 'test/screens';
 fs.mkdirSync(out, { recursive: true });

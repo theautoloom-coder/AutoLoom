@@ -292,7 +292,18 @@ export const DASHBOARD_TODAY = {
       (SELECT COALESCE(SUM(balance),0) FROM party_balance_live WHERE party_type='supplier' AND balance > 0) AS payables,
       (SELECT COALESCE(SUM(sl.qty * pv.avg_cost),0) FROM stock_on_hand sl JOIN product_variants pv ON pv.id = sl.variant_id JOIN locations l ON l.id = sl.location_id WHERE l.type <> 'damaged') AS stock_value,
       (SELECT COALESCE(SUM(grand_total - paid_total),0) FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND due_date < ?1 AND grand_total > paid_total) AS overdue_amount,
-      (SELECT COUNT(DISTINCT customer_id) FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND due_date < ?1 AND grand_total > paid_total) AS overdue_customers`,
+      (SELECT COUNT(DISTINCT customer_id) FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND due_date < ?1 AND grand_total > paid_total) AS overdue_customers,
+      -- What the maal that went out today had cost. Taken from the movement's
+      -- own unit_cost, which posting stamped with the moving average at the
+      -- moment of sale — so it is the cost of THOSE pieces, not today's rate.
+      -- Sale movements are negative, hence the sign flip.
+      (SELECT COALESCE(SUM(-qty * unit_cost),0) FROM stock_movements WHERE movement_type='sale' AND date(occurred_at) = ?1) AS cogs_today,
+      (SELECT COALESCE(SUM(-qty * unit_cost),0) FROM stock_movements WHERE movement_type='damage' AND date(occurred_at) = ?1) AS damage_today,
+      (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date = ?1) AS spent_today,
+      (SELECT COUNT(*) FROM product_variants pv JOIN products p ON p.id = pv.product_id
+        WHERE pv.is_active = 1 AND p.is_active = 1
+          AND COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id),0)
+              <= MAX(pv.min_stock, pv.reorder_level)) AS low_stock_count`,
 };
 
 export const STOCK_VALUE_BY_LOCATION = {
@@ -382,3 +393,39 @@ export const CUSTOMER_TOP_PRODUCTS = (sinceDate: string) => ({
     GROUP BY pv.id ORDER BY qty DESC LIMIT 20`,
   params: [sinceDate],
 });
+
+
+/**
+ * Aaj kya hua — everything that happened today, in the order it happened.
+ *
+ * One list out of five tables, because the shop does not think in tables. The
+ * time is what makes it read as a day rather than a report, so each row keeps
+ * whatever timestamp it actually has.
+ */
+export const TODAY_FEED = {
+  sql: `
+    SELECT * FROM (
+      SELECT 'sale' AS kind, i.id, i.created_at AS at,
+             COALESCE(c.name, 'Cash') AS who,
+             i.grand_total AS amount, NULL AS qty
+        FROM sales_invoices i LEFT JOIN customers c ON c.id = i.customer_id
+       WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date = ?1
+      UNION ALL
+      SELECT 'purchase', p.id, p.created_at, COALESCE(s.name, 'Maal aaya'), p.grand_total, NULL
+        FROM purchases p LEFT JOIN suppliers s ON s.id = p.supplier_id
+       WHERE p.doc_type='purchase' AND p.status='posted' AND p.doc_date = ?1
+      UNION ALL
+      SELECT 'expense', e.id, e.created_at, COALESCE(e.category, 'Kharcha'), e.amount, NULL
+        FROM expenses e WHERE e.expense_date = ?1
+      UNION ALL
+      SELECT 'payment', pm.id, pm.created_at,
+             CASE WHEN pm.direction='in' THEN 'Paisa aaya' ELSE 'Paisa diya' END,
+             pm.amount, NULL
+        FROM payments pm WHERE pm.status='posted' AND pm.payment_date = ?1
+      UNION ALL
+      SELECT CASE WHEN a.reason='damage' THEN 'damage' ELSE 'adjust' END, a.id, a.created_at,
+             COALESCE(a.notes, a.reason), NULL,
+             (SELECT COALESCE(SUM(qty_delta),0) FROM stock_adjustment_lines WHERE adjustment_id = a.id)
+        FROM stock_adjustments a WHERE a.status='posted' AND a.doc_date = ?1
+    ) ORDER BY at DESC LIMIT 40`,
+};

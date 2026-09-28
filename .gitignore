@@ -24,3 +24,7 @@ uiverse-mcp/
 # Supabase so write tests never touch the real shop's data.
 *.apk
 app/dist-local/
+# dist-check/ is the same idea for verification: a full web export built
+# purely so a screenshot is of the code that exists rather than of whatever
+# was last served.
+app/dist-check/

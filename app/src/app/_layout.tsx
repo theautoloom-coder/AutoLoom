@@ -128,7 +128,6 @@ export default function RootLayout() {
                 <Stack.Screen name="suppliers" options={{ title: 'Supplier' }} />
                 <Stack.Screen name="supplier/[id]" options={{ title: 'Supplier' }} />
                 <Stack.Screen name="supplier/edit" options={{ title: 'Supplier' }} />
-                <Stack.Screen name="admin/index" options={{ title: 'Admin' }} />
                 <Stack.Screen name="admin/item" options={{ title: 'Item' }} />
                 <Stack.Screen name="admin/products" options={{ title: 'Saara maal' }} />
                 <Stack.Screen name="admin/masters" options={{ title: 'Master data' }} />

@@ -25,7 +25,7 @@
 import React from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Card, useTheme } from './index';
+import { Card, DIVIDED_ROW, useTheme } from './index';
 import { radius, space } from './theme';
 
 // -----------------------------------------------------------------------------
@@ -163,7 +163,9 @@ export function SkeletonRow({ size = 44, round, divider = true }: { size?: numbe
         // the height — an avatar list is three pixels shorter than a photo
         // list, and `size` is how the caller says which one is coming.
         paddingVertical: 13,
-        borderBottomWidth: divider ? StyleSheet.hairlineWidth : 0,
+        // Width stays, colour goes: the same trick ListRow uses, so a row that
+        // happens to be last is not a hairline shorter than the rest.
+        borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: divider ? t.border : 'transparent',
       }}>
       <Skeleton width={size} height={size} radius={round ? size / 2 : radius.sm} />
@@ -174,6 +176,9 @@ export function SkeletonRow({ size = 44, round, divider = true }: { size?: numbe
     </View>
   );
 }
+
+// Card drops the hairline on the last one of these, same as a real ListRow.
+SkeletonRow[DIVIDED_ROW] = true;
 
 /**
  * A `StatTile` before its number: the accent strip, the label, the tinted icon

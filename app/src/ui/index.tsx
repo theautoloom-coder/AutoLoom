@@ -211,6 +211,11 @@ export function Grid({
   );
 }
 
+/** Marks a component whose last instance in a Card should drop its hairline. */
+export const DIVIDED_ROW = Symbol.for('autoloom.dividedRow');
+const isDividedRow = (t: unknown) =>
+  typeof t === 'function' && (t as { [DIVIDED_ROW]?: boolean })[DIVIDED_ROW] === true;
+
 /**
  * Turn off the hairline on the last ListRow in a card.
  *
@@ -220,6 +225,10 @@ export function Grid({
  * looks inside fragments because half the lists in this app are built as
  * `{canEdit ? <>...</> : null}` and a row hidden in one is still the last row.
  *
+ * It recognises a row by a flag on the component rather than by importing the
+ * component, because the skeleton rows live in a module that imports this one
+ * and asking for them by name here would close the circle.
+ *
  * The border is set transparent rather than removed, so nothing shifts by the
  * hairline when a row becomes the last one.
  */
@@ -228,7 +237,7 @@ function dropLastDivider(nodes: React.ReactNode): { nodes: React.ReactNode; done
   for (let i = arr.length - 1; i >= 0; i--) {
     const k = arr[i];
     if (!React.isValidElement(k)) continue;
-    if (k.type === ListRow) {
+    if (isDividedRow(k.type)) {
       const next = [...arr];
       next[i] = React.cloneElement(k as React.ReactElement<{ divider?: boolean }>, { divider: false });
       return { nodes: next, done: true };
@@ -617,6 +626,8 @@ export function ListRow({
     </Pressable>
   );
 }
+
+ListRow[DIVIDED_ROW] = true;
 
 /** Dashboard figure. */
 export function StatTile({

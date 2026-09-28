@@ -233,7 +233,13 @@ const html = `<!doctype html>
     var apk = document.getElementById('apk');
     var meta = document.getElementById('apk-meta');
     if (apk) {
-      fetch('${APK}', { method: 'HEAD' }).then(function (r) {
+      // The HEAD carries a cache-buster and the download link is stamped with
+      // the build's own date. Cloudflare sits in front of this and had been
+      // handing out a four-hour-old copy of the APK after a new one shipped --
+      // the page said "48 MB, 29 Sep" while the file arriving was the previous
+      // build. A per-build query string is a different cache key, so the link
+      // is always the build this page just measured, and still cacheable.
+      fetch('${APK}?t=' + Date.now(), { method: 'HEAD' }).then(function (r) {
         if (!r.ok) {
           apk.textContent = 'APK abhi taiyaar ho rahi hai';
           apk.setAttribute('aria-disabled', 'true');
@@ -242,6 +248,8 @@ const html = `<!doctype html>
         }
         var mb = Number(r.headers.get('content-length') || 0) / 1048576;
         var when = r.headers.get('last-modified');
+        var stamp = when ? Date.parse(when) : 0;
+        if (stamp) apk.setAttribute('href', '${APK}?v=' + stamp);
         var bits = [];
         if (mb > 0.5) bits.push(mb.toFixed(0) + ' MB');
         if (when) {

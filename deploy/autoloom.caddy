@@ -40,6 +40,16 @@ app.theautoloom.in {
         uri strip_prefix /download
         file_server
         header Content-Disposition "attachment"
+        # Cloudflare sits in front and, with no Cache-Control from here, applied
+        # its own 4h default — so a freshly shipped APK went on downloading as
+        # the previous one. no-cache means "keep it, but ask me first", and with
+        # Last-Modified that ask is a 304.
+        #
+        # Cloudflare's Browser Cache TTL setting still rewrites this to 4h on the
+        # way out, so the install page also stamps the link with the build's
+        # date. That query string is a different cache key, which is what
+        # actually guarantees a phone gets the build that just shipped.
+        header Cache-Control "no-cache"
     }
 
     # "Lagao" page — how to install on Android and on an iPhone. A plain file,

@@ -103,6 +103,24 @@ const out = ssh(
 );
 console.log(`  ${out.trim()}`);
 
-const head = ssh(`curl -sS -o /dev/null -m 30 -w "%{http_code} %{size_download}" --resolve app.theautoloom.in:443:127.0.0.1 https://app.theautoloom.in/download/autoloom.apk`);
-console.log(`▸ served: HTTP ${head.trim()}`);
+// Two checks, and the second is the one that matters. The --resolve pins the
+// request to the box itself, which proves the file landed but says nothing
+// about what a phone gets: Cloudflare sits in front, and the first time this
+// shipped it went on handing out the previous APK for hours while this line
+// printed a healthy 200. A deploy nobody can download is not a deploy.
+const origin = ssh(`curl -sS -o /dev/null -m 60 -w "%{http_code} %{size_download}" --resolve app.theautoloom.in:443:127.0.0.1 https://app.theautoloom.in/download/autoloom.apk`);
+console.log(`▸ origin: HTTP ${origin.trim()}`);
+const originSize = Number(origin.trim().split(' ')[1] ?? 0);
+
+const res = await fetch(`https://app.theautoloom.in/download/autoloom.apk?v=${Date.now()}`, { method: 'HEAD' });
+const publicSize = Number(res.headers.get('content-length') ?? 0);
+console.log(`▸ public: HTTP ${res.status} ${publicSize} (cf ${res.headers.get('cf-cache-status') ?? 'n/a'})`);
+
+if (publicSize !== originSize) {
+  console.error(`✗ the public URL is serving ${publicSize} bytes, the box has ${originSize}`);
+  console.error('  Cloudflare is holding an older copy. Purge it, or share the /install page,');
+  console.error('  which stamps the link with this build so it is never the cached one.');
+  process.exit(1);
+}
+
 console.log('✓ https://app.theautoloom.in/install');

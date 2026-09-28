@@ -28,7 +28,7 @@ export default function PaymentsScreen() {
   async function reverse(p: P) {
     const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Reason (e.g. cheque bounced, entered twice)') : 'Reversed';
     if (!reason || !(await confirm('Payment wapas lein?', `${p.doc_no} for ${formatINR(p.amount)} will be reversed in the ledger and its allocations removed.`))) return;
-    try { await db.writeTransaction((tx) => cancelPayment(tx, p.id, reason, actor)); notify('Wapas le liya.'); } catch (e) { notify((e as Error).message); }
+    try { await db.writeTransaction((tx) => cancelPayment(tx, p.id, reason, actor)); notify('Wapas le liya.', 'ok'); } catch (e) { notify((e as Error).message); }
   }
 
   return (

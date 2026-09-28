@@ -8,7 +8,7 @@ import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@domain';
 import { cancelDailyPendingReminder, ensureDailyPendingReminder } from '@/lib/daily-reminder';
 import { useSession } from '@/lib/session';
 import { changeMyPassword } from '@/lib/staff';
-import { Avatar, Badge, Button, Card, Chip, Divider, Input, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Avatar, Badge, Button, Card, Chip, Divider, IconBadge, Input, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { confirm, notify, SwitchRow } from '@/ui/forms';
 import { space } from '@/ui/theme';
 
@@ -31,7 +31,7 @@ export default function MoreScreen() {
     const err = await changeMyPassword(pw);
     setPwBusy(false);
     if (err) { notify(err); return; }
-    notify('Password badal gaya. Agli baar isi se sign in karna.');
+    notify('Password badal gaya. Agli baar isi se sign in karna.', 'ok');
     setPw('');
     setPwOpen(false);
   }
@@ -133,10 +133,22 @@ export default function MoreScreen() {
         )}
       </Card>
 
+      {/* Put it near the top: somebody who needs the manual needs it now, not
+          after scrolling past nine things they do not understand. */}
+      <SectionTitle>Madad</SectionTitle>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
+        <ListRow
+          left={<IconBadge name="help-buoy-outline" accent="rose" />}
+          title="Kaise chalayein"
+          subtitle="Bill, maal, khata, hisaab — har kaam ka tareeka"
+          onPress={() => router.push('/help')}
+        />
+      </Card>
+
       <SectionTitle>Sync</SectionTitle>
       <Card style={{ gap: 0 }}>
         <ListRow
-          title="Sync ka haal"
+          left={<IconBadge name="cloud-done-outline" accent="blue" />} title="Sync ka haal"
           subtitle={status.connected ? (status.lastSyncedAt ? `Aakhri sync ${status.lastSyncedAt.toLocaleTimeString('en-IN')}` : 'Juda hua') : 'Offline — badlav is phone par ruke hue hain'}
           onPress={() => router.push('/sync')}
           right={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Juda hua' : 'Offline'}</Badge>}
@@ -146,7 +158,7 @@ export default function MoreScreen() {
       <SectionTitle>Paisa</SectionTitle>
       <Card style={{ gap: 0 }}>
         <ListRow
-          title="Kharcha"
+          left={<IconBadge name="wallet-outline" accent="amber" />} title="Kharcha"
           subtitle="Transport, packing, chai, advance — jo bhi bahar jaaye"
           onPress={() => router.push('/expenses')}
         />
@@ -186,7 +198,7 @@ export default function MoreScreen() {
 
       {can('reports.view') ? (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
-          <ListRow title="Hisaab-kitab" subtitle="Bikri, GST, purchase, baaki paisa, stock, margin" onPress={() => router.push('/reports')} />
+          <ListRow left={<IconBadge name="bar-chart-outline" accent="violet" />} title="Hisaab-kitab" subtitle="Bikri, GST, purchase, baaki paisa, stock, margin" onPress={() => router.push('/reports')} />
         </Card>
       ) : null}
 
@@ -205,7 +217,7 @@ export default function MoreScreen() {
         <>
           <SectionTitle>Admin</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>
-            <ListRow title="Admin kholo" subtitle="Maal, gaadi, party, dukan settings" onPress={() => router.push('/admin')} />
+            <ListRow left={<IconBadge name="options-outline" accent="teal" />} title="Admin kholo" subtitle="Maal, gaadi, party, dukan settings" onPress={() => router.push('/admin')} />
           </Card>
         </>
       ) : null}

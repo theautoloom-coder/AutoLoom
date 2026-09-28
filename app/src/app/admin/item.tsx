@@ -211,13 +211,13 @@ export default function ItemForm() {
       // admin instead of writing the catalogue. They used to hit a dead end
       // here and ring the owner.
       if (!canEdit) {
-        if (!actor.userId) { notify('Session purana ho gaya. Dobara sign in karo.'); return; }
+        if (!actor.userId) { notify('Session purana ho gaya. Dobara sign in karo.', 'danger'); return; }
         if (requestId) {
           await resubmitRequest(db, requestId, proposal, note);
-          notify('Dobara bhej diya. Admin dekhega.');
+          notify('Dobara bhej diya. Admin dekhega.', 'ok');
         } else {
           await submitRequest(db, proposal, { actor, locationId, note });
-          notify('Admin ko bhej diya. Approve hote hi item ban jayega.');
+          notify('Admin ko bhej diya. Approve hote hi item ban jayega.', 'ok');
         }
         router.replace('/requests');
         return;
@@ -262,13 +262,13 @@ export default function ItemForm() {
               storage_path: stored, sort_order: 0,
             }, actor);
           } catch (e) {
-            notify(`Item ban gaya, par photo nahi chadhi: ${String((e as Error).message ?? e)}. Item kholke dobara lagao.`);
+            notify(`Item ban gaya, par photo nahi chadhi: ${String((e as Error).message ?? e)}. Item kholke dobara lagao.`, 'ok');
           }
         }
       }
       router.replace((back as never) ?? ('/admin/products' as never));
     } catch (e) {
-      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`);
+      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setSaving(false);
     }

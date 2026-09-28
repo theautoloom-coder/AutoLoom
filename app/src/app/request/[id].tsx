@@ -82,10 +82,10 @@ export default function RequestReview() {
       await approveRequest(db, req, {
         actor, locationId, takenSkus, skuPrefix: family?.sku_prefix ?? null,
       });
-      notify('Approve ho gaya. Item catalogue mein aa gaya.');
+      notify('Approve ho gaya. Item catalogue mein aa gaya.', 'ok');
       router.replace('/requests');
     } catch (e) {
-      notify(`Approve nahi hua: ${String((e as Error).message ?? e)}`);
+      notify(`Approve nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setBusy(false);
     }
@@ -100,10 +100,10 @@ export default function RequestReview() {
     setBusy(true);
     try {
       await rejectRequest(db, req.id, reason);
-      notify('Wapas bhej diya.');
+      notify('Wapas bhej diya.', 'ok');
       router.replace('/requests');
     } catch (e) {
-      notify(`Reject nahi hua: ${String((e as Error).message ?? e)}`);
+      notify(`Reject nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setBusy(false);
     }

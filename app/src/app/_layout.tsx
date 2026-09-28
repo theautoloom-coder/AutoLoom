@@ -164,7 +164,8 @@ export default function RootLayout() {
                 <Stack.Screen name="job-card/[id]" options={{ title: 'Job card' }} />
                 <Stack.Screen name="reorder" options={{ title: 'Kya mangwana hai' }} />
                 <Stack.Screen name="reminders" options={{ title: 'Yaad dilao' }} />
-                <Stack.Screen name="sync" options={{ title: 'Sync ka haal', presentation: 'modal' }} />
+                <Stack.Screen name="help" options={{ title: 'Kaise chalayein' }} />
+              <Stack.Screen name="sync" options={{ title: 'Sync ka haal', presentation: 'modal' }} />
               </Stack>
               <ToastHost />
               <InstallPrompt />

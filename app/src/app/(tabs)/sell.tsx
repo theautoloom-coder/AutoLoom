@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { formatINR, toDateString } from '@domain';
 
 import { useSession } from '@/lib/session';
-import { Badge, Button, Card, Empty, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Badge, Button, Card, Empty, IconBadge, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 
 type InvoiceRow = { id: string; doc_type: string; doc_no: string | null; doc_date: string; grand_total: number; paid_total: number; status: string; customer_name: string; payment_mode: string | null };
 
@@ -40,12 +40,12 @@ export default function BillingScreen() {
       </Card>
 
       <Card style={{ gap: 0, paddingVertical: 4 }}>
-        {can('payment.receive') ? <ListRow title="Payment aaya" subtitle="Cash / online, screenshot, remark" onPress={() => router.push('/payment/edit?direction=in')} /> : null}
-        <ListRow title="WhatsApp par yaad dilao aur parchi bhejo" subtitle="Din ke aakhir ki pending list, UPI link, aaj ki parchi" onPress={() => router.push('/reminders')} />
-        <ListRow title="Grahak (khata)" subtitle="Khata, baaki paisa, pichhle rate" onPress={() => router.push('/customers')} />
-        {can('payment.receive') ? <ListRow title="Payment" subtitle="Rasid, proof, wapasi" onPress={() => router.push('/payments')} /> : null}
-        {can('jobcard.edit') ? <ListRow title="Job card" subtitle="Workshop: parts + labour → bill" onPress={() => router.push('/job-cards')} /> : null}
-        {can('reports.view') ? <ListRow title="Hisaab-kitab" subtitle="Bikri, baaki paisa, stock, margin" onPress={() => router.push('/reports')} /> : null}
+        {can('payment.receive') ? <ListRow left={<IconBadge name="cash-outline" accent="green" />} title="Payment aaya" subtitle="Cash / online, screenshot, remark" onPress={() => router.push('/payment/edit?direction=in')} /> : null}
+        <ListRow left={<IconBadge name="logo-whatsapp" accent="green" />} title="WhatsApp par yaad dilao aur parchi bhejo" subtitle="Din ke aakhir ki pending list, UPI link, aaj ki parchi" onPress={() => router.push('/reminders')} />
+        <ListRow left={<IconBadge name="people-outline" accent="blue" />} title="Grahak (khata)" subtitle="Khata, baaki paisa, pichhle rate" onPress={() => router.push('/customers')} />
+        {can('payment.receive') ? <ListRow left={<IconBadge name="receipt-outline" accent="teal" />} title="Payment" subtitle="Rasid, proof, wapasi" onPress={() => router.push('/payments')} /> : null}
+        {can('jobcard.edit') ? <ListRow left={<IconBadge name="build-outline" accent="violet" />} title="Job card" subtitle="Workshop: parts + labour → bill" onPress={() => router.push('/job-cards')} /> : null}
+        {can('reports.view') ? <ListRow left={<IconBadge name="bar-chart-outline" accent="amber" />} title="Hisaab-kitab" subtitle="Bikri, baaki paisa, stock, margin" onPress={() => router.push('/reports')} /> : null}
       </Card>
 
       {drafts.length > 0 ? (

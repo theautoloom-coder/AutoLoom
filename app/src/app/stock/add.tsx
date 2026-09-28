@@ -114,10 +114,10 @@ export default function StockAdd() {
         }
         await postAdjustment(tx, adjId, actor);
       });
-      notify(`${total} pcs stock mein chadh gaya.`);
+      notify(`${total} pcs stock mein chadh gaya.`, 'ok');
       router.back();
     } catch (e) {
-      notify(`Nahi chadha: ${String((e as Error).message ?? e)}`);
+      notify(`Nahi chadha: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setSaving(false);
     }

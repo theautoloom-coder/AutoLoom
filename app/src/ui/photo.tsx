@@ -111,7 +111,7 @@ export function PhotoPicker({
       }
       const stored = await uploadPhoto(picked, variantId);
       await onChange?.(stored);
-      notify('Photo lag gayi.');
+      notify('Photo lag gayi.', 'ok');
     } catch (e) {
       notify(`Photo upload nahi hui: ${String((e as Error).message ?? e)}. Net check karo.`);
     } finally {
@@ -125,7 +125,7 @@ export function PhotoPicker({
       if (!path) { onPickLocal?.(null); return; }
       await onChange?.(null);
       await deletePhotoFile(path).catch(() => {});
-      notify('Photo hata di.');
+      notify('Photo hata di.', 'ok');
     } finally {
       setBusy(false);
     }

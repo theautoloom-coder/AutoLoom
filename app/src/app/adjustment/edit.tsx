@@ -65,7 +65,7 @@ export default function AdjustmentEdit() {
     if (!id || !doc) return;
     if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
     if ((lines ?? []).some((l) => !l.qty_delta)) { notify('Har line mein qty ka badlav zaroori hai.'); return; }
-    if (!can('stock.adjust')) { notify('Draft save ho gaya. Owner ya admin hi post karega.'); router.replace('/adjustments'); return; }
+    if (!can('stock.adjust')) { notify('Draft save ho gaya. Owner ya admin hi post karega.', 'ok'); router.replace('/adjustments'); return; }
     if (!(await confirm('Adjustment post karein?', 'Stock changes immediately and the adjustment is logged with your name.'))) return;
     setBusy(true);
     try {

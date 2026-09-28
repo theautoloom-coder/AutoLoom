@@ -63,7 +63,7 @@ export default function FamilyEditor() {
       is_active: !!form.is_active,
     });
     setDirty(false);
-    notify('Save ho gaya.');
+    notify('Save ho gaya.', 'ok');
   }
 
   async function move(spec: Spec, dir: -1 | 1) {

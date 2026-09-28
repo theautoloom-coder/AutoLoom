@@ -63,7 +63,7 @@ export default function SettingsScreen() {
     if (company) await updateRow(db, 'company_settings', company.id, payload);
     else await insertRow(db, 'company_settings', payload);
     setDirty(false);
-    notify('Save ho gaya.');
+    notify('Save ho gaya.', 'ok');
   }
 
   async function saveSetting(id: string, value: unknown) {
@@ -120,7 +120,7 @@ export default function SettingsScreen() {
           return (
             <View key={t.id} style={{ gap: 6 }}>
               <Input label={t.label} value={current} onChangeText={(v) => setTpl((x) => ({ ...x, [t.id]: v }))} multiline numberOfLines={5} hint={t.hint} editable={editable} style={{ minHeight: 110 }} />
-              {editable ? <Row gap={8}><Button title="Template save karo" size="sm" tone="secondary" onPress={() => saveSetting(t.id, current).then(() => notify('Template save ho gaya.'))} /><Button title="Wapas default par le jao" size="sm" tone="ghost" onPress={() => setTpl((x) => ({ ...x, [t.id]: t.def }))} /></Row> : null}
+              {editable ? <Row gap={8}><Button title="Template save karo" size="sm" tone="secondary" onPress={() => saveSetting(t.id, current).then(() => notify('Template save ho gaya.', 'ok'))} /><Button title="Wapas default par le jao" size="sm" tone="ghost" onPress={() => setTpl((x) => ({ ...x, [t.id]: t.def }))} /></Row> : null}
             </View>
           );
         })}

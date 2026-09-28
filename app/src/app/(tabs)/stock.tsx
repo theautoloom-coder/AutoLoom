@@ -7,12 +7,20 @@ import { formatINRShort, stockStatus } from '@domain';
 
 import { LOW_STOCK, SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
-import { Badge, Button, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Badge, Button, Card, Chip, Empty, IconBadge, Input, ListRow, Row, Screen, SectionTitle, StatTile, Text, type IconName } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
+
 type LowRow = { id: string; sku: string; variant_name: string; product_name: string; family_name: string | null; qty: number; min_stock: number; reorder_level: number; reorder_qty: number };
 type LocRow = { id: string; code: string; name: string; type: string; value: number; units: number };
+const LOCATION_LOOK: Record<string, { icon: IconName; accent: string }> = {
+  warehouse: { icon: 'business-outline', accent: 'blue' },
+  shop: { icon: 'storefront-outline', accent: 'green' },
+  workshop: { icon: 'construct-outline', accent: 'violet' },
+  damaged: { icon: 'alert-circle-outline', accent: 'amber' },
+};
+
 type VariantHit = { id: string; sku: string; variant_name: string; product_id: string; product_name: string; family_name: string | null; qty: number; min_stock: number; reorder_level: number; photo_path: string | null };
 
 export default function StockScreen() {
@@ -98,27 +106,28 @@ export default function StockScreen() {
           <SectionTitle>Kahan kitna</SectionTitle>
           <Row gap={space.md} wrap align="stretch">
             {(locations ?? []).map((l) => (
-              <Card key={l.id} style={{ flex: 1, minWidth: 140 }}>
-                <Text variant="label" color="textMuted">
-                  {l.name}
-                </Text>
-                <Text variant="number">{Math.round(l.units)}</Text>
-                <Text variant="small" color="textFaint">
-                  units{showMoney ? ` · ${formatINRShort(l.value)}` : ''}
-                </Text>
-              </Card>
+              <View key={l.id} style={{ flex: 1, minWidth: 150 }}>
+                <StatTile
+                  label={l.name}
+                  value={String(Math.round(l.units))}
+                  sub={`pcs${showMoney ? ` · ${formatINRShort(l.value)}` : ''}`}
+                  icon={(LOCATION_LOOK[l.type] ?? { icon: 'cube-outline' }).icon}
+                  accent={(LOCATION_LOOK[l.type] ?? { accent: 'teal' }).accent}
+                  tone={l.units < 0 ? 'danger' : undefined}
+                />
+              </View>
             ))}
           </Row>
 
           <Card style={{ gap: 0, paddingVertical: 4 }}>
-            {can('purchase.create') ? <ListRow title="Purchase bill" subtitle="Supplier ka bill — rate, udhaar, sab" onPress={() => router.push('/purchase/edit')} /> : null}
-            {can('purchase.create') ? <ListRow title="Purchase" subtitle="Bill, return, kitna baaki hai" onPress={() => router.push('/purchases')} /> : null}
-            {can('stock.transfer') ? <ListRow title="Transfer" subtitle="Godown ↔ dukan ↔ workshop" onPress={() => router.push('/transfers')} /> : null}
-            {can('stock.count') || can('stock.adjust') ? <ListRow title="Adjustment" subtitle="Damage, kam nikla, extra mila" onPress={() => router.push('/adjustments')} /> : null}
-            {can('stock.count') ? <ListRow title="Stock ginti" subtitle="Poora stock mila ke dekho" onPress={() => router.push('/audits')} /> : null}
-            {can('payment.pay_supplier') ? <ListRow title="Payment" subtitle="Aaya hua paisa, supplier ko diya" onPress={() => router.push('/payments')} /> : null}
-            {can('purchase.create') || can('reports.view') ? <ListRow title="Kya mangwana hai" subtitle="Bikri dekh kar batata hai kya mangwana hai" onPress={() => router.push('/reorder')} /> : null}
-            {can('jobcard.edit') ? <ListRow title="Job card" subtitle="Gaadi ka kaam — parts + labour" onPress={() => router.push('/job-cards')} /> : null}
+            {can('purchase.create') ? <ListRow left={<IconBadge name="receipt-outline" accent="blue" />} title="Purchase bill" subtitle="Supplier ka bill — rate, udhaar, sab" onPress={() => router.push('/purchase/edit')} /> : null}
+            {can('purchase.create') ? <ListRow left={<IconBadge name="documents-outline" accent="blue" />} title="Purchase" subtitle="Bill, return, kitna baaki hai" onPress={() => router.push('/purchases')} /> : null}
+            {can('stock.transfer') ? <ListRow left={<IconBadge name="swap-horizontal-outline" accent="violet" />} title="Transfer" subtitle="Godown ↔ dukan ↔ workshop" onPress={() => router.push('/transfers')} /> : null}
+            {can('stock.count') || can('stock.adjust') ? <ListRow left={<IconBadge name="construct-outline" accent="amber" />} title="Adjustment" subtitle="Damage, kam nikla, extra mila" onPress={() => router.push('/adjustments')} /> : null}
+            {can('stock.count') ? <ListRow left={<IconBadge name="checkbox-outline" accent="teal" />} title="Stock ginti" subtitle="Poora stock mila ke dekho" onPress={() => router.push('/audits')} /> : null}
+            {can('payment.pay_supplier') ? <ListRow left={<IconBadge name="cash-outline" accent="green" />} title="Payment" subtitle="Aaya hua paisa, supplier ko diya" onPress={() => router.push('/payments')} /> : null}
+            {can('purchase.create') || can('reports.view') ? <ListRow left={<IconBadge name="cart-outline" accent="rose" />} title="Kya mangwana hai" subtitle="Bikri dekh kar batata hai kya mangwana hai" onPress={() => router.push('/reorder')} /> : null}
+            {can('jobcard.edit') ? <ListRow left={<IconBadge name="build-outline" accent="violet" />} title="Job card" subtitle="Gaadi ka kaam — parts + labour" onPress={() => router.push('/job-cards')} /> : null}
           </Card>
 
           {(negative ?? []).length > 0 ? (

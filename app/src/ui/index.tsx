@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { accentFor, accents, MAX_CONTENT, palette, radius, shadow, space, spine as SPINE, type, WIDE, type AccentName, type Palette } from './theme';
+import { tap } from './haptics';
 
 // -----------------------------------------------------------------------------
 // Theme
@@ -297,8 +298,14 @@ type ButtonProps = PressableProps & {
   full?: boolean;
 };
 
-export function Button({ title, tone = 'primary', size = 'md', loading, left, full, disabled, style, ...rest }: ButtonProps) {
+export function Button({ title, tone = 'primary', size = 'md', loading, left, full, disabled, style, onPress, ...rest }: ButtonProps) {
   const t = useTheme();
+  // The buzz is the confirmation for someone holding a carton in the other
+  // hand and not looking at the screen.
+  const press = React.useCallback(
+    (e: Parameters<NonNullable<typeof onPress>>[0]) => { tap(); onPress?.(e); },
+    [onPress]
+  );
   const colors = {
     primary: { bg: t.accent, fg: t.accentText, border: t.accent, shadow: true },
     secondary: { bg: t.surface, fg: t.text, border: t.border, shadow: false },
@@ -312,6 +319,7 @@ export function Button({ title, tone = 'primary', size = 'md', loading, left, fu
       accessibilityRole="button"
       disabled={disabled || loading}
       android_ripple={{ color: tone === 'primary' ? 'rgba(255,255,255,0.22)' : t.surfaceAlt }}
+      onPress={press}
       {...rest}
       style={(state) => [
         styles.button,

@@ -59,9 +59,9 @@ export default function UsersScreen() {
       'SELECT id FROM profiles WHERE full_name = ? ORDER BY created_at DESC LIMIT 1', [draft.full_name.trim()]);
     if (made?.id) {
       try { await setRoles(made.id, draft.roles); }
-      catch (e) { notify(`Staff ban gaya, par baaki roles nahi lage: ${String((e as Error).message ?? e)}`); }
+      catch (e) { notify(`Staff ban gaya, par baaki roles nahi lage: ${String((e as Error).message ?? e)}`, 'ok'); }
     }
-    notify(`${draft.full_name} ban gaya. Login: ${draft.email}`);
+    notify(`${draft.full_name} ban gaya. Login: ${draft.email}`, 'ok');
     setDraft(emptyDraft);
     setAdding(false);
   }
@@ -101,7 +101,7 @@ export default function UsersScreen() {
     // else can undo. The old check looked for the literal role 'admin', which
     // stopped being right the moment the owner also got admin.users.
     if (editing.id === me?.id && !keepsAdmin(editRoles)) {
-      notify('Apne aap se user-admin ka haq nahi hata sakte — phir koi staff nahi bana payega.');
+      notify('Apne aap se user-admin ka haq nahi hata sakte — phir koi staff nahi bana payega.', 'danger');
       return;
     }
     // Say something when it fails. Without this the write threw, the form sat
@@ -115,7 +115,7 @@ export default function UsersScreen() {
       await setRoles(editing.id, editRoles);
       setEditing(null);
     } catch (e) {
-      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`);
+      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
     }
   }
 

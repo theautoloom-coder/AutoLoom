@@ -89,7 +89,7 @@ export default function ExpensesScreen() {
       setAdding(false);
       notify('Kharcha likh diya.');
     } catch (e) {
-      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`);
+      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setSaving(false);
     }

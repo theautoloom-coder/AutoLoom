@@ -30,7 +30,7 @@ export default function AdjustmentDetail() {
     setBusy(true);
     try {
       await db.writeTransaction(async (tx) => { await reverseMovements(tx, 'stock_adjustment', a.id, actor); await updateRow(tx, 'stock_adjustments', a.id, { status: 'cancelled' }); });
-      notify('Wapas le liya.');
+      notify('Wapas le liya.', 'ok');
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 

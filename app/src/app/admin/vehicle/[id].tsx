@@ -70,7 +70,7 @@ export default function VehicleModelEditor() {
       is_active: !!form.is_active,
     });
     setDirty(false);
-    notify('Save ho gaya.');
+    notify('Save ho gaya.', 'ok');
   }
 
   async function saveGen() {

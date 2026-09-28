@@ -86,7 +86,7 @@ export default function SpecEditor() {
     if (existing) {
       await updateRow(db, 'spec_definitions', existing.id, payload);
       setDirty(false);
-      notify('Save ho gaya.');
+      notify('Save ho gaya.', 'ok');
     } else {
       const newId = await insertRow(db, 'spec_definitions', payload);
       router.replace(`/admin/spec/${newId}`);

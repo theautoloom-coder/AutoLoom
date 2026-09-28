@@ -86,7 +86,7 @@ export default function PaymentEdit() {
         const d = openDocs?.find((x) => x.id === id);
         if (d && amt > d.outstanding + 0.005) { notify(`${d.doc_no}: more than its pending ${formatINR(d.outstanding)}.`); return; }
       }
-      if (manualTotal > amount + 0.005) { notify('Baant payment se zyada ho gaya.'); return; }
+      if (manualTotal > amount + 0.005) { notify('Baant payment se zyada ho gaya.', 'danger'); return; }
     }
     if (!(await confirm(isIn ? 'Mark payment received?' : 'Record payment?', `${formatINR(amount)} ${isIn ? 'from' : 'to'} ${party?.name} by ${MODES.find((m) => m.value === mode)?.label}.${unallocated > 0 ? ` ${formatINR(unallocated)} stays as advance.` : ''}`))) return;
     setBusy(true);
@@ -107,7 +107,7 @@ export default function PaymentEdit() {
           const path = await uploadProof(proof, paymentId);
           await updateRow(db, 'payments', paymentId, { proof_path: path });
         } catch (e) {
-          notify(`Payment save ho gaya, par screenshot abhi upload nahi hua (${(e as Error).message}). Baad mein Payment se laga dena.`);
+          notify(`Payment save ho gaya, par screenshot abhi upload nahi hua (${(e as Error).message}). Baad mein Payment se laga dena.`, 'danger');
         }
       }
       const pendingAfter = round((party?.balance ?? 0) - amount);

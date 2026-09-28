@@ -1,9 +1,18 @@
 /**
- * In-app toast + confirm dialog. Used only on web, where a bare
- * window.alert/confirm looks like a browser default rather than part of the
- * product; native keeps the OS Alert, which already looks native. Plain
- * module-level pub/sub so `notify()`/`confirm()` stay callable from anywhere
- * (event handlers, async posting code) without needing a hook.
+ * In-app toast + confirm dialog.
+ *
+ * The toast is used on every platform now. It used to be web-only, on the
+ * reasoning that native should keep the OS Alert because it already looks
+ * native — but an OS Alert is a blocking dialog you have to dismiss, and
+ * "Photo lag gayi" does not deserve one. At the counter that is an
+ * interruption between the person and the next customer. A toast says the
+ * same thing and gets out of the way.
+ *
+ * `confirm()` still uses the OS dialog on native, and should: it asks a
+ * question, so blocking is the point.
+ *
+ * Plain module-level pub/sub so `notify()`/`confirm()` stay callable from
+ * anywhere (event handlers, async posting code) without needing a hook.
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
@@ -11,7 +20,7 @@ import { Modal, Pressable, View } from 'react-native';
 import { Button, Row, Text, useTheme } from './index';
 import { radius, shadow, space } from './theme';
 
-type ToastItem = { id: number; message: string; tone: 'default' | 'danger' };
+type ToastItem = { id: number; message: string; tone: 'default' | 'danger' | 'ok' };
 type ConfirmState = { title: string; message: string; resolve: (v: boolean) => void } | null;
 
 let toastListeners: ((items: ToastItem[]) => void)[] = [];
@@ -54,14 +63,14 @@ export function ToastHost() {
             style={[
               shadow.md,
               {
-                backgroundColor: item.tone === 'danger' ? t.danger : t.navy,
+                backgroundColor: item.tone === 'danger' ? t.danger : item.tone === 'ok' ? t.ok : t.navy,
                 borderRadius: radius.md,
                 paddingVertical: 12,
                 paddingHorizontal: space.lg,
                 maxWidth: 420,
               },
             ]}>
-            <Text style={{ color: item.tone === 'danger' ? t.accentText : t.navyText }}>{item.message}</Text>
+            <Text style={{ color: item.tone === 'default' ? t.navyText : t.accentText }}>{item.message}</Text>
           </View>
         ))}
       </View>

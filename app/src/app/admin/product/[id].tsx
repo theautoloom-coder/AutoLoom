@@ -133,7 +133,7 @@ export default function ProductWizard() {
     (async () => {
       const p = (await db.getOptional<Record<string, unknown>>('SELECT * FROM products WHERE id = ?', [id])) as Record<string, string | number | null> | null;
       if (!p) {
-        notify('Ye item is phone par nahi mila.');
+        notify('Ye item is phone par nahi mila.', 'danger');
         router.back();
         return;
       }

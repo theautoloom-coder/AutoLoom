@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Divider, Empty, Input, Row, Text, useTheme } from './index';
 import { radius, shadow, space } from './theme';
 import { showConfirm, showToast } from './toast';
+import { done, nope } from './haptics';
 
 export type Option = { value: string; label: string; sublabel?: string };
 
@@ -309,11 +310,17 @@ export function Disclosure({
   hint,
   children,
   defaultOpen = false,
+  titleVariant = 'label',
 }: {
   title: string;
   hint?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  /**
+   * 'label' for a field group ("AUR DETAIL"), 'heading' for anything that is a
+   * sentence. Uppercase mono is a signpost; a question set in it is a shout.
+   */
+  titleVariant?: 'label' | 'heading';
 }) {
   const t = useTheme();
   const [open, setOpen] = useState(defaultOpen);
@@ -324,7 +331,7 @@ export function Disclosure({
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: 4 }}>
-        <Text variant="label" color={open ? 'text' : 'textMuted'} style={{ flex: 1 }}>
+        <Text variant={titleVariant} color={open ? 'text' : 'textMuted'} style={{ flex: 1 }}>
           {title}
         </Text>
         <Text color="textFaint">{open ? '▴' : '▾'}</Text>
@@ -357,13 +364,21 @@ export function confirm(title: string, message: string): Promise<boolean> {
   );
 }
 
-export function notify(message: string) {
-  if (Platform.OS === 'web') {
-    showToast(message);
-    return;
-  }
-  const { Alert } = require('react-native') as typeof import('react-native');
-  Alert.alert(message);
+/**
+ * Say something happened.
+ *
+ * A toast on every platform, not an OS Alert on native: a blocking dialog for
+ * "Photo lag gayi" is an interruption between the counter and the next
+ * customer. The buzz carries the same news to a hand that is not looking.
+ *
+ * `tone` decides both the colour and which buzz: 'ok' is for the moments the
+ * shop's books actually changed — a bill posted, stock put away — and is the
+ * one worth feeling.
+ */
+export function notify(message: string, tone: 'default' | 'ok' | 'danger' = 'default') {
+  showToast(message, tone);
+  if (tone === 'ok') done();
+  else if (tone === 'danger') nope();
 }
 
 const styles = StyleSheet.create({

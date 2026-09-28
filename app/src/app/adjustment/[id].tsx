@@ -34,7 +34,7 @@ export default function AdjustmentDetail() {
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!a) return <Screen><Empty title="Ye adjustment is phone par nahi mila" /></Screen>;
+  if (!a) return <Screen><Empty art="search" title="Ye adjustment is phone par nahi mila" /></Screen>;
   const value = (lines ?? []).reduce((s, l) => s + l.qty_delta * l.unit_cost, 0);
 
   return (

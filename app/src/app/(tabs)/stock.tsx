@@ -23,7 +23,8 @@ import { SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/querie
 import { useSession } from '@/lib/session';
 import { Badge, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, StatTile, Text, type IconName } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
-import { space } from '@/ui/theme';
+import { Skeleton, SkeletonList, SkeletonTile } from '@/ui/skeleton';
+import { radius, space } from '@/ui/theme';
 
 const LOCATION_LOOK: Record<string, { icon: IconName; accent: string }> = {
   warehouse: { icon: 'business-outline', accent: 'blue' },
@@ -60,8 +61,12 @@ export default function StockScreen() {
   // A blank search lists everything: the maal is the point of this screen, so
   // it is shown before anybody types.
   const sq = SEARCH_VARIANTS(tokens.length ? tokens : [' '], 300);
-  const { data: rows } = useQuery<Row>(sq.sql, sq.params);
-  const { data: locations } = useQuery<LocRow>(STOCK_VALUE_BY_LOCATION.sql);
+  // `isLoading` is the only honest signal here. PowerSync hands back
+  // `data: []` while the first read is still in flight, so an empty array
+  // means "nothing yet" and "nothing at all" at the same time — and the
+  // screen was picking the second reading every time it opened.
+  const { data: rows, isLoading: rowsLoading } = useQuery<Row>(sq.sql, sq.params);
+  const { data: locations, isLoading: locationsLoading } = useQuery<LocRow>(STOCK_VALUE_BY_LOCATION.sql);
   const { data: negative } = useQuery<{ id: string; sku: string; product_name: string; variant_name: string; location: string; qty: number; photo_path: string | null }>(
     `SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, l.name AS location, s.qty,
             (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
@@ -96,11 +101,23 @@ export default function StockScreen() {
 
       <Input value={q} onChangeText={setQ} placeholder="SKU, barcode ya naam dhoondo" autoCapitalize="none" autoCorrect={false} />
 
-      <Row gap={space.xs} wrap>
-        <Chip label={`Sab ${counts.sab}`} selected={filter === 'sab'} onPress={() => setFilter('sab')} />
-        <Chip label={`Kam hai ${counts.low}`} selected={filter === 'low'} onPress={() => setFilter('low')} />
-        <Chip label={`Khatam ${counts.khatam}`} selected={filter === 'khatam'} onPress={() => setFilter('khatam')} />
-      </Row>
+      {/* The chips carry counts, and a count of zero on an unfinished query is
+          not a count — it is a wrong answer in a confident font. Grey pills
+          until the numbers are real. The search box above stays live
+          throughout: you can start typing the SKU before the list lands. */}
+      {rowsLoading ? (
+        <Row gap={space.xs} wrap>
+          {[78, 104, 96].map((w) => (
+            <Skeleton key={w} width={w} height={34} radius={radius.pill} />
+          ))}
+        </Row>
+      ) : (
+        <Row gap={space.xs} wrap>
+          <Chip label={`Sab ${counts.sab}`} selected={filter === 'sab'} onPress={() => setFilter('sab')} />
+          <Chip label={`Kam hai ${counts.low}`} selected={filter === 'low'} onPress={() => setFilter('low')} />
+          <Chip label={`Khatam ${counts.khatam}`} selected={filter === 'khatam'} onPress={() => setFilter('khatam')} />
+        </Row>
+      )}
 
       {/* Sold from a place it never arrived at. Left alone it quietly becomes
           the truth, so it sits above the list until somebody settles it. */}
@@ -123,27 +140,42 @@ export default function StockScreen() {
       ) : null}
 
       <SectionTitle>Maal kahan pada hai</SectionTitle>
-      <Row gap={space.md} wrap align="stretch">
-        {(locations ?? []).map((l) => (
-          <View key={l.id} style={{ flex: 1, minWidth: 150 }}>
-            <StatTile
-              label={l.name}
-              value={String(Math.round(l.units))}
-              sub={`pcs${showCost ? ` · ${formatINRShort(l.value)}` : ''}`}
-              icon={(LOCATION_LOOK[l.type] ?? { icon: 'cube-outline' as IconName }).icon}
-              accent={(LOCATION_LOOK[l.type] ?? { accent: 'teal' }).accent}
-              tone={l.units < 0 ? 'danger' : undefined}
-            />
-          </View>
-        ))}
-      </Row>
+      {locationsLoading ? (
+        // Four, because the locations table is godown / counter / workshop /
+        // kharab and a shop rarely adds a fifth. Two rows of two at phone
+        // width — the same two rows the real tiles land in.
+        <Row gap={space.md} wrap align="stretch">
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={{ flex: 1, minWidth: 150 }}>
+              <SkeletonTile />
+            </View>
+          ))}
+        </Row>
+      ) : (
+        <Row gap={space.md} wrap align="stretch">
+          {(locations ?? []).map((l) => (
+            <View key={l.id} style={{ flex: 1, minWidth: 150 }}>
+              <StatTile
+                label={l.name}
+                value={String(Math.round(l.units))}
+                sub={`pcs${showCost ? ` · ${formatINRShort(l.value)}` : ''}`}
+                icon={(LOCATION_LOOK[l.type] ?? { icon: 'cube-outline' as IconName }).icon}
+                accent={(LOCATION_LOOK[l.type] ?? { accent: 'teal' }).accent}
+                tone={l.units < 0 ? 'danger' : undefined}
+              />
+            </View>
+          ))}
+        </Row>
+      )}
 
-      <SectionTitle right={<Text variant="small" color="textFaint">{shown.length}</Text>}>
+      <SectionTitle right={rowsLoading ? undefined : <Text variant="small" color="textFaint">{shown.length}</Text>}>
         {filter === 'low' ? 'Kam hai' : filter === 'khatam' ? 'Khatam ho gaya' : 'Saara maal'}
       </SectionTitle>
 
-      {shown.length === 0 ? (
-        <Empty
+      {rowsLoading ? (
+        <SkeletonList rows={6} />
+      ) : shown.length === 0 ? (
+        <Empty art="maal"
           title={q ? 'Kuch nahi mila' : filter === 'sab' ? 'Abhi koi maal add nahi hua' : 'Yahan kuch nahi'}
           hint={q ? 'Naam, SKU ya barcode se dhoondo.' : filter === 'sab' ? 'Neeche “+” dabao aur “Maal Aaya” se shuru karo.' : undefined}
         />

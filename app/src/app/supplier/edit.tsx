@@ -1,7 +1,7 @@
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, type TextInput } from 'react-native';
 
 import { isValidGstin, stateCodeFromGstin } from '@domain';
 
@@ -31,6 +31,23 @@ export default function SupplierEdit() {
   const [form, setForm] = useState<Partial<Supplier>>({ payment_terms_days: 30, opening_balance: 0, is_active: 1 });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Refs above the early returns, with the other hooks. Unlike the customer
+  // form this one opens on a text field rather than a picker, so a new supplier
+  // gets the cursor put in the name for it.
+  const nameRef = useRef<TextInput>(null);
+  const firmRef = useRef<TextInput>(null);
+  const contactRef = useRef<TextInput>(null);
+  const mobileRef = useRef<TextInput>(null);
+  const altRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const gstinRef = useRef<TextInput>(null);
+  const panRef = useRef<TextInput>(null);
+  const addr1Ref = useRef<TextInput>(null);
+  const addr2Ref = useRef<TextInput>(null);
+  const cityRef = useRef<TextInput>(null);
+  const pinRef = useRef<TextInput>(null);
+
   useEffect(() => { if (existing && !dirty) setForm(existing); }, [existing, dirty]);
   useEffect(() => {
     if (isNew && company?.[0] && !form.state_code) setForm((f) => ({ ...f, state_code: company[0].state_code, state_name: company[0].state_name }));
@@ -47,7 +64,7 @@ export default function SupplierEdit() {
 
   async function save() {
     if (!form.name?.trim()) { notify('Supplier ka naam likho.'); return; }
-    if (form.gstin && !isValidGstin(form.gstin)) { notify('GSTIN theek nahi lag raha.'); return; }
+    if (form.gstin && !isValidGstin(form.gstin)) { notify('GSTIN theek nahi lag raha. 15 character hone chahiye, jaise 09ABCDE1234F1Z5.'); return; }
 
     // Same trap as customers: one number, two suppliers, two half-ledgers.
     const digits = form.mobile?.replace(/\D/g, '') ?? '';
@@ -83,50 +100,195 @@ Phir bhi naya supplier banayein?`))) return;
       });
       setDirty(false);
       router.replace(`/supplier/${sid}`);
-    } catch (e) { notify(`Could not save: ${(e as Error).message}`); } finally { setSaving(false); }
+    } catch (e) { notify(`Save nahi hua: ${(e as Error).message}. Dobara koshish karo.`); } finally { setSaving(false); }
   }
 
   if (!can('party.edit')) return <Screen><Text>Aapko supplier badalne ki permission nahi hai.</Text></Screen>;
-  if (!isNew && !existing) return <Screen><Text>Loading…</Text></Screen>;
+  if (!isNew && !existing) return <Screen><Text>Khul raha hai…</Text></Screen>;
+
+  const canSave = !!form.name?.trim() && (isNew || dirty);
 
   return (
     <>
-      <Stack.Screen options={{ title: isNew ? 'New supplier' : existing?.name }} />
+      <Stack.Screen options={{ title: isNew ? 'Naya supplier' : existing?.name }} />
       <Screen>
-        <Text variant="display">{isNew ? 'New supplier' : existing?.name}</Text>
+        <Text variant="display">{isNew ? 'Naya supplier' : existing?.name}</Text>
         <FormSection title="Pehchaan">
-          <Input label="Naam" value={form.name ?? ''} onChangeText={(v) => set('name', v)} placeholder="Bright Auto Imports" />
-          <Input label="Firm ka naam" value={form.company_name ?? ''} onChangeText={(v) => set('company_name', v)} />
-          <Input label="Jisse baat hoti hai" value={form.contact_person ?? ''} onChangeText={(v) => set('contact_person', v)} />
+          <Input
+            ref={nameRef}
+            label="Naam"
+            value={form.name ?? ''}
+            onChangeText={(v) => set('name', v)}
+            placeholder="Bright Auto Imports"
+            autoFocus={isNew}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => firmRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={firmRef}
+            label="Firm ka naam"
+            value={form.company_name ?? ''}
+            onChangeText={(v) => set('company_name', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => contactRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={contactRef}
+            label="Jisse baat hoti hai"
+            value={form.contact_person ?? ''}
+            onChangeText={(v) => set('contact_person', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => mobileRef.current?.focus()}
+            submitBehavior="submit"
+          />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Mobile" value={form.mobile ?? ''} onChangeText={(v) => set('mobile', v)} keyboardType="phone-pad" />
-            <Input containerStyle={{ flex: 1 }} label="Doosra number" value={form.alt_phone ?? ''} onChangeText={(v) => set('alt_phone', v)} keyboardType="phone-pad" />
+            <Input
+              ref={mobileRef}
+              containerStyle={{ flex: 1 }}
+              label="Mobile"
+              value={form.mobile ?? ''}
+              onChangeText={(v) => set('mobile', v)}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              returnKeyType="next"
+              onSubmitEditing={() => altRef.current?.focus()}
+              submitBehavior="submit"
+            />
+            <Input
+              ref={altRef}
+              containerStyle={{ flex: 1 }}
+              label="Doosra number"
+              value={form.alt_phone ?? ''}
+              onChangeText={(v) => set('alt_phone', v)}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
+              submitBehavior="submit"
+            />
           </Row>
-          <Input label="Email" value={form.email ?? ''} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
+          <Input
+            ref={emailRef}
+            label="Email"
+            value={form.email ?? ''}
+            onChangeText={(v) => set('email', v)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            onSubmitEditing={() => gstinRef.current?.focus()}
+            submitBehavior="submit"
+          />
         </FormSection>
         <FormSection title="GST aur pata">
-          <Input label="GSTIN" value={form.gstin ?? ''} onChangeText={onGstin} autoCapitalize="characters" error={form.gstin && !isValidGstin(form.gstin) ? 'Not a valid GSTIN format' : null} />
-          <Input label="PAN" value={form.pan ?? ''} onChangeText={(v) => set('pan', v.toUpperCase())} autoCapitalize="characters" />
-          <Input label="Pata line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} />
-          <Input label="Pata line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} />
+          {/* Autocorrect on a GSTIN or a PAN is silent and permanent. */}
+          <Input
+            ref={gstinRef}
+            label="GSTIN"
+            value={form.gstin ?? ''}
+            onChangeText={onGstin}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            error={form.gstin && !isValidGstin(form.gstin) ? 'GSTIN poora nahi lag raha — 15 character hone chahiye, jaise 09ABCDE1234F1Z5.' : null}
+            returnKeyType="next"
+            onSubmitEditing={() => panRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={panRef}
+            label="PAN"
+            value={form.pan ?? ''}
+            onChangeText={(v) => set('pan', v.toUpperCase())}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="next"
+            onSubmitEditing={() => addr1Ref.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={addr1Ref}
+            label="Pata line 1"
+            value={form.address_line1 ?? ''}
+            onChangeText={(v) => set('address_line1', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => addr2Ref.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={addr2Ref}
+            label="Pata line 2"
+            value={form.address_line2 ?? ''}
+            onChangeText={(v) => set('address_line2', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => cityRef.current?.focus()}
+            submitBehavior="submit"
+          />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Shehar" value={form.city ?? ''} onChangeText={(v) => set('city', v)} />
-            <Input containerStyle={{ flex: 1 }} label="PIN code" value={form.pincode ?? ''} onChangeText={(v) => set('pincode', v)} keyboardType="number-pad" />
+            <Input
+              ref={cityRef}
+              containerStyle={{ flex: 1 }}
+              label="Shehar"
+              value={form.city ?? ''}
+              onChangeText={(v) => set('city', v)}
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => pinRef.current?.focus()}
+              submitBehavior="submit"
+            />
+            <Input
+              ref={pinRef}
+              containerStyle={{ flex: 1 }}
+              label="PIN code"
+              value={form.pincode ?? ''}
+              onChangeText={(v) => set('pincode', v)}
+              keyboardType="number-pad"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={() => { if (canSave && !saving) save(); }}
+            />
           </Row>
-          <SelectField label="State" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { set('state_code', v); set('state_name', INDIAN_STATES.find((s) => s.code === v)?.name ?? null); }} />
+          <SelectField label="Kaunsa state" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { set('state_code', v); set('state_name', INDIAN_STATES.find((s) => s.code === v)?.name ?? null); }} />
         </FormSection>
         <FormSection title="Shartein">
           <NumberField label="Kitne din mein paisa dena hai" value={form.payment_terms_days ?? 0} onChange={(v) => set('payment_terms_days', v ?? 0)} decimals={0} />
           {isNew ? (
             <Row gap={12}>
               <View style={{ flex: 1 }}><NumberField label="Purana balance (₹)" value={form.opening_balance ?? 0} onChange={(v) => set('opening_balance', v ?? 0)} hint="Plus matlab aapko unhe dena hai." /></View>
-              <Input containerStyle={{ flex: 1 }} label="Kis din tak ka (YYYY-MM-DD)" value={form.opening_balance_date ?? ''} onChangeText={(v) => set('opening_balance_date', v)} />
+              {/* Deliberately NOT defaulted to today: this is the date the old
+                  register was closed off at, not the date of typing, and it is
+                  only written when the balance is non-zero. */}
+              <Input
+                containerStyle={{ flex: 1 }}
+                label="Kis din tak ka (YYYY-MM-DD)"
+                value={form.opening_balance_date ?? ''}
+                onChangeText={(v) => set('opening_balance_date', v)}
+                placeholder="2026-04-01"
+                keyboardType="numbers-and-punctuation"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+              />
             </Row>
           ) : null}
-          <Input label="Note" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} multiline />
-          {!isNew ? <SwitchRow label="Active" value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} /> : null}
+          <Input label="Note" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} placeholder="Kuch yaad rakhne wali baat" multiline />
+          {!isNew ? <SwitchRow label="Chalu hai" hint="Band kar doge to naye purchase mein ye naam nahi aayega. Purana khata waise ka waisa rahega." value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} /> : null}
         </FormSection>
-        <Button title={isNew ? 'Create supplier' : dirty ? 'Save changes' : 'Saved'} onPress={save} loading={saving} disabled={!isNew && !dirty} />
+        {/* Waits for the one thing save() insists on, instead of being live
+            and then refusing with a toast. */}
+        <Button title={isNew ? 'Supplier bana do' : dirty ? 'Save karo' : 'Save ho gaya'} onPress={save} loading={saving} disabled={!canSave} />
       </Screen>
     </>
   );

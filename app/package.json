@@ -65,8 +65,11 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "smoke": "node test/smoke.mjs"
+    "typecheck": "expo customize tsconfig.json && tsc --noEmit -p tsconfig.json",
+    "smoke": "node test/smoke.mjs",
+    "types": "expo customize tsconfig.json",
+    "routes": "node test/routes.mjs",
+    "check": "npm run typecheck && npm run routes && npm test"
   },
   "private": true
 }

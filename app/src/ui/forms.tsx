@@ -2,7 +2,7 @@
  * Form controls shared by the admin and party screens.
  */
 import React, { useMemo, useState } from 'react';
-import { FlatList, Modal, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Switch, View, type StyleProp, type TextInput, type TextInputProps, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Divider, Empty, Input, Row, Text, useTheme } from './index';
@@ -233,17 +233,19 @@ export function SwitchRow({ label, hint, value, onChange }: { label: string; hin
 }
 
 /** Numeric input that keeps a string while typing and yields a number. */
-export function NumberField({
-  label,
-  value,
-  onChange,
-  hint,
-  error,
-  decimals = 2,
-  prefix,
-  suffix,
-  placeholder,
-}: {
+/**
+ * A money or quantity box.
+ *
+ * It owns its own text so a half-typed "12." is not thrown away by a round
+ * trip through a number, and it forwards the ref and the rest of the TextInput
+ * props. That last part is not decoration: without it, Enter could not move
+ * from Qty to Rate on any line of any bill, because every money and quantity
+ * field in this app is one of these. The chain stopped dead at the first one.
+ *
+ * `prefix` renders inside the box. It used to only cancel the left padding and
+ * draw nothing at all, so a field marked with ₹ showed no ₹.
+ */
+type NumberFieldProps = Omit<TextInputProps, 'value' | 'onChange' | 'onChangeText' | 'keyboardType'> & {
   label?: string;
   value: number | null | undefined;
   onChange: (v: number | null) => void;
@@ -252,8 +254,13 @@ export function NumberField({
   decimals?: number;
   prefix?: string;
   suffix?: string;
-  placeholder?: string;
-}) {
+  containerStyle?: StyleProp<ViewStyle>;
+};
+
+export const NumberField = React.forwardRef<TextInput, NumberFieldProps>(function NumberField(
+  { label, value, onChange, hint, error, decimals = 2, prefix, suffix, containerStyle, ...rest },
+  ref
+) {
   const [text, setText] = useState(value == null ? '' : String(value));
   const [lastProp, setLastProp] = useState(value);
   if (value !== lastProp) {
@@ -262,23 +269,25 @@ export function NumberField({
   }
   return (
     <Input
+      ref={ref}
       label={label}
       value={text}
       hint={hint}
       error={error}
-      placeholder={placeholder}
+      containerStyle={containerStyle}
       keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
+      {...rest}
       onChangeText={(s) => {
         const cleaned = s.replace(/[^0-9.\-]/g, '');
         setText(cleaned);
         const n = cleaned === '' || cleaned === '-' || cleaned === '.' ? null : Number(cleaned);
         onChange(n == null || Number.isNaN(n) ? null : n);
       }}
+      left={prefix ? <Text color="textFaint">{prefix}</Text> : undefined}
       right={suffix ? <Text color="textFaint">{suffix}</Text> : undefined}
-      style={prefix ? { paddingLeft: 0 } : undefined}
     />
   );
-}
+});
 
 export function FormSection({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
   const t = useTheme();

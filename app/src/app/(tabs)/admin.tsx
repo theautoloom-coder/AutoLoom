@@ -92,7 +92,11 @@ export default function AdminHome() {
         ) : null}
 
         {/* Team first: these are the two things nobody but the owner can do,
-            and they were the two missing from this screen entirely. */}
+            and they were the two missing from this screen entirely.
+            A "kisne kya kiya" tile used to sit here pointing at Parchi. Parchi
+            is the bill list, not an activity log, and audit_logs is a
+            server-only table that never reaches the device — so the tile
+            promised something no screen could show. */}
         <SectionTitle>Team aur approvals</SectionTitle>
         <Grid min={240}>
           <StatTile
@@ -112,16 +116,6 @@ export default function AdminHome() {
               icon="people-outline"
               accent="violet"
               onPress={() => router.push('/admin/users')}
-            />
-          ) : null}
-          {isAdmin ? (
-            <StatTile
-              label="KISNE KYA KIYA"
-              value="👁"
-              sub="har bill, rate aur setting ka record"
-              icon="time-outline"
-              accent="blue"
-              onPress={() => router.push('/parchi')}
             />
           ) : null}
           {canSettings ? (
@@ -216,16 +210,6 @@ export default function AdminHome() {
               <Card style={{ gap: 0, paddingVertical: 4 }}>
                 {canCatalog ? (
                   <>
-                    <ListRow
-                      title="Categories aur spec templates"
-                      subtitle={`${n?.families ?? 0} categories — sirf tab jab spec-wise SKU banane hon`}
-                      onPress={() => router.push('/admin/families')}
-                    />
-                    <ListRow
-                      title="Gaadi master"
-                      subtitle={`${n?.models ?? 0} models, generations, aliases`}
-                      onPress={() => router.push('/admin/vehicles')}
-                    />
                     <ListRow
                       title="Brand, unit, HSN"
                       subtitle={`${n?.brands ?? 0} brands · master data`}

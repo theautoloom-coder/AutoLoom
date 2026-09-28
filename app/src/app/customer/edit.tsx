@@ -1,7 +1,7 @@
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, type TextInput } from 'react-native';
 
 import { isValidGstin, stateCodeFromGstin, normaliseRegistration } from '@domain';
 
@@ -20,12 +20,15 @@ type Customer = {
 };
 type Vehicle = { id: string; registration_no: string; model_id: string | null; generation_id: string | null; color: string | null; model_name: string | null; make_name: string | null };
 
+// `label` is what the shop calls this kind of buyer; `value` is the column
+// value and stays put however the wording changes. "Thok" is the word the
+// rest of the app already shows for wholesale.
 const TYPES = [
-  { value: 'dealer', label: 'Dealer', sublabel: 'Accessory shop buying at dealer price' },
-  { value: 'wholesale', label: 'Wholesale', sublabel: 'Distributor buying in bulk' },
-  { value: 'workshop', label: 'Workshop', sublabel: 'Fitment / modification shop' },
-  { value: 'retail', label: 'Retail', sublabel: 'End customer' },
-  { value: 'other', label: 'Other' },
+  { value: 'dealer', label: 'Dealer', sublabel: 'Accessory ki dukan — dealer rate par leta hai' },
+  { value: 'wholesale', label: 'Thok', sublabel: 'Thok mein uthata hai' },
+  { value: 'workshop', label: 'Workshop', sublabel: 'Fitting / modification wala' },
+  { value: 'retail', label: 'Retail', sublabel: 'Gaadi wala khud' },
+  { value: 'other', label: 'Koi aur' },
 ];
 
 export default function CustomerEdit() {
@@ -52,6 +55,28 @@ export default function CustomerEdit() {
   const [saving, setSaving] = useState(false);
   const [reg, setReg] = useState('');
   const [regModel, setRegModel] = useState<string | null>(null);
+  // "Jodo" writes a row, so it gets the same treatment as the save button:
+  // pressed twice on a slow phone it would otherwise add the gaadi twice.
+  const [addingVehicle, setAddingVehicle] = useState(false);
+
+  // Refs live up here with the other hooks, above every early return.
+  //
+  // The chain skips Code and the opening-balance date on purpose: both are
+  // conditional on isNew, and a next key that lands on an unmounted field is a
+  // next key that does nothing. No autoFocus either — the first thing this form
+  // asks is Type, which is a picker.
+  const nameRef = useRef<TextInput>(null);
+  const firmRef = useRef<TextInput>(null);
+  const ownerRef = useRef<TextInput>(null);
+  const mobileRef = useRef<TextInput>(null);
+  const altRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const gstinRef = useRef<TextInput>(null);
+  const panRef = useRef<TextInput>(null);
+  const addr1Ref = useRef<TextInput>(null);
+  const addr2Ref = useRef<TextInput>(null);
+  const cityRef = useRef<TextInput>(null);
+  const pinRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (existing && !dirty) setForm(existing);
@@ -155,7 +180,7 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
       setDirty(false);
       router.replace(`/customer/${cid}`);
     } catch (e) {
-      notify(`Could not save: ${(e as Error).message}`);
+      notify(`Save nahi hua: ${(e as Error).message}. Dobara koshish karo.`);
     } finally {
       setSaving(false);
     }
@@ -168,55 +193,203 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
       notify('Gaadi number likho, jaise UP16AB1234.');
       return;
     }
-    await insertRow(db, 'customer_vehicles', { customer_id: id, registration_no: r, model_id: regModel, generation_id: null }, actor);
-    setReg('');
+    setAddingVehicle(true);
+    try {
+      await insertRow(db, 'customer_vehicles', { customer_id: id, registration_no: r, model_id: regModel, generation_id: null }, actor);
+      setReg('');
+    } catch (e) {
+      notify(`Gaadi nahi judi: ${(e as Error).message}. Dobara koshish karo.`);
+    } finally {
+      setAddingVehicle(false);
+    }
   }
 
   async function removeVehicle(v: Vehicle) {
-    if (await confirm('Gaadi hatayein?', `${v.registration_no} will be removed from this customer.`)) await db.execute('DELETE FROM customer_vehicles WHERE id = ?', [v.id]);
+    if (await confirm('Gaadi hatayein?', `${v.registration_no} is grahak ki list se hat jaayegi.`)) await db.execute('DELETE FROM customer_vehicles WHERE id = ?', [v.id]);
   }
 
   if (!can('party.edit')) return <Screen><Text>Aapko grahak badalne ki permission nahi hai.</Text></Screen>;
-  if (!isNew && !existing) return <Screen><Text>Loading…</Text></Screen>;
+  if (!isNew && !existing) return <Screen><Text>Khul raha hai…</Text></Screen>;
 
   const canEditCredit = can('party.edit_credit_limit');
+  const canSave = !!form.name?.trim() && (isNew || dirty);
+  const canAddVehicle = normaliseRegistration(reg).length >= 6;
 
   return (
     <>
-      <Stack.Screen options={{ title: isNew ? 'New customer' : existing?.name }} />
+      <Stack.Screen options={{ title: isNew ? 'Naya grahak' : existing?.name }} />
       <Screen>
-        <Text variant="display">{isNew ? 'New customer' : existing?.name}</Text>
+        <Text variant="display">{isNew ? 'Naya grahak' : existing?.name}</Text>
 
         <FormSection title="Pehchaan">
-          <SelectField label="Type" value={form.customer_type} options={TYPES} onChange={(v) => set('customer_type', v ?? 'retail')} />
-          <Input label="Naam" value={form.name ?? ''} onChangeText={(v) => set('name', v)} placeholder="XYZ Accessories" />
-          <Input label="Firm ka naam (bill par chhapega)" value={form.business_name ?? ''} onChangeText={(v) => set('business_name', v)} />
-          <Input label="Maalik / jisse baat hoti hai" value={form.owner_name ?? ''} onChangeText={(v) => set('owner_name', v)} />
+          <SelectField label="Kis tarah ka grahak" value={form.customer_type} options={TYPES} onChange={(v) => set('customer_type', v ?? 'retail')} />
+          <Input
+            ref={nameRef}
+            label="Naam"
+            value={form.name ?? ''}
+            onChangeText={(v) => set('name', v)}
+            placeholder="XYZ Accessories"
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => firmRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={firmRef}
+            label="Firm ka naam (bill par chhapega)"
+            value={form.business_name ?? ''}
+            onChangeText={(v) => set('business_name', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => ownerRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={ownerRef}
+            label="Maalik / jisse baat hoti hai"
+            value={form.owner_name ?? ''}
+            onChangeText={(v) => set('owner_name', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => mobileRef.current?.focus()}
+            submitBehavior="submit"
+          />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Mobile" value={form.mobile ?? ''} onChangeText={(v) => set('mobile', v)} keyboardType="phone-pad" />
-            <Input containerStyle={{ flex: 1 }} label="Doosra number" value={form.alt_phone ?? ''} onChangeText={(v) => set('alt_phone', v)} keyboardType="phone-pad" />
+            <Input
+              ref={mobileRef}
+              containerStyle={{ flex: 1 }}
+              label="Mobile"
+              value={form.mobile ?? ''}
+              onChangeText={(v) => set('mobile', v)}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              returnKeyType="next"
+              onSubmitEditing={() => altRef.current?.focus()}
+              submitBehavior="submit"
+            />
+            <Input
+              ref={altRef}
+              containerStyle={{ flex: 1 }}
+              label="Doosra number"
+              value={form.alt_phone ?? ''}
+              onChangeText={(v) => set('alt_phone', v)}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
+              submitBehavior="submit"
+            />
           </Row>
-          <Input label="Email" value={form.email ?? ''} onChangeText={(v) => set('email', v)} keyboardType="email-address" autoCapitalize="none" />
-          {!isNew ? <Input label="Code" value={form.code ?? ''} onChangeText={(v) => set('code', v)} hint="Apne aap ban jaata hai. Apna code chalta ho tabhi badlo." /> : null}
+          <Input
+            ref={emailRef}
+            label="Email"
+            value={form.email ?? ''}
+            onChangeText={(v) => set('email', v)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            onSubmitEditing={() => gstinRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          {!isNew ? (
+            <Input
+              label="Grahak code"
+              value={form.code ?? ''}
+              onChangeText={(v) => set('code', v)}
+              hint="Apne aap ban jaata hai. Apna code chalta ho tabhi badlo."
+              autoCapitalize="characters"
+              autoCorrect={false}
+              returnKeyType="done"
+            />
+          ) : null}
         </FormSection>
 
         <FormSection title="GST aur pata" hint="State se tay hota hai ki bill par CGST+SGST lagega ya IGST.">
-          <Input label="GSTIN" value={form.gstin ?? ''} onChangeText={onGstin} autoCapitalize="characters" error={form.gstin && !isValidGstin(form.gstin) ? 'Not a valid GSTIN format' : null} hint="State aur PAN apne aap bhar jaate hain." />
-          <Input label="PAN" value={form.pan ?? ''} onChangeText={(v) => set('pan', v.toUpperCase())} autoCapitalize="characters" />
-          <Input label="Pata line 1" value={form.address_line1 ?? ''} onChangeText={(v) => set('address_line1', v)} />
-          <Input label="Pata line 2" value={form.address_line2 ?? ''} onChangeText={(v) => set('address_line2', v)} />
+          {/* A GSTIN and a PAN are exactly the strings autocorrect likes to
+              "fix". Wrong here means wrong on every bill afterwards. */}
+          <Input
+            ref={gstinRef}
+            label="GSTIN"
+            value={form.gstin ?? ''}
+            onChangeText={onGstin}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            error={form.gstin && !isValidGstin(form.gstin) ? 'GSTIN poora nahi lag raha — 15 character hone chahiye, jaise 09ABCDE1234F1Z5.' : null}
+            hint="State aur PAN apne aap bhar jaate hain."
+            returnKeyType="next"
+            onSubmitEditing={() => panRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={panRef}
+            label="PAN"
+            value={form.pan ?? ''}
+            onChangeText={(v) => set('pan', v.toUpperCase())}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="next"
+            onSubmitEditing={() => addr1Ref.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={addr1Ref}
+            label="Pata line 1"
+            value={form.address_line1 ?? ''}
+            onChangeText={(v) => set('address_line1', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => addr2Ref.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={addr2Ref}
+            label="Pata line 2"
+            value={form.address_line2 ?? ''}
+            onChangeText={(v) => set('address_line2', v)}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => cityRef.current?.focus()}
+            submitBehavior="submit"
+          />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Shehar" value={form.city ?? ''} onChangeText={(v) => set('city', v)} />
-            <Input containerStyle={{ flex: 1 }} label="PIN code" value={form.pincode ?? ''} onChangeText={(v) => set('pincode', v)} keyboardType="number-pad" />
+            <Input
+              ref={cityRef}
+              containerStyle={{ flex: 1 }}
+              label="Shehar"
+              value={form.city ?? ''}
+              onChangeText={(v) => set('city', v)}
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => pinRef.current?.focus()}
+              submitBehavior="submit"
+            />
+            <Input
+              ref={pinRef}
+              containerStyle={{ flex: 1 }}
+              label="PIN code"
+              value={form.pincode ?? ''}
+              onChangeText={(v) => set('pincode', v)}
+              keyboardType="number-pad"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={() => { if (canSave && !saving) save(); }}
+            />
           </Row>
-          <SelectField label="State" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { const st = INDIAN_STATES.find((s) => s.code === v); set('state_code', v); set('state_name', st?.name ?? null); }} />
+          <SelectField label="Kaunsa state" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { const st = INDIAN_STATES.find((s) => s.code === v); set('state_code', v); set('state_name', st?.name ?? null); }} />
         </FormSection>
 
         <FormSection title="Rate aur udhaar">
-          <SelectField label="Rate list" value={form.price_list_id} options={(priceLists ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => set('price_list_id', v)} hint="Kisi ek item ka special rate us item ke page par set hota hai." />
+          <SelectField label="Kaunsi rate list" value={form.price_list_id} options={(priceLists ?? []).map((p) => ({ value: p.id, label: p.name }))} onChange={(v) => set('price_list_id', v)} hint="Kisi ek item ka special rate us item ke page par set hota hai." />
           <Row gap={12}>
             <View style={{ flex: 1 }}>
-              <NumberField label="Udhaar ki limit (₹)" value={form.credit_limit ?? 0} onChange={(v) => canEditCredit && set('credit_limit', v ?? 0)} hint={canEditCredit ? '0 = no limit' : 'Only owner/admin can change'} />
+              <NumberField label="Udhaar ki limit (₹)" value={form.credit_limit ?? 0} onChange={(v) => canEditCredit && set('credit_limit', v ?? 0)} hint={canEditCredit ? '0 rakho to koi limit nahi.' : 'Ye sirf owner ya admin badal sakta hai.'} />
             </View>
             <View style={{ flex: 1 }}>
               <NumberField label="Kitne din ka udhaar" value={form.credit_days ?? 0} onChange={(v) => canEditCredit && set('credit_days', v ?? 0)} decimals={0} />
@@ -227,28 +400,57 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
               <View style={{ flex: 1 }}>
                 <NumberField label="Purana balance (₹)" value={form.opening_balance ?? 0} onChange={(v) => set('opening_balance', v ?? 0)} hint="Plus matlab unka aapko dena hai. Khata mein entry ban jaayegi." />
               </View>
-              <Input containerStyle={{ flex: 1 }} label="Kis din tak ka (YYYY-MM-DD)" value={form.opening_balance_date ?? ''} onChangeText={(v) => set('opening_balance_date', v)} placeholder="2026-04-01" />
+              {/* Deliberately NOT defaulted to today. An opening balance is a
+                  figure carried over from the old register and its date is a
+                  fact about that register, not about the day somebody typed
+                  it in — and it is only written when the balance is non-zero. */}
+              <Input
+                containerStyle={{ flex: 1 }}
+                label="Kis din tak ka (YYYY-MM-DD)"
+                value={form.opening_balance_date ?? ''}
+                onChangeText={(v) => set('opening_balance_date', v)}
+                placeholder="2026-04-01"
+                keyboardType="numbers-and-punctuation"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+              />
             </Row>
           ) : null}
-          <Input label="Note" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} multiline />
-          {!isNew ? <SwitchRow label="Active" value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} /> : null}
+          <Input label="Note" value={form.notes ?? ''} onChangeText={(v) => set('notes', v)} placeholder="Kuch yaad rakhne wali baat" multiline />
+          {!isNew ? <SwitchRow label="Chalu hai" hint="Band kar doge to naye bill mein ye naam nahi aayega. Purana khata waise ka waisa rahega." value={!!form.is_active} onChange={(v) => set('is_active', v ? 1 : 0)} /> : null}
         </FormSection>
 
-        <Button title={isNew ? 'Create customer' : dirty ? 'Save changes' : 'Saved'} onPress={save} loading={saving} disabled={!isNew && !dirty} />
+        {/* A new customer with no name was a live button that always lost:
+            press it, get a toast, press it again. Now it waits for the one
+            thing save() actually insists on. */}
+        <Button title={isNew ? 'Grahak bana do' : dirty ? 'Save karo' : 'Save ho gaya'} onPress={save} loading={saving} disabled={!canSave} />
 
         {!isNew ? (
           <>
             <SectionTitle>Gaadiyan</SectionTitle>
             <Card style={{ gap: 0 }}>
               {(vehicles ?? []).map((v) => (
-                <ListRow key={v.id} title={v.registration_no} subtitle={[v.make_name, v.model_name, v.color].filter(Boolean).join(' · ') || 'model not set'} right={<Button title="×" tone="ghost" size="sm" onPress={() => removeVehicle(v)} />} />
+                <ListRow key={v.id} title={v.registration_no} subtitle={[v.make_name, v.model_name, v.color].filter(Boolean).join(' · ') || 'model nahi bhara'} right={<Button title="×" tone="ghost" size="sm" onPress={() => removeVehicle(v)} />} />
               ))}
               <Row gap={8} align="flex-end" style={{ paddingTop: 8 }}>
-                <Input containerStyle={{ flex: 1 }} label="Gaadi number" value={reg} onChangeText={(v) => setReg(v.toUpperCase())} placeholder="UP16AB1234" autoCapitalize="characters" />
+                {/* A registration is a part number by another name — one
+                    autocorrected letter and the gaadi belongs to nobody. */}
+                <Input
+                  containerStyle={{ flex: 1 }}
+                  label="Gaadi number"
+                  value={reg}
+                  onChangeText={(v) => setReg(v.toUpperCase())}
+                  placeholder="UP16AB1234"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={() => { if (canAddVehicle && !addingVehicle) addVehicle(); }}
+                />
                 <View style={{ flex: 1.4 }}>
-                  <SelectField label="Model" value={regModel} options={(models ?? []).map((m) => ({ value: m.id, label: `${m.make_name} ${m.name}` }))} onChange={setRegModel} allowClear />
+                  <SelectField label="Gaadi ka model" value={regModel} options={(models ?? []).map((m) => ({ value: m.id, label: `${m.make_name} ${m.name}` }))} onChange={setRegModel} allowClear />
                 </View>
-                <Button title="Jodo" tone="secondary" onPress={addVehicle} />
+                <Button title="Jodo" tone="secondary" onPress={addVehicle} loading={addingVehicle} disabled={!canAddVehicle} />
               </Row>
             </Card>
           </>

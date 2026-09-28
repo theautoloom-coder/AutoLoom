@@ -25,6 +25,7 @@ import { useSession } from '@/lib/session';
 import { Card, Empty, Grid, IconBadge, ListRow, Row, Screen, SectionTitle, StatTile, Text } from '@/ui';
 import { clockOf, KIND } from '@/ui/kinds';
 import { useCountUp } from '@/ui/motion';
+import { SkeletonList, SkeletonTile } from '@/ui/skeleton';
 import { space } from '@/ui/theme';
 
 type Feed = { kind: string; id: string; at: string; who: string; amount: number | null; qty: number | null };
@@ -41,11 +42,18 @@ export default function HomeScreen() {
   const { can, profile } = useSession();
   const today = toDateString();
 
-  const { data: kpiRows } = useQuery<Record<string, number>>(DASHBOARD_TODAY.sql, [today]);
+  // The two halves of this screen are two queries, so they wait separately.
+  // Blocking the numbers on the feed would hold back the thing the owner
+  // opened the app for because a list of the day's entries was still being
+  // stitched out of five tables.
+  const { data: kpiRows, isLoading: kpiLoading } = useQuery<Record<string, number>>(DASHBOARD_TODAY.sql, [today]);
   const k = kpiRows?.[0];
-  const { data: feed } = useQuery<Feed>(TODAY_FEED.sql, [today]);
+  const { data: feed, isLoading: feedLoading } = useQuery<Feed>(TODAY_FEED.sql, [today]);
 
   const showMoney = can('reports.view') || can('catalog.view_cost');
+  // Same count the Grid below renders, so the grey tiles and the real ones
+  // occupy the same rows and nothing reflows underneath them.
+  const tileCount = showMoney ? 5 : 3;
 
   const sale = k?.sales_today ?? 0;
   const spent = k?.spent_today ?? 0;
@@ -64,40 +72,53 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      <Grid min={150}>
-        <StatTile label="Aaj ki sale" value={formatINR(takings)} sub={`${k?.invoices_today ?? 0} bill`} icon="trending-up-outline" accent="blue" onPress={() => router.push('/parchi')} />
-        <StatTile label="Aaj ka kharcha" value={formatINR(spent)} sub="business ka" icon="wallet-outline" accent="amber" onPress={() => router.push('/expenses')} />
-        {showMoney ? (
+      {kpiLoading ? (
+        <Grid min={150}>
+          {Array.from({ length: tileCount }, (_, i) => (
+            <SkeletonTile key={i} />
+          ))}
+        </Grid>
+      ) : (
+        <Grid min={150}>
+          <StatTile label="Aaj ki sale" value={formatINR(takings)} sub={`${k?.invoices_today ?? 0} bill`} icon="trending-up-outline" accent="blue" onPress={() => router.push('/parchi')} />
+          <StatTile label="Aaj ka kharcha" value={formatINR(spent)} sub="business ka" icon="wallet-outline" accent="amber" onPress={() => router.push('/expenses')} />
+          {showMoney ? (
+            <StatTile
+              label="Aaj ka munafa"
+              value={formatINR(profit)}
+              sub="cost aur kharcha nikaal ke"
+              icon="cash-outline"
+              accent="green"
+              tone={profit < 0 ? 'danger' : undefined}
+              onPress={() => router.push('/hisab')}
+            />
+          ) : null}
+          {showMoney ? (
+            <StatTile label="Total stock" value={formatINRShort(k?.stock_value ?? 0)} sub="godown ki keemat" icon="cube-outline" accent="violet" onPress={() => router.push('/stock')} />
+          ) : null}
           <StatTile
-            label="Aaj ka munafa"
-            value={formatINR(profit)}
-            sub="cost aur kharcha nikaal ke"
-            icon="cash-outline"
-            accent="green"
-            tone={profit < 0 ? 'danger' : undefined}
-            onPress={() => router.push('/hisab')}
+            label="Khatam hone wala"
+            value={String(k?.low_stock_count ?? 0)}
+            sub="item"
+            icon="alert-circle-outline"
+            accent="rose"
+            tone={(k?.low_stock_count ?? 0) > 0 ? 'warn' : undefined}
+            onPress={() => router.push('/stock')}
           />
-        ) : null}
-        {showMoney ? (
-          <StatTile label="Total stock" value={formatINRShort(k?.stock_value ?? 0)} sub="godown ki keemat" icon="cube-outline" accent="violet" onPress={() => router.push('/stock')} />
-        ) : null}
-        <StatTile
-          label="Khatam hone wala"
-          value={String(k?.low_stock_count ?? 0)}
-          sub="item"
-          icon="alert-circle-outline"
-          accent="rose"
-          tone={(k?.low_stock_count ?? 0) > 0 ? 'warn' : undefined}
-          onPress={() => router.push('/stock')}
-        />
-      </Grid>
+        </Grid>
+      )}
 
       <SectionTitle right={(feed ?? []).length ? <Text variant="small" color="textFaint">{(feed ?? []).length}</Text> : undefined}>
         Aaj kya hua
       </SectionTitle>
 
-      {(feed ?? []).length === 0 ? (
-        <Empty title="Aaj abhi tak kuch nahi hua" hint="Neeche “+” dabao — maal aaya, maal gaya, ya kharcha." />
+      {feedLoading ? (
+        // Three, not ten: this list is the last forty entries of the day and
+        // on most mornings it is short. Ten grey rows would promise a busy day
+        // and then collapse to two.
+        <SkeletonList rows={3} size={38} />
+      ) : (feed ?? []).length === 0 ? (
+        <Empty art="parchi" title="Aaj abhi tak kuch nahi hua" hint="Neeche “+” dabao — maal aaya, maal gaya, ya kharcha." />
       ) : (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(feed ?? []).map((f) => {

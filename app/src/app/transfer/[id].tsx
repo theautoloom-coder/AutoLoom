@@ -27,7 +27,7 @@ export default function TransferDetail() {
     try { await fn(); notify(label); } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!t) return <Screen><Empty title="Ye transfer is phone par nahi mila" /></Screen>;
+  if (!t) return <Screen><Empty art="search" title="Ye transfer is phone par nahi mila" /></Screen>;
   const tone = t.status === 'received' ? 'ok' : t.status === 'dispatched' ? 'warn' : t.status === 'cancelled' ? 'danger' : 'neutral';
 
   return (

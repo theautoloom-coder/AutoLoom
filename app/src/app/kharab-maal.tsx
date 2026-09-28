@@ -25,8 +25,8 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, type TextInput } from 'react-native';
 
 import { formatINR, toDateString } from '@domain';
 
@@ -71,6 +71,14 @@ export default function KharabMaal() {
   const [note, setNote] = useState('');
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // One rate box per line, keyed by variant, so next on the qty keyboard lands
+  // on that line's rate and not on some other line's. The rate is the field
+  // people skip, and a skipped rate reports the loss as ₹0.
+  //
+  // Nothing on this screen autoFocuses: VariantPicker already opens with its
+  // search focused, and that is where the job starts.
+  const costRefs = useRef(new Map<string, TextInput | null>());
 
   // Every hook lives above the permission guard. A useQuery below an early
   // return unmounts and blanks the screen at runtime, and tsc says nothing.
@@ -214,13 +222,24 @@ export default function KharabMaal() {
               <Chip key={r.key} label={r.label} selected={r.key === reasonKey} onPress={() => setReasonKey(r.key)} />
             ))}
           </Row>
-          <Input label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
+          {/* Autocorrect rewrites a typed date and says nothing about it. */}
+          <Input
+            label="Tareekh"
+            value={date}
+            onChangeText={setDate}
+            placeholder="YYYY-MM-DD"
+            hint="Aaj ki date pehle se bhari hai."
+            keyboardType="numbers-and-punctuation"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+          />
         </Card>
 
         <VariantPicker onPick={add} locationId={locationId} showCost={can('catalog.view_cost')} />
 
         {lines.length === 0 ? (
-          <Empty title="Abhi koi maal nahi" hint="Upar scan karo ya naam likho. Ek saath kai cheezein daal sakte ho." />
+          <Empty art="maal" title="Abhi koi maal nahi" hint="Upar scan karo ya naam likho. Ek saath kai cheezein daal sakte ho." />
         ) : (
           <Card style={{ gap: space.md }}>
             {lines.map((l, i) => {
@@ -239,14 +258,19 @@ export default function KharabMaal() {
                       value={String(l.qty)}
                       onChangeText={(v) => patch(l.variantId, { qty: Math.max(0, Math.floor(Number(v.replace(/[^0-9]/g, '')) || 0)) })}
                       keyboardType="number-pad"
+                      returnKeyType="next"
+                      onSubmitEditing={() => costRefs.current.get(l.variantId)?.focus()}
+                      submitBehavior="submit"
                     />
                     <Input
+                      ref={(r) => { costRefs.current.set(l.variantId, r); }}
                       containerStyle={{ flex: 1 }}
                       label="Ek ka kharid rate"
                       value={l.cost ? String(l.cost) : ''}
                       onChangeText={(v) => patch(l.variantId, { cost: Number(v.replace(/[^0-9.]/g, '')) || 0 })}
                       keyboardType="decimal-pad"
                       hint="Isi se nuksan gina jaata hai"
+                      returnKeyType="done"
                     />
                   </Row>
                   <Text variant="small" color={l.cost ? 'textFaint' : 'danger'}>

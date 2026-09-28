@@ -62,7 +62,7 @@ export default function InvoiceDetail() {
     try { await db.writeTransaction((tx) => cancelInvoice(tx, inv.id, reason, actor)); notify('Cancel ho gaya.'); } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!inv) return <Screen><Empty title="Ye bill is phone par nahi mila" /></Screen>;
+  if (!inv) return <Screen><Empty art="search" title="Ye bill is phone par nahi mila" /></Screen>;
   const isCN = inv.doc_type === 'credit_note';
   const due = inv.grand_total - inv.paid_total;
   const hasTax = inv.cgst_total + inv.sgst_total + inv.igst_total > 0;

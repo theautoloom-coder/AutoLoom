@@ -193,7 +193,7 @@ export default function MaalAaya() {
         />
 
         {lines.length === 0 ? (
-          <Empty title="Abhi koi maal nahi" hint="Upar scan karo ya naam likho. Ek saath kai cheezein daal sakte ho." />
+          <Empty art="maal" title="Abhi koi maal nahi" hint="Upar scan karo ya naam likho. Ek saath kai cheezein daal sakte ho." />
         ) : (
           <Card style={{ gap: space.md }}>
             {lines.map((l, i) => {

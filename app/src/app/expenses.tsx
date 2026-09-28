@@ -20,8 +20,8 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, type TextInput } from 'react-native';
 
 import { formatINR, toDateString } from '@domain';
 
@@ -73,6 +73,12 @@ export default function KharchaScreen() {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [window_, setWindow] = useState<Window>('mahina');
+
+  // The keyboard's next key walks the form instead of the thumb doing it. The
+  // category and method rows in between are chips, so the jump skips them —
+  // they are already one tap each and a tap is cheaper than a focus.
+  const paidByRef = useRef<TextInput>(null);
+  const dateRef = useRef<TextInput>(null);
 
   // Business kharcha only. A partner's personal withdrawal is money out of the
   // same drawer and belongs on its own screen, not in this total.
@@ -195,13 +201,19 @@ export default function KharchaScreen() {
             <Card keyline spine="accent" style={{ gap: space.lg }}>
               {/* How much. Biggest thing on the screen, because it is the one
                   field nobody can leave blank and the one everybody knows
-                  before they open the app. */}
+                  before they open the app — so it is also where the cursor
+                  starts. Opening Kharcha and typing 40 should be the whole
+                  interaction for a ₹40 chai. */}
               <Input
                 label="Kitna kharcha hua?"
                 value={amountText}
                 onChangeText={setAmountText}
                 keyboardType="decimal-pad"
                 placeholder="0"
+                autoFocus
+                returnKeyType="next"
+                onSubmitEditing={() => paidByRef.current?.focus()}
+                submitBehavior="submit"
                 left={<Text style={[type_.hero, { fontSize: 26, lineHeight: 34 }]} color="textFaint">₹</Text>}
                 style={[type_.hero, { fontSize: 34, lineHeight: 44 }]}
               />
@@ -219,6 +231,10 @@ export default function KharchaScreen() {
                     onChangeText={setOtherCategory}
                     placeholder="Kis cheez ka? Khud likho…"
                     autoFocus
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                    onSubmitEditing={() => paidByRef.current?.focus()}
+                    submitBehavior="submit"
                   />
                 ) : null}
               </View>
@@ -234,10 +250,15 @@ export default function KharchaScreen() {
 
               <View style={{ gap: space.sm }}>
                 <Input
+                  ref={paidByRef}
                   label="Kisne diya"
                   value={paidBy}
                   onChangeText={setPaidBy}
                   placeholder="Naam likho ya neeche se chuno"
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                  onSubmitEditing={() => dateRef.current?.focus()}
+                  submitBehavior="submit"
                 />
                 {(staff ?? []).length > 0 ? (
                   <Row gap={8} wrap>
@@ -253,12 +274,20 @@ export default function KharchaScreen() {
                 ) : null}
               </View>
 
+              {/* Autocorrect on a date turns 2026-09-29 into something the
+                  parser will not take, and it does it silently. */}
               <Input
+                ref={dateRef}
                 label="Tareekh"
                 value={date}
                 onChangeText={setDate}
                 placeholder="YYYY-MM-DD"
                 hint="Aaj ki date pehle se bhari hai."
+                keyboardType="numbers-and-punctuation"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={() => { if (ready && !saving) save(); }}
               />
 
               <Button
@@ -294,7 +323,7 @@ export default function KharchaScreen() {
         </Row>
 
         {byDate.length === 0 ? (
-          <Empty
+          <Empty art="kharcha"
             title="Abhi koi kharcha nahi"
             hint={mayRecord
               ? 'Transport, petrol, loading, chai — jo bhi bahar jaaye, upar likh do. Tabhi din ka cash milega.'

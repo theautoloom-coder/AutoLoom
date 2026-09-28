@@ -120,7 +120,8 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="sign-in" options={{ headerShown: false }} />
                 <Stack.Screen name="reset-password" options={{ headerShown: false }} />
-                  <Stack.Screen name="product/[id]" options={{ title: 'Item' }} />
+                <Stack.Screen name="product/[id]" options={{ title: 'Item' }} />
+                <Stack.Screen name="vehicle/[id]" options={{ title: 'Gaadi' }} />
                 <Stack.Screen name="customer/[id]" options={{ title: 'Grahak' }} />
                 <Stack.Screen name="customer/edit" options={{ title: 'Grahak' }} />
                 <Stack.Screen name="customers" options={{ title: 'Grahak' }} />
@@ -130,11 +131,7 @@ export default function RootLayout() {
                 <Stack.Screen name="admin/index" options={{ title: 'Admin' }} />
                 <Stack.Screen name="admin/item" options={{ title: 'Item' }} />
                 <Stack.Screen name="admin/products" options={{ title: 'Saara maal' }} />
-                <Stack.Screen name="admin/product/[id]" options={{ title: 'Item' }} />
-                <Stack.Screen name="admin/families" options={{ title: 'Category' }} />
-                <Stack.Screen name="admin/family/[id]" options={{ title: 'Category' }} />
-                <Stack.Screen name="admin/spec/[id]" options={{ title: 'Spec' }} />
-                    <Stack.Screen name="admin/masters" options={{ title: 'Master data' }} />
+                <Stack.Screen name="admin/masters" options={{ title: 'Master data' }} />
                 <Stack.Screen name="admin/settings" options={{ title: 'Dukan settings' }} />
                 <Stack.Screen name="admin/users" options={{ title: 'Staff aur role' }} />
                 <Stack.Screen name="admin/import" options={{ title: 'Import' }} />
@@ -147,22 +144,21 @@ export default function RootLayout() {
                 <Stack.Screen name="adjustments" options={{ title: 'Adjustment' }} />
                 <Stack.Screen name="adjustment/edit" options={{ title: 'Adjustment' }} />
                 <Stack.Screen name="adjustment/[id]" options={{ title: 'Adjustment' }} />
-                <Stack.Screen name="audits" options={{ title: 'Stock ginti' }} />
-                <Stack.Screen name="audit/[id]" options={{ title: 'Ginti ki list' }} />
                 <Stack.Screen name="stock/add" options={{ title: 'Maal Aaya' }} />
-              <Stack.Screen name="kharab-maal" options={{ title: 'Kharab Maal' }} />
-              <Stack.Screen name="stock-check" options={{ title: 'Stock Check' }} />
-              <Stack.Screen name="warehouse" options={{ title: 'Warehouse' }} />
-              <Stack.Screen name="partner-kharcha" options={{ title: 'Partner Kharcha' }} />
-              <Stack.Screen name="stock/ledger/[id]" options={{ title: 'Stock ka hisaab' }} />
+                <Stack.Screen name="kharab-maal" options={{ title: 'Kharab Maal' }} />
+                <Stack.Screen name="stock-check" options={{ title: 'Stock Check' }} />
+                <Stack.Screen name="warehouse" options={{ title: 'Warehouse' }} />
+                <Stack.Screen name="expenses" options={{ title: 'Kharcha' }} />
+                <Stack.Screen name="partner-kharcha" options={{ title: 'Partner Kharcha' }} />
+                <Stack.Screen name="stock/ledger/[id]" options={{ title: 'Stock ka hisaab' }} />
                 <Stack.Screen name="payments" options={{ title: 'Payment' }} />
                 <Stack.Screen name="payment/edit" options={{ title: 'Payment' }} />
                 <Stack.Screen name="invoice/edit" options={{ title: 'Bill' }} />
                 <Stack.Screen name="invoice/[id]" options={{ title: 'Bill' }} />
-                        <Stack.Screen name="reorder" options={{ title: 'Kya mangwana hai' }} />
+                <Stack.Screen name="reorder" options={{ title: 'Kya mangwana hai' }} />
                 <Stack.Screen name="reminders" options={{ title: 'Yaad dilao' }} />
                 <Stack.Screen name="help" options={{ title: 'Kaise chalayein' }} />
-              <Stack.Screen name="sync" options={{ title: 'Sync ka haal', presentation: 'modal' }} />
+                <Stack.Screen name="sync" options={{ title: 'Sync ka haal', presentation: 'modal' }} />
               </Stack>
               <ToastHost />
               <InstallPrompt />

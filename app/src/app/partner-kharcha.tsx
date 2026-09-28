@@ -23,8 +23,8 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Pressable, View, type TextInput } from 'react-native';
 
 import { formatINR, toDateString } from '@domain';
 
@@ -47,6 +47,48 @@ const METHODS = [
 ];
 const methodLabel = (mode: string) => METHODS.find((m) => m.value === mode)?.label ?? mode;
 
+/**
+ * One of the two cards that are the point of this screen.
+ *
+ * At module scope, not inside the screen. Declared in the render it was a new
+ * component type on every keystroke in the amount box, so React threw both
+ * cards away and rebuilt them each time somebody typed a digit — and eslint's
+ * react-hooks/static-components said so.
+ */
+function Choice({
+  selected, title, line, tone, onPress,
+}: { selected: boolean; title: string; line: string; tone: 'ok' | 'warn'; onPress: () => void }) {
+  const t = useTheme();
+  const edge = tone === 'warn' ? t.warn : t.ok;
+  const fill = tone === 'warn' ? t.warnSoft : t.okSoft;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={(s) => [{
+        gap: space.xs,
+        padding: space.lg,
+        borderRadius: radius.md,
+        borderWidth: selected ? 2 : 1,
+        borderColor: selected ? edge : t.border,
+        backgroundColor: selected ? fill : t.surface,
+        opacity: s.pressed ? 0.9 : 1,
+      }]}>
+      <Row gap={space.sm} align="center">
+        <View style={{
+          width: 18, height: 18, borderRadius: 9,
+          borderWidth: selected ? 6 : 1.5,
+          borderColor: selected ? edge : t.borderStrong,
+          backgroundColor: t.surface,
+        }} />
+        <Text variant="heading" style={{ flex: 1 }}>{title}</Text>
+      </Row>
+      <Text variant="small" color="textMuted" style={{ paddingLeft: 18 + space.sm }}>{line}</Text>
+    </Pressable>
+  );
+}
+
 type Entry = {
   id: string; expense_date: string; category: string; amount: number;
   mode: string; paid_by: string | null; note: string | null;
@@ -56,7 +98,6 @@ type Entry = {
 export default function PartnerKharchaScreen() {
   const { db } = useSystem();
   const { can, actor, locationId } = useSession();
-  const t = useTheme();
 
   const [partner, setPartner] = useState<string | null>(null);
   const [newPartners, setNewPartners] = useState<string[]>([]);
@@ -71,6 +112,12 @@ export default function PartnerKharchaScreen() {
   /** null until chosen — nothing saves on a guess about which kind this is. */
   const [isPersonal, setIsPersonal] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // No autoFocus anywhere on this screen: the first thing it asks for is which
+  // partner, and that is a picker. A keyboard thrown up over a list the person
+  // has to read is a keyboard they have to dismiss first.
+  const paidByRef = useRef<TextInput>(null);
+  const dateRef = useRef<TextInput>(null);
 
   // Every hook sits above the permission guard. A useQuery below an early
   // return unmounts on the render where the guard passes and blanks the
@@ -158,7 +205,7 @@ export default function PartnerKharchaScreen() {
       reset();
       notify(`${partner} · ${kind} ${formatINR(amount)} likh diya.`, 'ok');
     } catch (e) {
-      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
+      notify(`Save nahi hua: ${String((e as Error).message ?? e)}. Dobara koshish karo.`, 'danger');
     } finally {
       setSaving(false);
     }
@@ -177,40 +224,6 @@ export default function PartnerKharchaScreen() {
   const today = toDateString();
   const dayLabel = (d: string) =>
     d === today ? 'Aaj' : new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' });
-
-  /** One of the two cards that are the point of this screen. */
-  function Choice({
-    selected, title, line, tone, onPress,
-  }: { selected: boolean; title: string; line: string; tone: 'ok' | 'warn'; onPress: () => void }) {
-    const edge = tone === 'warn' ? t.warn : t.ok;
-    const fill = tone === 'warn' ? t.warnSoft : t.okSoft;
-    return (
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="radio"
-        accessibilityState={{ selected }}
-        style={(s) => [{
-          gap: space.xs,
-          padding: space.lg,
-          borderRadius: radius.md,
-          borderWidth: selected ? 2 : 1,
-          borderColor: selected ? edge : t.border,
-          backgroundColor: selected ? fill : t.surface,
-          opacity: s.pressed ? 0.9 : 1,
-        }]}>
-        <Row gap={space.sm} align="center">
-          <View style={{
-            width: 18, height: 18, borderRadius: 9,
-            borderWidth: selected ? 6 : 1.5,
-            borderColor: selected ? edge : t.borderStrong,
-            backgroundColor: t.surface,
-          }} />
-          <Text variant="heading" style={{ flex: 1 }}>{title}</Text>
-        </Row>
-        <Text variant="small" color="textMuted" style={{ paddingLeft: 18 + space.sm }}>{line}</Text>
-      </Pressable>
-    );
-  }
 
   if (!can('reports.view')) {
     return (
@@ -261,6 +274,9 @@ export default function PartnerKharchaScreen() {
             onChangeText={setAmountText}
             keyboardType="decimal-pad"
             placeholder="0"
+            returnKeyType="next"
+            onSubmitEditing={() => paidByRef.current?.focus()}
+            submitBehavior="submit"
             left={<Text style={[type_.hero, { fontSize: 26, lineHeight: 34 }]} color="textFaint">₹</Text>}
             style={[type_.hero, { fontSize: 34, lineHeight: 44 }]}
           />
@@ -279,7 +295,7 @@ export default function PartnerKharchaScreen() {
               selected={isPersonal === true}
               tone="warn"
               title="Personal Paisa Nikala"
-              line="Business expense NAHI hai."
+              line="Business kharcha NAHI hai."
               onPress={() => setIsPersonal(true)}
             />
             <Text variant="small" color="textFaint">
@@ -295,7 +311,16 @@ export default function PartnerKharchaScreen() {
               ))}
             </Row>
             {category === 'Other' ? (
-              <Input value={otherCategory} onChangeText={setOtherCategory} placeholder="Kis cheez ka? Khud likho…" autoFocus />
+              <Input
+                value={otherCategory}
+                onChangeText={setOtherCategory}
+                placeholder="Kis cheez ka? Khud likho…"
+                autoFocus
+                autoCapitalize="words"
+                returnKeyType="next"
+                onSubmitEditing={() => paidByRef.current?.focus()}
+                submitBehavior="submit"
+              />
             ) : null}
             {isPersonal ? (
               <Text variant="small" color="textFaint">
@@ -314,7 +339,17 @@ export default function PartnerKharchaScreen() {
           </View>
 
           <View style={{ gap: space.sm }}>
-            <Input label="Kisne diya" value={paidBy} onChangeText={setPaidBy} placeholder="Naam likho ya neeche se chuno" />
+            <Input
+              ref={paidByRef}
+              label="Kisne diya"
+              value={paidBy}
+              onChangeText={setPaidBy}
+              placeholder="Naam likho ya neeche se chuno"
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => dateRef.current?.focus()}
+              submitBehavior="submit"
+            />
             {(staff ?? []).length > 0 ? (
               <Row gap={8} wrap>
                 {(staff ?? []).map((s) => (
@@ -329,7 +364,20 @@ export default function PartnerKharchaScreen() {
             ) : null}
           </View>
 
-          <Input label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
+          {/* Autocorrect rewrites a typed date and says nothing about it. */}
+          <Input
+            ref={dateRef}
+            label="Tareekh"
+            value={date}
+            onChangeText={setDate}
+            placeholder="YYYY-MM-DD"
+            hint="Aaj ki date pehle se bhari hai."
+            keyboardType="numbers-and-punctuation"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={() => { if (ready && !saving) save(); }}
+          />
 
           <Button
             title={ready ? `${formatINR(amount)} likh do` : 'Likh do'}
@@ -369,7 +417,7 @@ export default function PartnerKharchaScreen() {
               <StatTile
                 label="PERSONAL NIKALA"
                 value={formatINR(totals.personal)}
-                sub="business expense nahi"
+                sub="business kharcha nahi"
                 icon="person-outline"
                 accent="amber"
                 tone="warn"
@@ -377,7 +425,7 @@ export default function PartnerKharchaScreen() {
             </Grid>
 
             {byDate.length === 0 ? (
-              <Empty
+              <Empty art="hisab"
                 title={`${partner} ka koi hisaab nahi`}
                 hint="Upar amount daalo, do mein se ek chuno, aur likh do."
               />

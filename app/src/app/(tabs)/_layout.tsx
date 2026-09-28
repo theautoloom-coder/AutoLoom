@@ -139,6 +139,10 @@ function Sidebar() {
               active={item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)}
             />
           ))}
+          {/* Not one of the five places, but a wide screen has the room and a
+              mouse has nowhere else to reach it. Gaadi, grahak, gaadi number,
+              bill number — the questions Stock's own box does not answer. */}
+          <NavLink href="/search" title="Dhoondo" symbol="search-outline" active={pathname.startsWith('/search')} />
         </View>
 
         {/* The owner's own controls, kept as a group of their own rather than
@@ -244,10 +248,9 @@ export default function TabsLayout() {
           reaches them on a narrow one. */}
       <Tabs.Screen name="admin" options={{ href: null, title: 'Admin' }} />
       <Tabs.Screen name="requests" options={{ href: null, title: 'Requests' }} />
-      {/* Reachable, not a tab. Billing is a job you start from "+", and the
-          global search is a second way to do what Stock's own box already
-          does — neither earns a permanent place on a five-slot bar. */}
-      <Tabs.Screen name="sell" options={{ href: null, title: 'Bill' }} />
+      {/* Reachable, not a tab. Stock's own box finds maal; this one finds the
+          gaadi, the grahak, the gaadi number and the bill — a different
+          question, asked less often than five times a day. */}
       <Tabs.Screen name="search" options={{ href: null, title: 'Dhoondo' }} />
     </Tabs>
   );

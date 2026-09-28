@@ -132,7 +132,7 @@ export default function ProductScreen() {
   if (!product) {
     return (
       <Screen>
-        <Empty title="Ye item is phone par nahi mila" hint="Shayad abhi sync nahi hua." />
+        <Empty art="search" title="Ye item is phone par nahi mila" hint="Shayad abhi sync nahi hua." />
       </Screen>
     );
   }
@@ -172,7 +172,7 @@ export default function ProductScreen() {
             <Text variant="display" style={{ marginTop: space.xs, flex: 1 }}>
               {product.name}
             </Text>
-            {can('catalog.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/admin/product/${product.id}`)} /> : null}
+            {can('catalog.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/admin/item?id=${product.id}`)} /> : null}
           </Row>
           {product.description ? (
             <Text variant="small" color="textMuted">
@@ -440,7 +440,7 @@ export default function ProductScreen() {
                   <ListRow key={p.id} title={p.supplier_name} subtitle={`${p.doc_no} · ${p.doc_date}`} right={<Text mono>{p.qty} @ {formatINR(p.rate)}</Text>} />
                 ))
               ) : (
-                <Empty title="Koi purchase nahi mila" hint="Shuruaati stock import se aaya tha." />
+                <Empty art="search" title="Koi purchase nahi mila" hint="Shuruaati stock import se aaya tha." />
               )}
             </Card>
           </>

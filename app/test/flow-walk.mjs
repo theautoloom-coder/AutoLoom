@@ -26,9 +26,9 @@ if (!email || !password) {
 const SCREENS = [
   ['Home', '/'],
   ['Search', '/search'],
-  ['Billing', '/sell'],
   ['Stock', '/stock'],
   ['More', '/more'],
+  ['Help', '/help'],
   ['Admin', '/admin'],
   ['Requests', '/requests'],
   ['Staff', '/admin/users'],
@@ -44,7 +44,9 @@ const SCREENS = [
   ['All items', '/admin/products'],
   ['CSV import', '/admin/import'],
   ['Customers', '/customers'],
+  ['New customer', '/customer/edit'],
   ['Suppliers', '/suppliers'],
+  ['New supplier', '/supplier/edit'],
   ['Reminders', '/reminders'],
   ['Hisab', '/hisab'],
   ['Sync', '/sync'],
@@ -58,7 +60,6 @@ const SCREENS = [
   ['Payments', '/payments'],
   ['Adjustments', '/adjustments'],
   ['Transfers', '/transfers'],
-  ['Audits', '/audits'],
 ];
 
 /** Words that mean the screen gave up or never arrived. */

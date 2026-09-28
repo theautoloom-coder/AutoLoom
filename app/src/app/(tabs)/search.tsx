@@ -1,3 +1,17 @@
+/**
+ * Dhoondo — ek hi box, sab kuch.
+ *
+ * Stock ka apna search maal dhoondhta hai. This one is the other question a
+ * counter asks: not "kaun sa maal", but "kis gaadi ka", "kaun sa grahak",
+ * "wo bill kahan gaya". A socket (H4), a car with a year (Creta 2024), a
+ * mobile number, a gaadi number, a bill number — one box, because the person
+ * typing does not know which category their scrap of information belongs to.
+ *
+ * It stopped being a tab in the redesign, and for a while nothing linked to
+ * it at all: it was reachable only by typing the URL, which on a phone means
+ * not at all. The car-fitment path ran through here, so that went with it.
+ * It is now opened from Ghar and from Aur.
+ */
 import { useQuery } from '@powersync/react';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -8,12 +22,13 @@ import { formatINR, normaliseRegistration, parseVehicleSearch } from '@domain';
 import { SEARCH_CUSTOMERS, SEARCH_INVOICES, SEARCH_REGISTRATIONS, SEARCH_VARIANTS, SEARCH_VEHICLES, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { Badge, Card, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
 type VariantHit = {
   id: string; sku: string; barcode: string | null; variant_name: string; retail_price: number; dealer_price: number | null;
   product_id: string; product_name: string; brand_name: string | null; family_name: string | null; is_universal_fit: number; qty: number;
-  min_stock: number; reorder_level: number;
+  min_stock: number; reorder_level: number; photo_path: string | null;
 };
 type VehicleHit = { id: string; name: string; make_name: string; body_type: string | null; fitment_count: number };
 type CustomerHit = { id: string; code: string; name: string; business_name: string | null; mobile: string | null; city: string | null; customer_type: string; balance: number; credit_limit: number };
@@ -57,11 +72,16 @@ export default function SearchScreen() {
 
   return (
     <Screen>
-      <Text variant="display">Dhoondo</Text>
+      <View>
+        <Text variant="display">Dhoondo</Text>
+        <Text variant="small" color="textMuted">
+          Maal, gaadi, grahak ya bill — sab ek hi box se.
+        </Text>
+      </View>
       <Input
         value={q}
         onChangeText={setQ}
-        placeholder="H4 LED · Creta 2024 · XYZ Auto · UP16AB1234 · NOI/A/26-27/0042"
+        placeholder="H4 LED · Creta 2024 · grahak ka naam · UP16AB1234 · bill number"
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="while-editing"
@@ -71,9 +91,9 @@ export default function SearchScreen() {
 
       {!active ? (
         <Card tone="alt">
-          <Text variant="heading">Ek hi jagah sab kuch</Text>
+          <Text variant="heading">Ek hi box, sab kuch</Text>
           <Text variant="small" color="textMuted">
-            Type a socket (H4, 9005), a product, a vehicle with year (Creta 2024), a customer or mobile number, a vehicle registration, or an invoice number.
+            Maal ka naam ya SKU, socket (H4, 9005), gaadi saal ke saath (Creta 2024), grahak ka naam ya mobile, gaadi number, ya bill number — kuch bhi likho.
           </Text>
         </Card>
       ) : null}
@@ -86,9 +106,9 @@ export default function SearchScreen() {
               <ListRow
                 key={v.id}
                 title={`${v.make_name} ${v.name}`}
-                subtitle={`${v.fitment_count} fitment${v.fitment_count === 1 ? '' : 's'}${v.body_type ? ` · ${v.body_type}` : ''}`}
+                subtitle={`${v.fitment_count} item is gaadi ke liye${v.body_type ? ` · ${v.body_type}` : ''}`}
                 onPress={() => router.push(`/vehicle/${v.id}${parsed.year ? `?year=${parsed.year}` : ''}`)}
-                right={<Text color="accent">Is gaadi mein lagne wala maal</Text>}
+                right={<Text variant="small" color="accent">Kya lagta hai</Text>}
               />
             ))}
           </Card>
@@ -118,6 +138,7 @@ export default function SearchScreen() {
             {variants.map((v) => (
               <ListRow
                 key={v.id}
+                left={<ItemPhoto path={v.photo_path} name={v.product_name} size={44} />}
                 title={`${v.product_name} · ${v.variant_name}`}
                 subtitle={
                   <Row gap={space.xs} wrap>
@@ -132,7 +153,7 @@ export default function SearchScreen() {
                 right={
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text mono color={v.qty <= 0 ? 'danger' : v.qty <= Math.max(v.min_stock, v.reorder_level) ? 'warn' : 'ok'}>
-                      {v.qty} in stock
+                      {v.qty} pcs
                     </Text>
                     {showPrice ? (
                       <Text variant="small" color="textMuted" mono>
@@ -159,10 +180,10 @@ export default function SearchScreen() {
                 onPress={() => router.push(`/customer/${c.id}`)}
                 right={
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Badge tone={c.customer_type === 'retail' ? 'neutral' : 'info'}>{c.customer_type}</Badge>
+                    <Badge tone={c.customer_type === 'retail' ? 'neutral' : 'info'}>{c.customer_type === 'retail' ? 'retail' : c.customer_type === 'wholesale' ? 'thok' : c.customer_type}</Badge>
                     {c.balance ? (
                       <Text variant="small" mono color={c.balance > 0 ? 'warn' : 'ok'}>
-                        {formatINR(c.balance)} due
+                        {formatINR(c.balance)} baaki
                       </Text>
                     ) : null}
                   </View>
@@ -186,7 +207,7 @@ export default function SearchScreen() {
                 right={
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text mono>{formatINR(i.grand_total)}</Text>
-                    <Badge tone={i.status === 'cancelled' ? 'danger' : i.paid_total >= i.grand_total ? 'ok' : 'warn'}>{i.status === 'cancelled' ? 'cancelled' : i.paid_total >= i.grand_total ? 'paid' : 'due'}</Badge>
+                    <Badge tone={i.status === 'cancelled' ? 'danger' : i.paid_total >= i.grand_total ? 'ok' : 'warn'}>{i.status === 'cancelled' ? 'radd' : i.paid_total >= i.grand_total ? 'paisa aaya' : 'udhaar'}</Badge>
                   </View>
                 }
               />
@@ -195,7 +216,7 @@ export default function SearchScreen() {
         </>
       ) : null}
 
-      {nothing ? <Empty title={`Nothing matches “${q.trim()}”`} hint="H4 jaisa socket, Creta jaisa model, ya grahak ka mobile number likho." /> : null}
+      {nothing ? <Empty art="search" title={`“${q.trim()}” ka kuch nahi mila`} hint="H4 jaisa socket, Creta jaisa model, ya grahak ka mobile number likho." /> : null}
     </Screen>
   );
 }

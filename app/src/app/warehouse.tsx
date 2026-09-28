@@ -98,7 +98,7 @@ export default function Warehouse() {
               {(locations ?? []).find((l) => l.id === openLoc)?.name ?? 'Yahan kya hai'}
             </SectionTitle>
             {here.length === 0 ? (
-              <Empty title="Yahan abhi kuch nahi hai" hint="Is jagah par koi maal nahi pada." />
+              <Empty art="sahi" title="Yahan abhi kuch nahi hai" hint="Is jagah par koi maal nahi pada." />
             ) : (
               <Card style={{ gap: 0, paddingVertical: 4 }}>
                 {here.map((it) => (

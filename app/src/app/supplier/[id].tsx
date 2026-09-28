@@ -35,7 +35,7 @@ export default function SupplierScreen() {
     JOIN product_variants pv ON pv.id = pl.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY qty DESC LIMIT 20`, [id]);
   const showMoney = can('purchase.create') || can('reports.view') || can('payment.pay_supplier');
 
-  if (!s) return <Screen><Empty title="Ye supplier is phone par nahi mila" /></Screen>;
+  if (!s) return <Screen><Empty art="search" title="Ye supplier is phone par nahi mila" /></Screen>;
 
   let running = 0;
   const asc = [...(ledger ?? [])].reverse().map((e) => { running += e.credit - e.debit; return { ...e, running }; });

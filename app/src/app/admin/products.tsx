@@ -43,7 +43,7 @@ export default function ProductsAdmin() {
           {(hits ?? []).map((h) => (
             <ListRow key={h.id} title={`${h.product_name} · ${h.variant_name}`} subtitle={h.sku} onPress={() => router.push(`/admin/item?id=${h.product_id}`)} right={<Text mono>{h.qty}</Text>} />
           ))}
-          {(hits ?? []).length === 0 ? <Empty title="Koi SKU nahi mila" /> : null}
+          {(hits ?? []).length === 0 ? <Empty art="search" title="Koi SKU nahi mila" /> : null}
         </Card>
       ) : (
         <>
@@ -71,7 +71,7 @@ export default function ProductsAdmin() {
                 right={<Text mono>{Math.round(p.qty)} pcs</Text>}
               />
             ))}
-            {(products ?? []).length === 0 ? <Empty title="Abhi koi maal nahi" hint="Pehla item “Naya item” se banao." /> : null}
+            {(products ?? []).length === 0 ? <Empty art="maal" title="Abhi koi maal nahi" hint="Pehla item “Naya item” se banao." /> : null}
           </Card>
         </>
       )}

@@ -42,7 +42,7 @@ export default function PurchaseDetail() {
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 
-  if (!p) return <Screen><Empty title="Ye purchase is phone par nahi mila" /></Screen>;
+  if (!p) return <Screen><Empty art="search" title="Ye purchase is phone par nahi mila" /></Screen>;
   const isReturn = p.doc_type === 'debit_note';
   const due = p.grand_total - p.paid_total;
 

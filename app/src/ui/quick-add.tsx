@@ -1,10 +1,10 @@
 /**
  * The "+".
  *
- * Four jobs make up almost every entry this shop will ever make: maal came in,
- * maal went out, money was spent, the count was wrong. Before this they lived
- * on four different screens reached four different ways, and the tab bar
- * carried a tab for one of them because it had to go somewhere.
+ * Five jobs make up almost every entry this shop will ever make: maal came in,
+ * maal went out, money was spent, maal was written off, the count was wrong.
+ * Before this they lived on separate screens reached separate ways, and the
+ * tab bar carried a tab for one of them because it had to go somewhere.
  *
  * A tab bar is for places you go. This is for jobs you do, which is why it is
  * a button and not a sixth tab — and why it sits where a thumb already rests
@@ -58,11 +58,19 @@ export function QuickAdd() {
       allowed: true,
     },
     {
-      label: 'Stock Sudhar',
-      hint: 'Ginti mein farak mila to theek karo',
-      icon: 'swap-vertical-outline',
+      label: 'Kharab Maal',
+      hint: 'Toot gaya, kharab hua ya kam nikla',
+      icon: 'alert-circle-outline',
+      accent: 'rose',
+      href: '/kharab-maal',
+      allowed: can('stock.adjust'),
+    },
+    {
+      label: 'Stock Check',
+      hint: 'Ginke mila lo — farak ho to theek karo',
+      icon: 'checkbox-outline',
       accent: 'violet',
-      href: '/adjustment/edit',
+      href: '/stock-check',
       allowed: can('stock.adjust'),
     },
   ].filter((a) => a.allowed);

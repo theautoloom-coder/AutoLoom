@@ -1,3 +1,32 @@
+/**
+ * Aur — the fifth place on the bar, and the only one that is not a place.
+ *
+ * Ghar, Stock, Parchi and Hisab are four questions the shop asks all day. The
+ * "+" is the four entries it makes all day. Everything else in the app has to
+ * be reachable from here, or it does not exist — which is exactly what had
+ * happened to Warehouse, Kharab Maal, Stock Check and Partner Kharcha: four
+ * screens that were built and then linked from nowhere.
+ *
+ * The grouping is by WHEN somebody needs the thing, not by which table it
+ * touches:
+ *
+ *   Madad   — the manual, first, because somebody who needs it needs it now
+ *   Roz ka  — every day: kharcha, the day-end reminder round
+ *   Godown  — the weekly maal jobs the Stock tab is too busy to carry
+ *   Paisa   — who owes whom, and the bills behind it
+ *   Dukan   — owner only: the catalogue, the staff, the settings
+ *   Sync    — is this phone talking to the server
+ *
+ * Every row carries an IconBadge. This screen used to be a wall of identical
+ * text rows and it was unreadable at a glance; the coloured square is what
+ * makes a list of fourteen things scannable in one second.
+ *
+ * Two things deliberately do NOT appear here: a row for Parchi or Hisab (they
+ * are tabs — repeating a tab teaches people the bar is not trustworthy) and
+ * the old diagnostics panels (row counts per table, a wall of permission
+ * strings). Those answered a developer's question, in a screen named for the
+ * shop's.
+ */
 import { useQuery, useStatus } from '@powersync/react';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -8,16 +37,14 @@ import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@domain';
 import { cancelDailyPendingReminder, ensureDailyPendingReminder } from '@/lib/daily-reminder';
 import { useSession } from '@/lib/session';
 import { changeMyPassword } from '@/lib/staff';
-import { Avatar, Badge, Button, Card, Chip, Divider, IconBadge, Input, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Avatar, Badge, Button, Card, Chip, Divider, IconBadge, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { confirm, notify, SwitchRow } from '@/ui/forms';
 import { space } from '@/ui/theme';
-
-type Counts = { families: number; specs: number; options: number; products: number; variants: number; models: number; fitments: number; customers: number; suppliers: number; movements: number };
 
 export default function MoreScreen() {
   const router = useRouter();
   const status = useStatus();
-  const { profile, permissions, locationId, setLocationId, signOut, can, session, actor } = useSession();
+  const { profile, locationId, setLocationId, signOut, can, session, actor } = useSession();
 
   // Anyone can change their own password. This needs no Edge Function and no
   // admin: Supabase lets a signed-in user set their own, which means it keeps
@@ -26,19 +53,12 @@ export default function MoreScreen() {
   const [pw, setPw] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
 
-  async function savePassword() {
-    setPwBusy(true);
-    const err = await changeMyPassword(pw);
-    setPwBusy(false);
-    if (err) { notify(err); return; }
-    notify('Password badal gaya. Agli baar isi se sign in karna.', 'ok');
-    setPw('');
-    setPwOpen(false);
-  }
-
-  const isReviewer = can('catalog.edit');
-
-  const { data: locations } = useQuery<{ id: string; code: string; name: string }>('SELECT id, code, name FROM locations WHERE is_active = 1 ORDER BY sort_order');
+  // ---------------------------------------------------------------------------
+  // Every hook lives above the first return. A useQuery below a conditional
+  // return blanks the screen at runtime and the typechecker says nothing.
+  // ---------------------------------------------------------------------------
+  const { data: locations } = useQuery<{ id: string; code: string; name: string }>(
+    'SELECT id, code, name FROM locations WHERE is_active = 1 ORDER BY sort_order');
 
   // Two numbers, because the row means different things to the two audiences:
   // an admin needs to know what is waiting on them, a staff member needs to
@@ -52,18 +72,6 @@ export default function MoreScreen() {
   );
   const pendingReq = reqRows?.[0]?.pending ?? 0;
   const myRejected = reqRows?.[0]?.mine_back ?? 0;
-  const { data: countRows } = useQuery<Counts>(`
-    SELECT (SELECT COUNT(*) FROM product_families) AS families,
-           (SELECT COUNT(*) FROM spec_definitions) AS specs,
-           (SELECT COUNT(*) FROM spec_options) AS options,
-           (SELECT COUNT(*) FROM products) AS products,
-           (SELECT COUNT(*) FROM product_variants) AS variants,
-           (SELECT COUNT(*) FROM vehicle_models) AS models,
-           (SELECT COUNT(*) FROM product_fitments) AS fitments,
-           (SELECT COUNT(*) FROM customers) AS customers,
-           (SELECT COUNT(*) FROM suppliers) AS suppliers,
-           (SELECT COUNT(*) FROM stock_movements) AS movements`);
-  const counts = countRows?.[0];
 
   const [dailyReminder, setDailyReminder] = useState(false);
   useEffect(() => {
@@ -74,6 +82,22 @@ export default function MoreScreen() {
       setDailyReminder(all.some((n) => n.identifier === 'autoloom-daily-pending-reminder'));
     })().catch(() => {});
   }, []);
+
+  const isReviewer = can('catalog.edit');
+  const canStock = can('stock.adjust');
+  const canMoney = can('payment.receive') || can('payment.pay_supplier');
+  const isOwner = can('reports.view');
+  const showDukan = can('catalog.edit') || can('admin.settings') || can('admin.users');
+
+  async function savePassword() {
+    setPwBusy(true);
+    const err = await changeMyPassword(pw);
+    setPwBusy(false);
+    if (err) { notify(err); return; }
+    notify('Password badal gaya. Agli baar isi se sign in karna.', 'ok');
+    setPw('');
+    setPwOpen(false);
+  }
 
   async function toggleDailyReminder(on: boolean) {
     setDailyReminder(on);
@@ -133,8 +157,8 @@ export default function MoreScreen() {
         )}
       </Card>
 
-      {/* Put it near the top: somebody who needs the manual needs it now, not
-          after scrolling past nine things they do not understand. */}
+      {/* Near the top: somebody who needs the manual needs it now, not after
+          scrolling past nine things they do not understand. */}
       <SectionTitle>Madad</SectionTitle>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         <ListRow
@@ -143,111 +167,212 @@ export default function MoreScreen() {
           subtitle="Bill, maal, khata, hisaab — har kaam ka tareeka"
           onPress={() => router.push('/help')}
         />
-      </Card>
-
-      {/* Everything the Stock tab used to carry as a menu. These are the
-          once-a-week jobs; the daily ones are on "+" and inside Stock. */}
-      <SectionTitle>Stock ke kaam</SectionTitle>
-      <Card style={{ gap: 0, paddingVertical: 4 }}>
-        {can('purchase.create') ? <ListRow left={<IconBadge name="receipt-outline" accent="blue" />} title="Purchase bill" subtitle="Supplier ka bill — rate, udhaar, sab" onPress={() => router.push('/purchase/edit')} /> : null}
-        {can('purchase.create') ? <ListRow left={<IconBadge name="documents-outline" accent="blue" />} title="Purchase" subtitle="Bill, return, kitna baaki hai" onPress={() => router.push('/purchases')} /> : null}
-        {can('stock.transfer') ? <ListRow left={<IconBadge name="swap-horizontal-outline" accent="violet" />} title="Transfer" subtitle="Godown ↔ dukan ↔ workshop" onPress={() => router.push('/transfers')} /> : null}
-        {can('stock.count') || can('stock.adjust') ? <ListRow left={<IconBadge name="construct-outline" accent="amber" />} title="Stock Sudhar" subtitle="Damage, kam nikla, extra mila" onPress={() => router.push('/adjustments')} /> : null}
-        {can('stock.count') ? <ListRow left={<IconBadge name="checkbox-outline" accent="teal" />} title="Stock Check" subtitle="Godown ka maal ginke mila lo" onPress={() => router.push('/audits')} /> : null}
-        {can('payment.pay_supplier') ? <ListRow left={<IconBadge name="cash-outline" accent="green" />} title="Payment" subtitle="Aaya hua paisa, supplier ko diya" onPress={() => router.push('/payments')} /> : null}
-        {can('purchase.create') || can('reports.view') ? <ListRow left={<IconBadge name="cart-outline" accent="rose" />} title="Kya mangwana hai" subtitle="Bikri ke hisaab se suggestion" onPress={() => router.push('/reorder')} /> : null}
-        {can('catalog.edit') ? <ListRow left={<IconBadge name="pricetags-outline" accent="violet" />} title="Saara maal" subtitle="Item banao, rate badlo" onPress={() => router.push('/admin/products')} /> : null}
-      </Card>
-
-      <SectionTitle>Sync</SectionTitle>
-      <Card style={{ gap: 0 }}>
+        {/* The Stock tab searches maal. This one searches everything else —
+            gaadi, grahak, gaadi number, bill number — and after the redesign
+            nothing linked to it, which on a phone means it did not exist. */}
         <ListRow
-          left={<IconBadge name="cloud-done-outline" accent="blue" />} title="Sync ka haal"
-          subtitle={status.connected ? (status.lastSyncedAt ? `Aakhri sync ${status.lastSyncedAt.toLocaleTimeString('en-IN')}` : 'Juda hua') : 'Offline — badlav is phone par ruke hue hain'}
-          onPress={() => router.push('/sync')}
-          right={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Juda hua' : 'Offline'}</Badge>}
+          left={<IconBadge name="search-outline" accent="blue" />}
+          title="Dhoondo"
+          subtitle="Gaadi, grahak, gaadi number ya bill number — sab ek box se"
+          onPress={() => router.push('/search')}
         />
       </Card>
 
-      <SectionTitle>Paisa</SectionTitle>
-      <Card style={{ gap: 0 }}>
+      {/* The things that happen every single day and are not already a tab or
+          a "+" job. Parchi and Hisab are deliberately absent — they are tabs. */}
+      <SectionTitle>Roz ka</SectionTitle>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
         <ListRow
-          left={<IconBadge name="wallet-outline" accent="amber" />} title="Kharcha"
-          subtitle="Transport, packing, chai, advance — jo bhi bahar jaaye"
+          left={<IconBadge name="wallet-outline" accent="amber" />}
+          title="Kharcha"
+          subtitle="Transport, packing, chai, advance — jo bhi paisa bahar jaaye"
           onPress={() => router.push('/expenses')}
         />
-      </Card>
-
-      <SectionTitle>{isReviewer ? 'Requests' : 'Meri requests'}</SectionTitle>
-      <Card style={{ gap: 0 }}>
         <ListRow
-          title={isReviewer ? 'Approve karne hain' : 'Naya item bheja hua'}
-          subtitle={
-            isReviewer
-              ? (pendingReq > 0 ? `${pendingReq} request admin ke paas pending hai` : 'Kuch pending nahi')
-              : (myRejected > 0 ? `${myRejected} wapas aayi hai — theek karni hai` : 'Naya maal admin ko bhejo')
-          }
-          onPress={() => router.push('/requests')}
-          right={
-            myRejected > 0 ? <Badge tone="danger">{String(myRejected)}</Badge>
-            : pendingReq > 0 ? <Badge tone="warn">{String(pendingReq)}</Badge>
-            : undefined
-          }
+          left={<IconBadge name="logo-whatsapp" accent="green" />}
+          title="Yaad dilao"
+          subtitle="Din ke aakhir mein kisse paise lene hain, WhatsApp par bhej do"
+          onPress={() => router.push('/reminders')}
         />
+        {/* A staff member's own submissions. The owner's side of the same queue
+            sits under Dukan, where the rest of the approving happens. */}
+        {!isReviewer ? (
+          <ListRow
+            left={<IconBadge name="paper-plane-outline" accent="violet" />}
+            title="Meri requests"
+            subtitle={myRejected > 0 ? `${myRejected} wapas aayi hai — theek karke dobara bhejo` : 'Naya maal ya rate ka badlav owner ko bheja hua'}
+            onPress={() => router.push('/requests')}
+            right={myRejected > 0 ? <Badge tone="danger">{String(myRejected)}</Badge> : undefined}
+          />
+        ) : null}
       </Card>
 
       {Platform.OS !== 'web' ? (
+        <Card>
+          <SwitchRow
+            label="Roz 6:30 baje yaad dilao"
+            hint="Roz shaam is phone par yaad aayega — baaki paisa dekh lo aur yaad dila do."
+            value={dailyReminder}
+            onChange={toggleDailyReminder}
+          />
+        </Card>
+      ) : null}
+
+      {/* The maal jobs. Daily receiving and daily correction are on the "+";
+          these are the once-a-week ones the Stock tab has no room for. */}
+      <SectionTitle>Godown</SectionTitle>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
+        <ListRow
+          left={<IconBadge name="map-outline" accent="blue" />}
+          title="Maal kahan pada hai"
+          subtitle="Godown, dukan, workshop — kis jagah kitna maal aur kitne ka"
+          onPress={() => router.push('/warehouse')}
+        />
+        {canStock ? (
+          <ListRow
+            left={<IconBadge name="alert-circle-outline" accent="rose" />}
+            title="Kharab Maal"
+            subtitle="Toot gaya, kharab ho gaya, kam nikla — stock se nikal do"
+            onPress={() => router.push('/kharab-maal')}
+          />
+        ) : null}
+        {canStock ? (
+          <ListRow
+            left={<IconBadge name="checkbox-outline" accent="teal" />}
+            title="Stock Check"
+            subtitle="Godown ka maal ginke app se mila lo"
+            onPress={() => router.push('/stock-check')}
+          />
+        ) : null}
+        {can('stock.transfer') ? (
+          <ListRow
+            left={<IconBadge name="swap-horizontal-outline" accent="violet" />}
+            title="Transfer"
+            subtitle="Maal ek jagah se doosri jagah bhejo — godown, dukan, workshop"
+            onPress={() => router.push('/transfers')}
+          />
+        ) : null}
+        {can('purchase.create') || isOwner ? (
+          <ListRow
+            left={<IconBadge name="cart-outline" accent="green" />}
+            title="Kya mangwana hai"
+            subtitle="Jo tezi se bik raha hai aur khatam hone wala hai"
+            onPress={() => router.push('/reorder')}
+          />
+        ) : null}
+      </Card>
+
+      {/* Who owes whom. The parties sit here rather than under Dukan because a
+          counter hand needs a khata all day and never needs a setting. */}
+      <SectionTitle>Paisa</SectionTitle>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
+        {canMoney ? (
+          <ListRow
+            left={<IconBadge name="cash-outline" accent="green" />}
+            title="Payment"
+            subtitle="Aaya hua paisa aur supplier ko diya hua — rasid ke saath"
+            onPress={() => router.push('/payments')}
+          />
+        ) : null}
+        <ListRow
+          left={<IconBadge name="people-outline" accent="teal" />}
+          title="Grahak"
+          subtitle="Kiska khata kitna chal raha hai, pichhla rate kya tha"
+          onPress={() => router.push('/customers')}
+        />
+        <ListRow
+          left={<IconBadge name="business-outline" accent="violet" />}
+          title="Supplier"
+          subtitle="Kis se maal aata hai aur uska kitna baaki hai"
+          onPress={() => router.push('/suppliers')}
+        />
+        {can('purchase.create') ? (
+          <ListRow
+            left={<IconBadge name="documents-outline" accent="blue" />}
+            title="Purchase"
+            subtitle="Supplier ke bill, return, aur kitna paisa dena baaki hai"
+            onPress={() => router.push('/purchases')}
+          />
+        ) : null}
+        {isOwner ? (
+          <ListRow
+            left={<IconBadge name="briefcase-outline" accent="rose" />}
+            title="Partner Kharcha"
+            subtitle="Partner ne apne liye nikala ya dukan ke liye — dono alag"
+            onPress={() => router.push('/partner-kharcha')}
+          />
+        ) : null}
+      </Card>
+
+      {showDukan ? (
         <>
-          <SectionTitle>Yaad dilane wale</SectionTitle>
-          <Card>
-            <SwitchRow
-              label="Roz 6:30 baje yaad dilao"
-              hint="Roz shaam is phone par yaad aayega — baaki paisa dekh lo aur yaad dila do."
-              value={dailyReminder}
-              onChange={toggleDailyReminder}
+          <SectionTitle>Dukan</SectionTitle>
+          <Card style={{ gap: 0, paddingVertical: 4 }}>
+            {isReviewer ? (
+              <ListRow
+                left={<IconBadge name="checkmark-done-outline" accent="amber" />}
+                title="Requests"
+                subtitle={pendingReq > 0 ? `${pendingReq} cheez aapke haan ya na ka intezaar kar rahi hai` : 'Staff ne jo naya maal bheja — abhi kuch pending nahi'}
+                onPress={() => router.push('/requests')}
+                right={pendingReq > 0 ? <Badge tone="warn">{String(pendingReq)}</Badge> : undefined}
+              />
+            ) : null}
+            {can('catalog.edit') ? (
+              <ListRow
+                left={<IconBadge name="cube-outline" accent="blue" />}
+                title="Saara maal"
+                subtitle="Naya item banao, rate badlo, purana band karo"
+                onPress={() => router.push('/admin/products')}
+              />
+            ) : null}
+            {can('admin.users') ? (
+              <ListRow
+                left={<IconBadge name="person-add-outline" accent="violet" />}
+                title="Staff"
+                subtitle="Kiska login banega aur woh kya-kya kar sakta hai"
+                onPress={() => router.push('/admin/users')}
+              />
+            ) : null}
+            {can('admin.settings') ? (
+              <ListRow
+                left={<IconBadge name="storefront-outline" accent="teal" />}
+                title="Dukan settings"
+                subtitle="Dukan ka naam, number, UPI aur bill ke neeche ka likha"
+                onPress={() => router.push('/admin/settings')}
+              />
+            ) : null}
+            {can('catalog.edit') ? (
+              <ListRow
+                left={<IconBadge name="cloud-upload-outline" accent="green" />}
+                title="Import"
+                subtitle="Excel se ek saath maal, grahak ya opening stock chadhao"
+                onPress={() => router.push('/admin/import')}
+              />
+            ) : null}
+            {/* The deep master data — categories, brand, unit, HSN, rate list,
+                location, bill number format — lives only behind this. Without
+                the row a phone cannot reach any of it. */}
+            <ListRow
+              left={<IconBadge name="options-outline" accent="amber" />}
+              title="Poora admin"
+              subtitle="Category, brand, rate list, location, bill number ka format"
+              onPress={() => router.push('/admin')}
             />
           </Card>
         </>
       ) : null}
 
-      {can('reports.view') ? (
-        <Card style={{ gap: 0, paddingVertical: 4 }}>
-          <ListRow left={<IconBadge name="bar-chart-outline" accent="violet" />} title="Hisaab-kitab" subtitle="Bikri, GST, purchase, baaki paisa, stock, margin" onPress={() => router.push('/hisab')} />
-        </Card>
-      ) : null}
-
-      <SectionTitle>Is phone par kitna maal</SectionTitle>
-      <Card style={{ gap: 0 }}>
-        <KV k="Category" v={String(counts?.families ?? 0)} mono />
-        <KV k="Spec ke khaane" v={`${counts?.specs ?? 0} with ${counts?.options ?? 0} options`} mono />
-        <KV k="Item / SKU" v={`${counts?.products ?? 0} / ${counts?.variants ?? 0}`} mono />
-        <KV k="Gaadi ke model" v={String(counts?.models ?? 0)} mono />
-        <KV k="Kis gaadi mein lagta hai" v={String(counts?.fitments ?? 0)} mono />
-        <KV k="Grahak / supplier" v={`${counts?.customers ?? 0} / ${counts?.suppliers ?? 0}`} mono />
-        <KV k="Stock ka aana-jaana" v={String(counts?.movements ?? 0)} mono />
-      </Card>
-
-      {can('catalog.edit') || can('admin.settings') ? (
-        <>
-          <SectionTitle>Admin</SectionTitle>
-          <Card style={{ gap: 0, paddingVertical: 4 }}>
-            <ListRow left={<IconBadge name="options-outline" accent="teal" />} title="Admin kholo" subtitle="Maal, gaadi, party, dukan settings" onPress={() => router.push('/admin')} />
-          </Card>
-        </>
-      ) : null}
-
-      <SectionTitle>Aap kya kar sakte ho</SectionTitle>
-      <Card>
-        <Row gap={space.xs} wrap>
-          {[...permissions].sort().map((p) => (
-            <Badge key={p}>{p}</Badge>
-          ))}
-          {permissions.size === 0 ? (
-            <Text variant="small" color="textMuted">
-              None yet — waiting for first sync.
-            </Text>
-          ) : null}
-        </Row>
+      <SectionTitle>Sync</SectionTitle>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
+        <ListRow
+          left={<IconBadge name="cloud-done-outline" accent="blue" />}
+          title="Sync ka haal"
+          subtitle={status.connected
+            ? (status.lastSyncedAt ? `Aakhri baar ${status.lastSyncedAt.toLocaleTimeString('en-IN')} par server se mila` : 'Server se juda hua hai')
+            : 'Offline — badlav is phone par ruke hue hain'}
+          onPress={() => router.push('/sync')}
+          right={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Juda hua' : 'Offline'}</Badge>}
+        />
       </Card>
 
       <Button title="Sign out" tone="secondary" onPress={confirmSignOut} />

@@ -24,8 +24,8 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, type TextInput } from 'react-native';
 
 import { formatINR, toDateString } from '@domain';
 
@@ -62,6 +62,11 @@ export default function StockCheck() {
   const [note, setNote] = useState('');
   const [step, setStep] = useState<'count' | 'confirm'>('count');
   const [saving, setSaving] = useState(false);
+
+  // Above the early returns with the rest of the hooks. No autoFocus on this
+  // screen: VariantPicker opens with its own search focused, which is the field
+  // the counting actually starts in.
+  const noteRef = useRef<TextInput>(null);
 
   // Above the permission guard on purpose: a useQuery under an early return
   // blanks the screen at runtime and tsc will not catch it.
@@ -149,7 +154,7 @@ export default function StockCheck() {
       notify(`${changes.length} item ka stock theek ho gaya.`, 'ok');
       router.back();
     } catch (e) {
-      notify(`Nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
+      notify(`Stock theek nahi hua: ${String((e as Error).message ?? e)}. Ginti waise ki waise padi hai — dobara koshish karo.`, 'danger');
     } finally {
       setSaving(false);
     }
@@ -208,7 +213,17 @@ export default function StockCheck() {
             </Card>
           ) : null}
 
-          <Button title="Haan, stock theek kar do" size="lg" full onPress={apply} loading={saving} />
+          {/* Disabled the moment the differences go to zero — a bill posting
+              while this screen sat open can empty the list, and pressing a
+              live button on an empty list is how a no-op document gets made. */}
+          <Button
+            title="Haan, stock theek kar do"
+            size="lg"
+            full
+            onPress={apply}
+            loading={saving}
+            disabled={changes.length === 0}
+          />
           <Button title="Peeche jao" tone="ghost" full onPress={() => setStep('count')} />
         </Screen>
       </>
@@ -244,22 +259,23 @@ export default function StockCheck() {
                 </Row>
 
                 <Row style={{ justifyContent: 'space-between' }}>
-                  <Text variant="label" color="textMuted">System Stock</Text>
+                  <Text variant="label" color="textMuted">App ka stock</Text>
                   <Text variant="number" mono>{c.system} pcs</Text>
                 </Row>
 
                 <Input
-                  label="Actual Stock"
+                  label="Ginti mein kitna nikla"
                   value={c.actual === null ? '' : String(c.actual)}
                   onChangeText={(v) => patch(c.variantId, { actual: v.replace(/[^0-9]/g, '') })}
                   keyboardType="number-pad"
-                  placeholder="Ginti karke likho"
+                  placeholder="Apna number likho"
+                  returnKeyType="done"
                 />
 
                 {c.actual !== null ? (
                   <>
                     <Row style={{ justifyContent: 'space-between' }}>
-                      <Text variant="label" color="textMuted">Difference</Text>
+                      <Text variant="label" color="textMuted">Farak</Text>
                       <Text variant="number" mono color={c.diff === 0 ? 'ok' : c.diff < 0 ? 'danger' : 'ok'}>
                         {c.diff === 0 ? 'Sahi hai' : c.diff > 0 ? `+${c.diff}` : String(c.diff)}
                       </Text>
@@ -284,8 +300,29 @@ export default function StockCheck() {
         )}
 
         <Card style={{ gap: space.md }}>
-          <Input label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
-          <Input label="Note" value={note} onChangeText={setNote} placeholder="Kis rack ka count, kisne kiya" />
+          {/* Autocorrect rewrites a typed date and says nothing about it. */}
+          <Input
+            label="Tareekh"
+            value={date}
+            onChangeText={setDate}
+            placeholder="YYYY-MM-DD"
+            hint="Aaj ki date pehle se bhari hai."
+            keyboardType="numbers-and-punctuation"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="next"
+            onSubmitEditing={() => noteRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Input
+            ref={noteRef}
+            label="Note"
+            value={note}
+            onChangeText={setNote}
+            placeholder="Kis rack ka count, kisne kiya"
+            returnKeyType="done"
+            onSubmitEditing={review}
+          />
         </Card>
 
         {rows.length > 0 ? (

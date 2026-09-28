@@ -36,6 +36,7 @@ import { formatINR, toDateString } from '@domain';
 import { useSession } from '@/lib/session';
 import { Card, Chip, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
 import { Sheet } from '@/ui/sheet';
+import { Skeleton } from '@/ui/skeleton';
 import { space } from '@/ui/theme';
 
 // -----------------------------------------------------------------------------
@@ -259,6 +260,7 @@ function Line({
   onPress,
   tone,
   minus,
+  loading,
 }: {
   label: string;
   hint: string;
@@ -267,13 +269,20 @@ function Line({
   tone?: 'rule' | 'plain';
   /** Draw it as money going out, so the subtraction is visible, not implied. */
   minus?: boolean;
+  /** Figure not in yet. The label and the hint are already true, so they stay;
+   *  only the number is withheld. A statement of six confident zeroes reads as
+   *  a month with no trade in it, which is a worse lie than a grey bar. */
+  loading?: boolean;
 }) {
   const t = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      disabled={loading}
       accessibilityRole="button"
-      accessibilityLabel={`${label} ${formatINR(value)}`}
+      // No figure yet, so none is announced — a screen reader saying "Sale
+      // zero rupees" is the same wrong answer as printing it.
+      accessibilityLabel={loading ? label : `${label} ${formatINR(value)}`}
       style={({ pressed }) => [
         {
           flexDirection: 'row',
@@ -290,10 +299,16 @@ function Line({
           {hint}
         </Text>
       </View>
-      <Text variant="number" mono color={minus ? 'textMuted' : 'text'}>
-        {minus ? '− ' : ''}
-        {formatINR(value)}
-      </Text>
+      {loading ? (
+        <View style={{ height: 26, justifyContent: 'center' }}>
+          <Skeleton width={tone === 'rule' ? 104 : 88} height={18} />
+        </View>
+      ) : (
+        <Text variant="number" mono color={minus ? 'textMuted' : 'text'}>
+          {minus ? '− ' : ''}
+          {formatINR(value)}
+        </Text>
+      )}
       <Text style={{ color: t.textFaint, fontSize: 18, marginLeft: 2 }}>›</Text>
     </Pressable>
   );
@@ -312,7 +327,12 @@ export default function HisabScreen() {
   // Hooks rule: every useQuery lives above every early return, including the
   // permission guard below. A hook after a conditional return blanks the whole
   // screen at runtime and tsc will not catch it.
-  const { data: rows } = useQuery<Record<string, number>>(SUMMARY, [from, to]);
+  //
+  // `isLoading` covers only the first answer. Changing the range afterwards
+  // keeps the previous figures on screen while the new ones are worked out,
+  // which is the right behaviour — a statement that blanks every time you
+  // touch a chip is a statement you cannot compare two months in.
+  const { data: rows, isLoading } = useQuery<Record<string, number>>(SUMMARY, [from, to]);
   const listKey: ListKey | null = open && open !== 'munafa' ? open : null;
   const { data: detail } = useQuery<DetailRow>(
     listKey ? DETAIL[listKey].sql : NO_ROWS,
@@ -387,23 +407,24 @@ export default function HisabScreen() {
       </Text>
 
       <Card keyline style={{ padding: 0, gap: 0, paddingVertical: space.sm }}>
-        <Line label="Sale" hint="Posted bill ka total" value={sale} onPress={() => setOpen('sale')} />
-        <Line label="Maal Ki Cost" hint="Jo maal bika, uski cost" value={cogs} minus onPress={() => setOpen('cogs')} />
+        <Line label="Sale" hint="Posted bill ka total" value={sale} loading={isLoading} onPress={() => setOpen('sale')} />
+        <Line label="Maal Ki Cost" hint="Jo maal bika, uski cost" value={cogs} minus loading={isLoading} onPress={() => setOpen('cogs')} />
 
         <Divider style={{ marginVertical: 4 }} />
-        <Line label="Gross Profit" hint="Sale minus maal ki cost" value={gross} tone="rule" onPress={() => setOpen('gross')} />
+        <Line label="Gross Profit" hint="Sale minus maal ki cost" value={gross} tone="rule" loading={isLoading} onPress={() => setOpen('gross')} />
         <Divider style={{ marginVertical: 4 }} />
 
-        <Line label="Business Kharcha" hint="Rent, bijli, diesel, chai" value={kharcha} minus onPress={() => setOpen('kharcha')} />
-        <Line label="Kharab / Loss" hint="Toota-phoota maal ki cost" value={damage} minus onPress={() => setOpen('damage')} />
+        <Line label="Business Kharcha" hint="Rent, bijli, diesel, chai" value={kharcha} minus loading={isLoading} onPress={() => setOpen('kharcha')} />
+        <Line label="Kharab / Loss" hint="Toota-phoota maal ki cost" value={damage} minus loading={isLoading} onPress={() => setOpen('damage')} />
 
         <Divider style={{ marginTop: 4 }} />
 
         {/* The reason the screen exists — so it gets the one hero figure. */}
         <Pressable
           onPress={() => setOpen('munafa')}
+          disabled={isLoading}
           accessibilityRole="button"
-          accessibilityLabel={`Munafa ${formatINR(munafa)}`}
+          accessibilityLabel={isLoading ? 'Munafa' : `Munafa ${formatINR(munafa)}`}
           style={({ pressed }) => [
             { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm, gap: 2, backgroundColor: pressed ? t.surfaceAlt : 'transparent' },
           ]}>
@@ -415,12 +436,25 @@ export default function HisabScreen() {
               kya gina, kya nahi ›
             </Text>
           </Row>
-          <Text variant="hero" mono color={munafa < 0 ? 'danger' : 'text'}>
-            {formatINR(munafa)}
-          </Text>
-          <Text variant="small" color="textMuted">
-            {munafa < 0 ? 'Is period mein nuksan hua.' : 'Maal ki cost aur saara kharcha nikaal ke.'}
-          </Text>
+          {/* The one figure the screen exists for. Until it is known it is a
+              bar, not a zero: "₹0" here is read as a month that made nothing,
+              and it is the first thing the eye lands on. */}
+          {isLoading ? (
+            <View style={{ height: 47, justifyContent: 'center' }}>
+              <Skeleton width={186} height={32} />
+            </View>
+          ) : (
+            <Text variant="hero" mono color={munafa < 0 ? 'danger' : 'text'}>
+              {formatINR(munafa)}
+            </Text>
+          )}
+          {isLoading ? (
+            <View style={{ height: 18 }} />
+          ) : (
+            <Text variant="small" color="textMuted">
+              {munafa < 0 ? 'Is period mein nuksan hua.' : 'Maal ki cost aur saara kharcha nikaal ke.'}
+            </Text>
+          )}
         </Pressable>
       </Card>
 
@@ -480,7 +514,7 @@ export default function HisabScreen() {
             </Row>
 
             {listRows.length === 0 ? (
-              <Empty title="Is period mein koi entry nahi" />
+              <Empty art="parchi" title="Is period mein koi entry nahi" />
             ) : (
               <>
                 <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator>

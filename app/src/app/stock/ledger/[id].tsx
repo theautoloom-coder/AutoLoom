@@ -38,7 +38,7 @@ export default function StockLedger() {
     else if (m.ref_type === 'stock_adjustment') router.push(`/adjustment/${m.ref_id}`);
   }
 
-  if (!v) return <Screen><Empty title="Ye SKU nahi mila" /></Screen>;
+  if (!v) return <Screen><Empty art="search" title="Ye SKU nahi mila" /></Screen>;
 
   return (
     <>

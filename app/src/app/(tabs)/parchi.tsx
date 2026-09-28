@@ -34,6 +34,7 @@ import {
   type IconName,
 } from '@/ui';
 import { clockOf, KIND } from '@/ui/kinds';
+import { Skeleton, SkeletonList } from '@/ui/skeleton';
 import { space } from '@/ui/theme';
 
 type Entry = {
@@ -136,6 +137,19 @@ function dayLabel(iso: string, today: string): string {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
 }
 
+/**
+ * A figure on the summary card that has not arrived yet. The grey bar is
+ * shorter than the line it stands in but the box around it is exactly a
+ * `heading`'s 21px, so the card is the same height loaded or not.
+ */
+function Bar({ width }: { width: number }) {
+  return (
+    <View style={{ height: 21, justifyContent: 'center' }}>
+      <Skeleton width={width} height={13} />
+    </View>
+  );
+}
+
 export default function ParchiScreen() {
   const router = useRouter();
   const today = toDateString();
@@ -159,7 +173,14 @@ export default function ParchiScreen() {
 
   // Every hook is above every return in this file. A useQuery below a
   // conditional return blanks the screen at runtime and tsc says nothing.
-  const { data: rows } = useQuery<Entry>(RANGE_FEED, [from, to]);
+  //
+  // `isLoading`, not `rows.length === 0`. PowerSync answers with an empty
+  // array while the first read is still running, so the screen cannot tell
+  // "nothing yet" from "nothing happened today" — and it was choosing the
+  // second every time it opened. `isLoading` only covers that first answer;
+  // changing the chips afterwards keeps the previous range on screen instead
+  // of blanking, which is right: the numbers stay readable while they update.
+  const { data: rows, isLoading } = useQuery<Entry>(RANGE_FEED, [from, to]);
 
   const list = rows ?? [];
   const multiDay = from !== to;
@@ -229,22 +250,31 @@ export default function ParchiScreen() {
         <Row gap={space.md} align="flex-start" style={{ justifyContent: 'space-between' }}>
           <View>
             <Text variant="small" color="textMuted">Entry</Text>
-            <Text variant="heading" mono>{list.length}</Text>
+            {/* Three zeroes on an unanswered query are not a summary, they are
+                a wrong one — and this card sits directly above the list that
+                is about to contradict it. */}
+            {isLoading ? <Bar width={34} /> : <Text variant="heading" mono>{list.length}</Text>}
           </View>
           <View>
             <Text variant="small" color="textMuted">Sale</Text>
-            <Text variant="heading" mono>{formatINR(saleTotal)}</Text>
+            {isLoading ? <Bar width={82} /> : <Text variant="heading" mono>{formatINR(saleTotal)}</Text>}
           </View>
           <View>
             <Text variant="small" color="textMuted">Kharcha</Text>
-            <Text variant="heading" mono color={kharchaTotal > 0 ? 'warn' : 'text'}>
-              {formatINR(kharchaTotal)}
-            </Text>
+            {isLoading ? (
+              <Bar width={70} />
+            ) : (
+              <Text variant="heading" mono color={kharchaTotal > 0 ? 'warn' : 'text'}>
+                {formatINR(kharchaTotal)}
+              </Text>
+            )}
           </View>
         </Row>
       </Card>
 
-      {list.length === 0 ? (
+      {isLoading ? (
+        <SkeletonList rows={5} size={34} />
+      ) : list.length === 0 ? (
         <Empty
           title={
             range === 'aaj'

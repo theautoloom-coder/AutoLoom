@@ -14,14 +14,18 @@ import { chromium } from 'playwright';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:8208';
 
+// Kept in step with the app by hand, which is how /sell, /audits and
+// /admin/families stayed on this list for a week after they were deleted --
+// a route that 404s reports no English, so the scan quietly passed.
 const SCREENS = [
-  '/', '/search', '/sell', '/stock', '/more', '/admin', '/requests', '/parchi',
-  '/expenses', '/hisab', '/reminders', '/customers', '/suppliers', '/purchases',
-  '/payments', '/adjustments', '/transfers', '/audits', '/reorder',
+  '/', '/search', '/stock', '/more', '/help', '/admin', '/requests', '/parchi',
+  '/expenses', '/partner-kharcha', '/hisab', '/reminders', '/customers', '/customer/edit', '/suppliers', '/supplier/edit',
+  '/purchases', '/payments', '/adjustments', '/transfers', '/reorder',
+  '/kharab-maal', '/stock-check', '/warehouse',
   '/sync', '/stock/add', '/admin/item', '/admin/products', '/admin/users',
-  '/admin/settings', '/admin/masters', '/admin/families',
+  '/admin/settings', '/admin/masters',
   '/admin/import', '/invoice/edit', '/purchase/edit', '/payment/edit',
-  '/adjustment/edit', '/transfer/edit', 
+  '/adjustment/edit', '/transfer/edit',
 ];
 
 // Words that stay English on purpose: trade vocabulary, statutory terms,

@@ -13,10 +13,10 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, type TextInput } from 'react-native';
 
-import { slug, uniqueSku, uuidv7 } from '@domain';
+import { slug } from '@domain';
 
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
@@ -84,6 +84,14 @@ export default function ItemForm() {
   // create one — `product_families` is gated by `catalog.edit` — so the name
   // travels with the proposal and the approver creates it.
   const [newFamilyName, setNewFamilyName] = useState('');
+
+  // The detail fields chain to each other. Qty, rate, kharid rate and warranty
+  // sit between them and are NumberFields, which take no ref, so the chain
+  // stops where they start rather than pretending to jump over them.
+  const typeRef = useRef<TextInput>(null);
+  const colourRef = useRef<TextInput>(null);
+  const yearRef = useRef<TextInput>(null);
+  const packLabelRef = useRef<TextInput>(null);
 
   // Load the existing item once its row arrives.
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -279,6 +287,8 @@ export default function ItemForm() {
     return <Screen><Text>Sirf admin item edit kar sakta hai.</Text></Screen>;
   }
 
+  const missing = validateProposal(buildProposal());
+
   return (
     <>
       <Stack.Screen options={{ title: isNew ? 'New item' : 'Edit item' }} />
@@ -312,7 +322,16 @@ export default function ItemForm() {
                 : undefined
             }
           />
-          <Input label="Item ka naam" value={name} onChangeText={setName} placeholder="7D Luxury Mat" />
+          <Input
+            label="Item ka naam"
+            value={name}
+            onChangeText={setName}
+            placeholder="7D Luxury Mat"
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => typeRef.current?.focus()}
+            submitBehavior="submit"
+          />
           <Row gap={12}>
             <View style={{ flex: 1 }}>
               <NumberField label="Qty" value={qty} onChange={setQty} decimals={0} placeholder="10" hint={isNew ? undefined : 'Stock yahan se nahi badalta'} />
@@ -331,8 +350,35 @@ export default function ItemForm() {
           hint="Gaadi, colour, kharid rate, set/pair, warranty — zaroorat ho to kholo."
           defaultOpen={!isNew || !!requestId}>
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Type" value={type} onChangeText={setType} placeholder="7D / Premium" />
-            <Input containerStyle={{ flex: 1 }} label="Colour" value={colour} onChangeText={setColour} placeholder="Black" />
+            {/* "7D", "9D", "XUV500" — autocorrect treats a part spec as a
+                misspelling and quietly replaces it, and the wrong SKU is then
+                wrong forever. */}
+            <Input
+              ref={typeRef}
+              containerStyle={{ flex: 1 }}
+              label="Type"
+              value={type}
+              onChangeText={setType}
+              placeholder="7D / Premium"
+              autoCapitalize="words"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => colourRef.current?.focus()}
+              submitBehavior="submit"
+            />
+            <Input
+              ref={colourRef}
+              containerStyle={{ flex: 1 }}
+              label="Colour"
+              value={colour}
+              onChangeText={setColour}
+              placeholder="Black"
+              autoCapitalize="words"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => yearRef.current?.focus()}
+              submitBehavior="submit"
+            />
           </Row>
           <SelectField
             label="Gaadi"
@@ -343,13 +389,34 @@ export default function ItemForm() {
             allowClear
             placeholder="Sab gaadi ke liye — khaali chhod do"
           />
-          <Input label="Model / saal" value={yearText} onChangeText={setYearText} placeholder="2020-2024" />
+          <Input
+            ref={yearRef}
+            label="Model / saal"
+            value={yearText}
+            onChangeText={setYearText}
+            placeholder="2020-2024"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="next"
+            onSubmitEditing={() => packLabelRef.current?.focus()}
+            submitBehavior="submit"
+          />
           <NumberField label="Kharid rate" value={cost} onChange={setCost} placeholder="1200" hint="Margin report ke liye." />
           <Row gap={12}>
             <View style={{ flex: 1 }}>
               <NumberField label="Ek set mein pieces" value={packSize} onChange={setPackSize} decimals={0} placeholder="7" />
             </View>
-            <Input containerStyle={{ flex: 1 }} label="Kya bolte ho" value={packLabel} onChangeText={setPackLabel} placeholder="set / pair / box" />
+            <Input
+              ref={packLabelRef}
+              containerStyle={{ flex: 1 }}
+              label="Kya bolte ho"
+              value={packLabel}
+              onChangeText={setPackLabel}
+              placeholder="set / pair / box"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+            />
           </Row>
           <NumberField
             label="Warranty (mahine)"
@@ -361,12 +428,34 @@ export default function ItemForm() {
           />
         </Disclosure>
 
+        {/* Staff cannot add an item themselves, so this screen sends a request
+            instead — and the note is the only place they can say why. It was
+            wired into submitRequest() from the start but had no field anywhere
+            on the page, so every request went up blank and a rejected one came
+            back carrying a note it could neither show nor change. */}
+        {!canEdit ? (
+          <Input
+            label="Admin ke liye note"
+            value={note}
+            onChangeText={setNote}
+            placeholder="Kyu chahiye, ya kya badla — ek line"
+            hint={requestId ? 'Pichli baar wapas aayi thi — yahan likho ki ab kya theek kiya.' : 'Owner yahi padhega jab approve karega.'}
+            multiline
+            returnKeyType="done"
+          />
+        ) : null}
+
+        {/* The button asks the same question save() does, so it greys out for
+            exactly the reasons the save would have refused — and says which
+            one, because a dead button with no reason is worse than a toast. */}
+        {missing ? <Text variant="small" color="textFaint">{missing}</Text> : null}
         <Row gap={space.sm}>
           <Button
-            title={canEdit ? (isNew ? 'Save item' : 'Update item') : (requestId ? 'Dobara bhejo' : 'Admin ko bhejo')}
+            title={canEdit ? (isNew ? 'Item bana do' : 'Badlav kar do') : (requestId ? 'Dobara bhejo' : 'Admin ko bhejo')}
             size="lg"
             onPress={save}
             loading={saving}
+            disabled={!!missing}
             style={{ flex: 1 }}
           />
           <Button title="Rehne do" tone="secondary" onPress={() => router.back()} />

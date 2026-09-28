@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { accentFor, accents, MAX_CONTENT, palette, radius, shadow, space, spine as SPINE, type, WIDE, type AccentName, type Palette } from './theme';
+import { Illustration, type IllustrationName } from './illustrations';
 import { tap } from './haptics';
 
 // -----------------------------------------------------------------------------
@@ -210,6 +211,40 @@ export function Grid({
   );
 }
 
+/**
+ * Turn off the hairline on the last ListRow in a card.
+ *
+ * A row cannot know it is last, so the card tells it: otherwise every card
+ * ended in a line with nothing under it and looked like it had been cut off
+ * mid-load. It walks backwards and stops at the first row it finds, and it
+ * looks inside fragments because half the lists in this app are built as
+ * `{canEdit ? <>...</> : null}` and a row hidden in one is still the last row.
+ *
+ * The border is set transparent rather than removed, so nothing shifts by the
+ * hairline when a row becomes the last one.
+ */
+function dropLastDivider(nodes: React.ReactNode): { nodes: React.ReactNode; done: boolean } {
+  const arr = React.Children.toArray(nodes);
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const k = arr[i];
+    if (!React.isValidElement(k)) continue;
+    if (k.type === ListRow) {
+      const next = [...arr];
+      next[i] = React.cloneElement(k as React.ReactElement<{ divider?: boolean }>, { divider: false });
+      return { nodes: next, done: true };
+    }
+    if (k.type === React.Fragment) {
+      const inner = dropLastDivider((k.props as { children?: React.ReactNode }).children);
+      if (inner.done) {
+        const next = [...arr];
+        next[i] = React.cloneElement(k, {}, inner.nodes);
+        return { nodes: next, done: true };
+      }
+    }
+  }
+  return { nodes, done: false };
+}
+
 export function Card({
   children,
   style,
@@ -233,6 +268,7 @@ export function Card({
   const t = useTheme();
   const bg = tone === 'navy' ? t.navy : tone === 'alt' ? t.surfaceAlt : t.surface;
   const spineColor = spine === 'warn' ? t.warn : spine === 'ok' ? t.ok : t.accent;
+  const body = dropLastDivider(children).nodes;
   return (
     <View
       style={[
@@ -243,7 +279,7 @@ export function Card({
         spine && { borderLeftWidth: SPINE, borderLeftColor: spineColor, borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
         style,
       ]}>
-      {children}
+      {body}
     </View>
   );
 }
@@ -264,13 +300,40 @@ export function SectionTitle({ children, right }: { children: React.ReactNode; r
   );
 }
 
-export function Empty({ title, hint, icon = '○' }: { title: string; hint?: string; icon?: string }) {
+/**
+ * Nothing here yet.
+ *
+ * `art` draws the branded line illustration for what is missing — an empty
+ * carton, a blank slip, a level scale. A grey circle told the shopkeeper
+ * nothing and looked like a screen that had failed to load; a picture of the
+ * thing that is absent reads as "nothing yet", which is what it is.
+ *
+ * `icon` is the old single-character fallback, kept so every existing caller
+ * still renders while the screens are moved over one at a time.
+ */
+export function Empty({
+  title,
+  hint,
+  icon = '○',
+  art,
+}: {
+  title: string;
+  hint?: string;
+  icon?: string;
+  art?: IllustrationName;
+}) {
   const t = useTheme();
   return (
     <View style={{ paddingVertical: space.xxl, alignItems: 'center', gap: space.sm }}>
-      <View style={[styles.emptyGlyph, { backgroundColor: t.surfaceAlt }]}>
-        <RNText style={{ fontSize: 20, color: t.textFaint }}>{icon}</RNText>
-      </View>
+      {art ? (
+        <View style={{ marginBottom: space.xs }}>
+          <Illustration name={art} size={96} />
+        </View>
+      ) : (
+        <View style={[styles.emptyGlyph, { backgroundColor: t.surfaceAlt }]}>
+          <RNText style={{ fontSize: 20, color: t.textFaint }}>{icon}</RNText>
+        </View>
+      )}
       <Text variant="heading" color="textMuted" center>
         {title}
       </Text>
@@ -513,6 +576,7 @@ export function ListRow({
   onPress,
   left,
   chevron,
+  divider = true,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -521,6 +585,9 @@ export function ListRow({
   onPress?: () => void;
   /** Show a trailing “›” affordance. Defaults to on when the row is pressable. */
   chevron?: boolean;
+  /** Hairline under the row. Card turns this off for its last row — a line
+   *  with nothing under it reads as a card that failed to finish loading. */
+  divider?: boolean;
 }) {
   const t = useTheme();
   const showChevron = chevron ?? !!onPress;
@@ -529,7 +596,7 @@ export function ListRow({
       onPress={onPress}
       disabled={!onPress}
       android_ripple={onPress ? { color: t.surfaceAlt } : undefined}
-      style={({ pressed }) => [styles.listRow, { borderColor: t.border, backgroundColor: pressed ? t.surfaceAlt : 'transparent' }]}>
+      style={({ pressed }) => [styles.listRow, { borderColor: divider ? t.border : 'transparent', backgroundColor: pressed ? t.surfaceAlt : 'transparent' }]}>
       {left}
       <View style={{ flex: 1, gap: 2 }}>
         {typeof title === 'string' ? <Text variant="heading">{title}</Text> : title}
@@ -650,7 +717,11 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
   content: { flex: 1, width: '100%', alignSelf: 'center' },
   contentWide: { maxWidth: MAX_CONTENT },
-  padded: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.xxl, gap: space.md },
+  // 96, not 32: the “+” floats over the bottom-right of every tab screen, and
+  // at 32 the last row of a long list sat underneath it — on Stock that is the
+  // qty, the one number the row exists for. Whitespace at the end of a scroll
+  // reads as deliberate; a number hidden under a red circle does not.
+  padded: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: 96, gap: space.md },
   card: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, padding: space.lg, gap: space.sm },
   button: { borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 26, alignItems: 'center', justifyContent: 'center' },
   iconButton: { borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

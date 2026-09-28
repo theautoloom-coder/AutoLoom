@@ -76,7 +76,7 @@ export default function CustomerScreen() {
   if (!c) {
     return (
       <Screen>
-        <Empty title="Ye grahak is phone par nahi mila" />
+        <Empty art="search" title="Ye grahak is phone par nahi mila" />
       </Screen>
     );
   }
@@ -137,7 +137,6 @@ export default function CustomerScreen() {
               {can('sale.create') ? <Button title="Naya bill" size="sm" onPress={() => router.push(`/invoice/edit?customer=${c.id}`)} /> : null}
               <Button title="Hisaab bhejo" size="sm" tone="ghost" onPress={sendStatement} />
               {c.balance > 0 ? <Button title="Yaad dilao" size="sm" tone="secondary" onPress={async () => { if (!c.mobile) { notify('Is grahak ka mobile number nahi hai.'); return; } await openWhatsApp(c.mobile, reminderMessage(shop.wa, { name: c.name, pending: c.balance })); }} /> : null}
-              {can('jobcard.edit') ? <Button title="Job card" size="sm" tone="secondary" onPress={() => router.push(`/job-card/edit?customer=${c.id}`)} /> : null}
               {can('payment.receive') ? <Button title="Paisa aa gaya" size="sm" tone="secondary" onPress={() => router.push(`/payment/edit?direction=in&party=${c.id}${c.balance > 0 ? `&amount=${c.balance}` : ''}`)} /> : null}
               {can('party.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/customer/edit?id=${c.id}`)} /> : null}
             </Row>

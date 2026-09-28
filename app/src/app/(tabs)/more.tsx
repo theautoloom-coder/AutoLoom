@@ -145,6 +145,20 @@ export default function MoreScreen() {
         />
       </Card>
 
+      {/* Everything the Stock tab used to carry as a menu. These are the
+          once-a-week jobs; the daily ones are on "+" and inside Stock. */}
+      <SectionTitle>Stock ke kaam</SectionTitle>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
+        {can('purchase.create') ? <ListRow left={<IconBadge name="receipt-outline" accent="blue" />} title="Purchase bill" subtitle="Supplier ka bill — rate, udhaar, sab" onPress={() => router.push('/purchase/edit')} /> : null}
+        {can('purchase.create') ? <ListRow left={<IconBadge name="documents-outline" accent="blue" />} title="Purchase" subtitle="Bill, return, kitna baaki hai" onPress={() => router.push('/purchases')} /> : null}
+        {can('stock.transfer') ? <ListRow left={<IconBadge name="swap-horizontal-outline" accent="violet" />} title="Transfer" subtitle="Godown ↔ dukan ↔ workshop" onPress={() => router.push('/transfers')} /> : null}
+        {can('stock.count') || can('stock.adjust') ? <ListRow left={<IconBadge name="construct-outline" accent="amber" />} title="Stock Sudhar" subtitle="Damage, kam nikla, extra mila" onPress={() => router.push('/adjustments')} /> : null}
+        {can('stock.count') ? <ListRow left={<IconBadge name="checkbox-outline" accent="teal" />} title="Stock Check" subtitle="Godown ka maal ginke mila lo" onPress={() => router.push('/audits')} /> : null}
+        {can('payment.pay_supplier') ? <ListRow left={<IconBadge name="cash-outline" accent="green" />} title="Payment" subtitle="Aaya hua paisa, supplier ko diya" onPress={() => router.push('/payments')} /> : null}
+        {can('purchase.create') || can('reports.view') ? <ListRow left={<IconBadge name="cart-outline" accent="rose" />} title="Kya mangwana hai" subtitle="Bikri ke hisaab se suggestion" onPress={() => router.push('/reorder')} /> : null}
+        {can('catalog.edit') ? <ListRow left={<IconBadge name="pricetags-outline" accent="violet" />} title="Saara maal" subtitle="Item banao, rate badlo" onPress={() => router.push('/admin/products')} /> : null}
+      </Card>
+
       <SectionTitle>Sync</SectionTitle>
       <Card style={{ gap: 0 }}>
         <ListRow
@@ -198,7 +212,7 @@ export default function MoreScreen() {
 
       {can('reports.view') ? (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
-          <ListRow left={<IconBadge name="bar-chart-outline" accent="violet" />} title="Hisaab-kitab" subtitle="Bikri, GST, purchase, baaki paisa, stock, margin" onPress={() => router.push('/reports')} />
+          <ListRow left={<IconBadge name="bar-chart-outline" accent="violet" />} title="Hisaab-kitab" subtitle="Bikri, GST, purchase, baaki paisa, stock, margin" onPress={() => router.push('/hisab')} />
         </Card>
       ) : null}
 

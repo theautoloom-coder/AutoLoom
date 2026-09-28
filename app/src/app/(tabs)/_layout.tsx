@@ -9,6 +9,7 @@ import { visibleSections } from '@domain';
 import { useSession } from '@/lib/session';
 import { TAGLINE } from '@/ui/brand';
 import { Avatar, Badge, Icon, Row, Text, useIsWide, useTheme, type IconName } from '@/ui';
+import { QuickAdd } from '@/ui/quick-add';
 import { palette, radius, space } from '@/ui/theme';
 
 /** The mark is red, so its tile has to be dark for it to read at all. */
@@ -89,11 +90,14 @@ function useOwnerNav(): OwnerItem[] {
 function useNavItems(): NavItem[] {
   const { permissions } = useSession();
   const sections = visibleSections(permissions);
+  // Five places, named for what the shop calls them. Everything that used to
+  // need a tab of its own — billing, search — is either inside one of these or
+  // behind the "+", because a tab bar is for places you go, not jobs you do.
   return [
     { key: 'index', href: '/', title: 'Ghar', symbol: 'home' },
-    { key: 'search', href: '/search', title: 'Dhoondo', symbol: 'search' },
-    { key: 'sell', href: '/sell', title: 'Bill', symbol: 'receipt-outline', visible: sections.sell },
     { key: 'stock', href: '/stock', title: 'Stock', symbol: 'cube-outline', visible: sections.stock },
+    { key: 'parchi', href: '/parchi', title: 'Parchi', symbol: 'receipt-outline' },
+    { key: 'hisab', href: '/hisab', title: 'Hisab', symbol: 'stats-chart-outline' },
     { key: 'more', href: '/more', title: 'Aur', symbol: 'ellipsis-horizontal' },
   ];
 }
@@ -240,10 +244,22 @@ export default function TabsLayout() {
           reaches them on a narrow one. */}
       <Tabs.Screen name="admin" options={{ href: null, title: 'Admin' }} />
       <Tabs.Screen name="requests" options={{ href: null, title: 'Requests' }} />
+      {/* Reachable, not a tab. Billing is a job you start from "+", and the
+          global search is a second way to do what Stock's own box already
+          does — neither earns a permanent place on a five-slot bar. */}
+      <Tabs.Screen name="sell" options={{ href: null, title: 'Bill' }} />
+      <Tabs.Screen name="search" options={{ href: null, title: 'Dhoondo' }} />
     </Tabs>
   );
 
-  if (!wide) return tabs;
+  // The "+" floats over whichever tab is showing: every one of these screens
+  // is a place you might be standing when the next entry needs making.
+  if (!wide) return (
+    <View style={{ flex: 1 }}>
+      {tabs}
+      <QuickAdd />
+    </View>
+  );
 
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: t.bg }}>

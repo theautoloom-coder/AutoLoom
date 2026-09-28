@@ -42,10 +42,22 @@ export function useIsWide(): boolean {
 }
 
 /** The accent pair (foreground + tinted background) for a name, in the current scheme. */
+/**
+ * The colour for a key.
+ *
+ * If the key IS an accent name ('blue', 'green', …) it is used as given. Any
+ * other string is hashed to a stable colour, so a list of families or
+ * locations gets a consistent palette without anybody choosing one.
+ *
+ * The name check is not a convenience — without it, passing 'blue' hashed the
+ * word "blue" to whatever came out, which is how a deliberate colour choice
+ * silently became a random one.
+ */
 export function useAccent(key: string | AccentName, explicit = false): { fg: string; bg: string } {
   const scheme = useColorScheme();
   const set = scheme === 'dark' ? accents.dark : accents.light;
-  const name = (explicit ? key : accentFor(key)) as AccentName;
+  const named = (key as AccentName) in set;
+  const name = (explicit || named ? key : accentFor(key)) as AccentName;
   return set[name] ?? set.blue;
 }
 

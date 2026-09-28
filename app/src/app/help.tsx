@@ -109,7 +109,7 @@ const TOPICS: Topic[] = [
       'Jo hisaab chahiye wo chuno: bikri, baaki paisa, stock ki keemat, margin.',
       'PDF chahiye to "PDF / print" dabao.',
     ],
-    go: { label: 'Hisaab-kitab', href: '/reports' },
+    go: { label: 'Hisaab-kitab', href: '/hisab' },
   },
   {
     q: 'Net na ho to kya hoga?',

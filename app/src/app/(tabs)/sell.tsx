@@ -44,8 +44,7 @@ export default function BillingScreen() {
         <ListRow left={<IconBadge name="logo-whatsapp" accent="green" />} title="WhatsApp par yaad dilao aur parchi bhejo" subtitle="Din ke aakhir ki pending list, UPI link, aaj ki parchi" onPress={() => router.push('/reminders')} />
         <ListRow left={<IconBadge name="people-outline" accent="blue" />} title="Grahak (khata)" subtitle="Khata, baaki paisa, pichhle rate" onPress={() => router.push('/customers')} />
         {can('payment.receive') ? <ListRow left={<IconBadge name="receipt-outline" accent="teal" />} title="Payment" subtitle="Rasid, proof, wapasi" onPress={() => router.push('/payments')} /> : null}
-        {can('jobcard.edit') ? <ListRow left={<IconBadge name="build-outline" accent="violet" />} title="Job card" subtitle="Workshop: parts + labour → bill" onPress={() => router.push('/job-cards')} /> : null}
-        {can('reports.view') ? <ListRow left={<IconBadge name="bar-chart-outline" accent="amber" />} title="Hisaab-kitab" subtitle="Bikri, baaki paisa, stock, margin" onPress={() => router.push('/reports')} /> : null}
+        {can('reports.view') ? <ListRow left={<IconBadge name="bar-chart-outline" accent="amber" />} title="Hisaab-kitab" subtitle="Bikri, baaki paisa, stock, margin" onPress={() => router.push('/hisab')} /> : null}
       </Card>
 
       {drafts.length > 0 ? (

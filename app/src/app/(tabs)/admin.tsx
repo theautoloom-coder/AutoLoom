@@ -121,7 +121,7 @@ export default function AdminHome() {
               sub="har bill, rate aur setting ka record"
               icon="time-outline"
               accent="blue"
-              onPress={() => router.push('/activity')}
+              onPress={() => router.push('/parchi')}
             />
           ) : null}
           {canSettings ? (

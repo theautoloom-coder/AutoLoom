@@ -193,8 +193,7 @@ export default function CustomerScreen() {
                   key={v.id}
                   title={formatRegistration(v.registration_no)}
                   subtitle={[v.make_name, v.model_name, v.generation_name, v.color].filter(Boolean).join(' · ') || 'Model not recorded'}
-                  onPress={() => router.push(`/job-cards?vehicle=${v.id}`)}
-                  right={<Row gap={8}>{v.model_id ? <Text color="accent" onPress={() => router.push(`/vehicle/${v.model_id}`)}>Saara maal</Text> : null}<Text color="accent">Pehle kya liya</Text></Row>}
+                  right={<Text variant="small" color="textFaint">{v.color || ''}</Text>}
                 />
               ))}
             </Card>

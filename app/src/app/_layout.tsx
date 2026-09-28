@@ -120,8 +120,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="sign-in" options={{ headerShown: false }} />
                 <Stack.Screen name="reset-password" options={{ headerShown: false }} />
-                <Stack.Screen name="vehicle/[id]" options={{ title: 'Gaadi' }} />
-                <Stack.Screen name="product/[id]" options={{ title: 'Item' }} />
+                  <Stack.Screen name="product/[id]" options={{ title: 'Item' }} />
                 <Stack.Screen name="customer/[id]" options={{ title: 'Grahak' }} />
                 <Stack.Screen name="customer/edit" options={{ title: 'Grahak' }} />
                 <Stack.Screen name="customers" options={{ title: 'Grahak' }} />
@@ -135,9 +134,7 @@ export default function RootLayout() {
                 <Stack.Screen name="admin/families" options={{ title: 'Category' }} />
                 <Stack.Screen name="admin/family/[id]" options={{ title: 'Category' }} />
                 <Stack.Screen name="admin/spec/[id]" options={{ title: 'Spec' }} />
-                <Stack.Screen name="admin/vehicles" options={{ title: 'Gaadi master' }} />
-                <Stack.Screen name="admin/vehicle/[id]" options={{ title: 'Model' }} />
-                <Stack.Screen name="admin/masters" options={{ title: 'Master data' }} />
+                    <Stack.Screen name="admin/masters" options={{ title: 'Master data' }} />
                 <Stack.Screen name="admin/settings" options={{ title: 'Dukan settings' }} />
                 <Stack.Screen name="admin/users" options={{ title: 'Staff aur role' }} />
                 <Stack.Screen name="admin/import" options={{ title: 'Import' }} />
@@ -158,11 +155,7 @@ export default function RootLayout() {
                 <Stack.Screen name="payment/edit" options={{ title: 'Payment' }} />
                 <Stack.Screen name="invoice/edit" options={{ title: 'Bill' }} />
                 <Stack.Screen name="invoice/[id]" options={{ title: 'Bill' }} />
-                <Stack.Screen name="reports" options={{ title: 'Hisaab-kitab' }} />
-                <Stack.Screen name="job-cards" options={{ title: 'Job card' }} />
-                <Stack.Screen name="job-card/edit" options={{ title: 'Job card' }} />
-                <Stack.Screen name="job-card/[id]" options={{ title: 'Job card' }} />
-                <Stack.Screen name="reorder" options={{ title: 'Kya mangwana hai' }} />
+                        <Stack.Screen name="reorder" options={{ title: 'Kya mangwana hai' }} />
                 <Stack.Screen name="reminders" options={{ title: 'Yaad dilao' }} />
                 <Stack.Screen name="help" options={{ title: 'Kaise chalayein' }} />
               <Stack.Screen name="sync" options={{ title: 'Sync ka haal', presentation: 'modal' }} />

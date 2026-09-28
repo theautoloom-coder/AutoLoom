@@ -144,11 +144,22 @@ export async function postPurchase(tx: Transaction, purchaseId: string, actor: A
       // Mirror the server's moving-average trigger so the device shows the new cost immediately.
       const avg = newAverageCost({ currentQty: before?.qty ?? 0, currentAvg: before?.avg_cost ?? 0, receivedQty: l.qty, receivedCost: landed[i] });
       await updateRow(tx, 'product_variants', l.variant_id, { avg_cost: avg, last_purchase_cost: landed[i] });
-      await tx.execute(
-        `INSERT INTO supplier_products (id, supplier_id, variant_id, last_rate, last_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO NOTHING`,
-        [uuidv7(), p.supplier_id, l.variant_id, l.rate, p.doc_date, now, now]
-      );
+      // Read-then-write, not an upsert. Every PowerSync table is a VIEW on the
+      // device, and a view cannot take ON CONFLICT — SQLite answers "cannot
+      // UPSERT a view" and the whole transaction dies. That is why posting a
+      // purchase has never once succeeded from the app: seventeen drafts in
+      // production, not one posted. Going through insertRow/updateRow also
+      // means the change is queued for upload; a raw execute would not be.
+      const known = await one<{ id: string }>(
+        tx, 'SELECT id FROM supplier_products WHERE supplier_id = ? AND variant_id = ? LIMIT 1',
+        [p.supplier_id, l.variant_id]);
+      if (known) {
+        await updateRow(tx, 'supplier_products', known.id, { last_rate: l.rate, last_date: p.doc_date });
+      } else {
+        await insertRow(tx, 'supplier_products', {
+          supplier_id: p.supplier_id, variant_id: l.variant_id, last_rate: l.rate, last_date: p.doc_date,
+        }, actor);
+      }
     }
   }
 

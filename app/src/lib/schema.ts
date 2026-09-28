@@ -563,6 +563,7 @@ export const purchases = new Table(
     supplier_invoice_no: column.text,
     supplier_invoice_date: column.text,
     location_id: column.text,
+    bill_photo_path: column.text,
     supplier_name: column.text,
     supplier_gstin: column.text,
     supplier_state_code: column.text,

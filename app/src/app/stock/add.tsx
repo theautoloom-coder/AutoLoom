@@ -1,63 +1,79 @@
 /**
- * "Maal aaya" — put stock in, in about ten seconds.
+ * MAAL AAYA — godown mein naya maal aaye to yahan.
  *
- * The long way round already exists: a purchase bill with a supplier, rates and
- * payment terms, or an adjustment with a reason, a location and a date. Both
- * are right when there is paperwork to match. Neither is what happens when a
- * tempo drops off ten mats at four in the afternoon and the counter is busy.
+ * This used to post a "found" adjustment, which moved the stock and left the
+ * cost alone: tg_update_avg_cost only fires for movement_type 'purchase'. A
+ * new item therefore arrived with avg_cost 0, and every later sale of it
+ * reported the whole selling price as profit. The books looked healthy because
+ * the cost was missing.
  *
- * So: scan or type, set how many, press once. It posts a `found` adjustment —
- * the same rows, the same stock movements and the same ledger the long way
- * writes, so nothing downstream can tell the difference. A bill can still be
- * entered later; this is about the shelf being right now.
+ * So receiving is a purchase. That needs a supplier, which is why you can
+ * create one here by typing a name — a supplier in this shop is a name and a
+ * phone, and making somebody leave the screen to add one is how a five-second
+ * job becomes a two-minute one.
+ *
+ * Counting something you did not know you had is a different job and belongs
+ * to Stock Check.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
+import { formatINR, toDateString } from '@domain';
+
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
-import { postAdjustment } from '@/lib/posting';
-import { insertRow } from '@/lib/writes';
+import { postPurchase } from '@/lib/posting';
+import { insertRow, searchText } from '@/lib/writes';
+import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
 import { Button, Card, Divider, Empty, Input, Row, Screen, Text } from '@/ui';
-import { notify } from '@/ui/forms';
+import { notify, SelectField } from '@/ui/forms';
+import { PhotoPicker } from '@/ui/photo';
 import { VariantPicker, type PickedVariant } from '@/ui/lines';
 import { space } from '@/ui/theme';
 
-type Line = { variantId: string; label: string; sku: string; qty: number };
+type Line = { variantId: string; label: string; sku: string; qty: number; rate: number };
+type Supplier = { id: string; name: string };
 
-export default function StockAdd() {
+export default function MaalAaya() {
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
   const { variant: variantParam } = useLocalSearchParams<{ variant?: string }>();
+
+  const [supplierId, setSupplierId] = useState<string | null>(null);
+  const [date, setDate] = useState(toDateString());
   const [lines, setLines] = useState<Line[]>([]);
   const [note, setNote] = useState('');
+  const [billPhoto, setBillPhoto] = useState<PickedPhoto | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // What is on the shelf right now, so the new total is visible before saving.
+  const { data: suppliers } = useQuery<Supplier>('SELECT id, name FROM suppliers WHERE is_active = 1 ORDER BY name');
   const { data: onHand } = useQuery<{ variant_id: string; qty: number }>(
-    'SELECT variant_id, qty FROM stock_on_hand WHERE location_id = ?',
-    [locationId ?? '']
-  );
+    'SELECT variant_id, qty FROM stock_on_hand WHERE location_id = ?', [locationId ?? '']);
   const hereMap = useMemo(() => new Map((onHand ?? []).map((r) => [r.variant_id, r.qty])), [onHand]);
 
-  // Opened from a product page: that item is already the first line.
-  const { data: preRows } = useQuery<{ id: string; sku: string; variant_name: string; product_name: string }>(
-    `SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name
+  // Opened from an item's own page: that item is already the first line.
+  const { data: preRows } = useQuery<{ id: string; sku: string; variant_name: string; product_name: string; last_purchase_cost: number; avg_cost: number }>(
+    `SELECT pv.id, pv.sku, pv.variant_name, pv.last_purchase_cost, pv.avg_cost, p.name AS product_name
        FROM product_variants pv JOIN products p ON p.id = pv.product_id WHERE pv.id = ? LIMIT 1`,
-    [variantParam ?? '']
-  );
+    [variantParam ?? '']);
   const [seeded, setSeeded] = useState(false);
   const pre = preRows?.[0];
   if (pre && !seeded) {
     setSeeded(true);
-    setLines([{ variantId: pre.id, label: `${pre.product_name} · ${pre.variant_name}`, sku: pre.sku, qty: 1 }]);
+    setLines([{ variantId: pre.id, label: `${pre.product_name} · ${pre.variant_name}`, sku: pre.sku, qty: 1, rate: pre.last_purchase_cost || pre.avg_cost || 0 }]);
+  }
+
+  async function addSupplier(name: string) {
+    const id = await insertRow(db, 'suppliers', {
+      name: name.trim(), is_active: true, search_text: searchText(name),
+    }, actor);
+    setSupplierId(id);
   }
 
   function add(v: PickedVariant) {
-    // Scanning the same box twice means two of them, not a second row.
     setLines((prev) => {
       const at = prev.findIndex((l) => l.variantId === v.id);
       if (at >= 0) {
@@ -65,56 +81,66 @@ export default function StockAdd() {
         next[at] = { ...next[at], qty: next[at].qty + 1 };
         return next;
       }
-      return [...prev, { variantId: v.id, label: `${v.product_name} · ${v.variant_name}`, sku: v.sku, qty: 1 }];
+      // The rate it came at last time is nearly always the rate it came at
+      // this time, so it is filled in rather than asked for.
+      return [...prev, {
+        variantId: v.id,
+        label: `${v.product_name} · ${v.variant_name}`,
+        sku: v.sku,
+        qty: 1,
+        rate: v.last_purchase_cost || v.avg_cost || 0,
+      }];
     });
   }
 
-  function setQty(variantId: string, qty: number) {
-    setLines((prev) => prev.map((l) => (l.variantId === variantId ? { ...l, qty } : l)));
-  }
+  const patch = (id: string, p: Partial<Line>) => setLines((prev) => prev.map((l) => (l.variantId === id ? { ...l, ...p } : l)));
+  const drop = (id: string) => setLines((prev) => prev.filter((l) => l.variantId !== id));
 
-  function remove(variantId: string) {
-    setLines((prev) => prev.filter((l) => l.variantId !== variantId));
-  }
-
-  const total = lines.reduce((a, l) => a + (l.qty || 0), 0);
+  const totalQty = lines.reduce((a, l) => a + (l.qty || 0), 0);
+  const totalValue = lines.reduce((a, l) => a + (l.qty || 0) * (l.rate || 0), 0);
 
   async function save() {
     const usable = lines.filter((l) => l.qty > 0);
-    if (usable.length === 0) {
-      notify('Pehle maal choose karo aur qty daalo.');
-      return;
-    }
-    if (!locationId) {
-      notify('Location nahi mili. Admin se location set karwao.');
-      return;
-    }
+    if (!supplierId) { notify('Supplier chuno — ya naam likh ke naya bana lo.', 'danger'); return; }
+    if (usable.length === 0) { notify('Kam se kam ek maal daalo.', 'danger'); return; }
+    if (!locationId) { notify('Location nahi mili. Admin se location set karwao.', 'danger'); return; }
+
     setSaving(true);
     try {
-      await db.writeTransaction(async (tx) => {
-        const adjId = await insertRow(
-          tx,
-          'stock_adjustments',
-          {
-            doc_date: new Date().toISOString().slice(0, 10),
-            location_id: locationId,
-            reason: 'found',
-            notes: note.trim() || 'Maal aaya',
-            status: 'draft',
-          },
-          actor
-        );
-        for (const l of usable) {
-          await insertRow(
-            tx,
-            'stock_adjustment_lines',
-            { adjustment_id: adjId, variant_id: l.variantId, qty_delta: l.qty, unit_cost: 0, note: null },
-            actor
-          );
+      // The photo goes up first: if the network is down we want to know before
+      // the stock has moved, not after.
+      let billPath: string | null = null;
+      if (billPhoto) {
+        try {
+          billPath = await uploadPhoto(billPhoto, 'bills');
+        } catch {
+          notify('Bill ki photo nahi chadhi — entry phir bhi save ho rahi hai.', 'danger');
         }
-        await postAdjustment(tx, adjId, actor);
+      }
+
+      const supplier = suppliers?.find((s) => s.id === supplierId);
+      await db.writeTransaction(async (tx) => {
+        const id = await insertRow(tx, 'purchases', {
+          doc_type: 'purchase',
+          doc_date: date,
+          supplier_id: supplierId,
+          supplier_name: supplier?.name ?? null,
+          location_id: locationId,
+          bill_photo_path: billPath,
+          notes: note.trim() || null,
+          status: 'draft',
+        }, actor);
+
+        for (const [i, l] of usable.entries()) {
+          await insertRow(tx, 'purchase_lines', {
+            purchase_id: id, line_no: i + 1, variant_id: l.variantId, description: l.label,
+            qty: l.qty, rate: l.rate, tax_rate_pct: 0,
+          }, actor);
+        }
+        await postPurchase(tx, id, actor);
       });
-      notify(`${total} pcs stock mein chadh gaya.`, 'ok');
+
+      notify(`${totalQty} pcs chadh gaya.`, 'ok');
       router.back();
     } catch (e) {
       notify(`Nahi chadha: ${String((e as Error).message ?? e)}`, 'danger');
@@ -123,17 +149,13 @@ export default function StockAdd() {
     }
   }
 
-  if (!can('stock.adjust')) {
+  if (!can('purchase.create')) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Maal aaya' }} />
+        <Stack.Screen options={{ title: 'Maal Aaya' }} />
         <Screen>
-          <Text variant="display">Maal aaya</Text>
-          <Empty
-            title="Iski permission nahi hai"
-            hint="Admin se 'stock.adjust' maango, ya purchase bill bana ke maal chadhao."
-          />
-          <Button title="Purchase bill banao" tone="secondary" onPress={() => router.replace('/purchase/edit')} />
+          <Text variant="display">Maal Aaya</Text>
+          <Empty title="Iski permission nahi hai" hint="Admin se maal chadhane ka haq maango." />
         </Screen>
       </>
     );
@@ -141,10 +163,27 @@ export default function StockAdd() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Maal aaya' }} />
+      <Stack.Screen options={{ title: 'Maal Aaya' }} />
       <Screen>
-        <Text variant="display">Maal aaya</Text>
-        <Text color="textMuted">Scan karo ya naam likho, qty daalo, ek baar dabao. Bas.</Text>
+        <View>
+          <Text variant="display">Maal Aaya</Text>
+          <Text variant="small" color="textMuted">
+            Godown mein naya maal aaye to yahan entry karein.
+          </Text>
+        </View>
+
+        <Card style={{ gap: space.md }}>
+          <SelectField
+            label="Supplier"
+            value={supplierId}
+            options={(suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))}
+            onChange={setSupplierId}
+            onCreate={addSupplier}
+            placeholder="Kisse aaya?"
+            hint="Naam likh ke naya supplier bhi bana sakte ho."
+          />
+          <Input label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
+        </Card>
 
         <VariantPicker
           onPick={add}
@@ -154,7 +193,7 @@ export default function StockAdd() {
         />
 
         {lines.length === 0 ? (
-          <Empty title="Abhi kuch nahi" hint="Upar se maal dhoondo — jitne piece aaye hain wo daal do." />
+          <Empty title="Abhi koi maal nahi" hint="Upar scan karo ya naam likho. Ek saath kai cheezein daal sakte ho." />
         ) : (
           <Card style={{ gap: space.md }}>
             {lines.map((l, i) => {
@@ -163,28 +202,28 @@ export default function StockAdd() {
                 <View key={l.variantId} style={{ gap: space.xs }}>
                   {i > 0 ? <Divider /> : null}
                   <Row style={{ justifyContent: 'space-between' }} gap={space.sm}>
-                    <Text style={{ flex: 1 }} numberOfLines={2}>
-                      {l.label}
-                    </Text>
-                    <Button title="Hatao" tone="ghost" size="sm" onPress={() => remove(l.variantId)} />
+                    <Text style={{ flex: 1 }} numberOfLines={2}>{l.label}</Text>
+                    <Button title="Hatao" tone="ghost" size="sm" onPress={() => drop(l.variantId)} />
                   </Row>
                   <Row gap={space.sm}>
-                    <Button
-                      title="−"
-                      tone="secondary"
-                      size="lg"
-                      onPress={() => setQty(l.variantId, Math.max(0, l.qty - 1))}
+                    <Input
+                      containerStyle={{ flex: 1 }}
+                      label="Kitne aaye"
+                      value={String(l.qty)}
+                      onChangeText={(v) => patch(l.variantId, { qty: Math.max(0, Math.floor(Number(v.replace(/[^0-9]/g, '')) || 0)) })}
+                      keyboardType="number-pad"
                     />
                     <Input
                       containerStyle={{ flex: 1 }}
-                      value={String(l.qty)}
-                      onChangeText={(v) => setQty(l.variantId, Math.max(0, Math.floor(Number(v.replace(/[^0-9]/g, '')) || 0)))}
-                      keyboardType="number-pad"
+                      label="Kitne ka pada"
+                      value={l.rate ? String(l.rate) : ''}
+                      onChangeText={(v) => patch(l.variantId, { rate: Number(v.replace(/[^0-9.]/g, '')) || 0 })}
+                      keyboardType="decimal-pad"
+                      hint="Ek piece ka"
                     />
-                    <Button title="+" size="lg" onPress={() => setQty(l.variantId, l.qty + 1)} />
                   </Row>
                   <Text variant="small" color="textFaint">
-                    {l.sku} · abhi {here} → {here + l.qty}
+                    {l.sku} · abhi {here} → {here + l.qty} · {formatINR(l.qty * l.rate)}
                   </Text>
                 </View>
               );
@@ -192,20 +231,32 @@ export default function StockAdd() {
           </Card>
         )}
 
-        <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Sharma auto se aaya" />
+        <Card style={{ gap: space.md }}>
+          <Text variant="label" color="textMuted">Bill ki photo</Text>
+          <PhotoPicker
+            localUri={billPhoto?.uri}
+            name="Bill"
+            onPickLocal={setBillPhoto}
+          />
+          <Input label="Note" value={note} onChangeText={setNote} placeholder="Gaadi number, driver, kuch bhi" />
+        </Card>
+
+        {lines.length > 0 ? (
+          <Card>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Text color="textMuted">{totalQty} pcs</Text>
+              <Text variant="number">{formatINR(totalValue)}</Text>
+            </Row>
+          </Card>
+        ) : null}
 
         <Button
-          title={total > 0 ? `${total} pcs chadha do` : 'Chadha do'}
+          title={totalQty > 0 ? `${totalQty} pcs chadha do` : 'Chadha do'}
           size="lg"
           full
           onPress={save}
           loading={saving}
-          disabled={total === 0}
-        />
-        <Button
-          title="Bill ke saath aaya hai? Purchase banao"
-          tone="ghost"
-          onPress={() => router.replace('/purchase/edit')}
+          disabled={totalQty === 0}
         />
       </Screen>
     </>

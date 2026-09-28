@@ -15,6 +15,25 @@
  * a partial install is a much worse failure than a missing download.
  */
 import { execFileSync, execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+
+// eas-cli reads EXPO_TOKEN from the environment and npm does not load .env, so
+// without this the script runs unauthenticated and reports "Not logged in" as
+// if the build had failed. The token lives in app/.env, which is gitignored.
+if (!process.env.EXPO_TOKEN) {
+  try {
+    const line = readFileSync(new URL('../.env', import.meta.url), 'utf8')
+      .split('\n')
+      .find((l) => l.startsWith('EXPO_TOKEN='));
+    if (line) process.env.EXPO_TOKEN = line.slice('EXPO_TOKEN='.length).trim().replace(/^["']|["']$/g, '');
+  } catch {
+    // No .env is fine — the caller may have exported it themselves.
+  }
+}
+if (!process.env.EXPO_TOKEN) {
+  console.error('✗ no EXPO_TOKEN — put one in app/.env or export it (expo.dev → Account settings → Access tokens)');
+  process.exit(1);
+}
 
 const SSH_KEY = process.env.SSH_KEY ?? '/d/Gulshan/Keys/ServoRica_TradeOS';
 const HOST = process.env.APK_HOST ?? 'root@38.49.209.165';

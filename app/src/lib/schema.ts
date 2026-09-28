@@ -217,6 +217,10 @@ export const expenses = new Table(
     location_id: column.text,
     created_at: column.text,
     updated_at: column.text,
+    is_personal: column.integer,
+    partner_name: column.text,
+    paid_by: column.text,
+    photo_path: column.text,
   },
   {}
 );

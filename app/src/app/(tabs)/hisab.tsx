@@ -1,279 +1,545 @@
 /**
- * Reports hub. Every report is one SQL statement over the local database with
- * a date range, rendered as a table and exportable to CSV. Works offline.
+ * Hisab — ek saaf profit-and-loss.
+ *
+ * Six lines and one big figure. The owner opens this to settle one argument:
+ * "itna maal becha, phir paisa kahan gaya?" Every other report in this app
+ * answers a question nobody asked at the counter, so they are not here.
+ *
+ * The arithmetic is deliberately the SAME as Home's "Aaj ka munafa"
+ * (DASHBOARD_TODAY in src/lib/queries.ts), just over a chosen date range
+ * instead of one day. If these two screens ever disagree, one of them has been
+ * edited without the other — they are meant to be the same four numbers.
+ *
+ * ONE KNOWN DIFFERENCE, which is Home's to fix, not this screen's:
+ * DASHBOARD_TODAY's `spent_today` has no `is_personal` filter, so on a day a
+ * partner takes money out for himself, Home's "Aaj ka kharcha" and "Aaj ka
+ * munafa" will be off by that withdrawal and this screen will not. The filter
+ * belongs in src/lib/queries.ts too.
+ *
+ *     Sale            bills ka grand total
+ *   − Maal Ki Cost    jo maal gaya, uski stamped cost
+ *   = Gross Profit
+ *   − Business Kharcha
+ *   − Kharab / Loss
+ *   = MUNAFA
+ *
+ * The three things that are NOT on this screen are the whole point of it:
+ * purchases, party payments, and a partner's personal withdrawal. Each is
+ * commented at the line where somebody would expect to find it.
  */
 import { useQuery } from '@powersync/react';
-import React, { useMemo, useState } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 
-import { financialYearStart, formatINR, toCsv, toDateString } from '@domain';
+import { formatINR, toDateString } from '@domain';
 
-import { shareInvoiceHtml } from '@/lib/invoice-html';
-import { reportHtml } from '@/lib/report-html';
 import { useSession } from '@/lib/session';
-import { useShopSettings } from '@/lib/use-settings';
-import { Button, Card, Chip, Divider, Empty, Input, Row, Screen, Text, useTheme } from '@/ui';
-import { notify } from '@/ui/forms';
+import { Card, Chip, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
+import { Sheet } from '@/ui/sheet';
 import { space } from '@/ui/theme';
 
-type Col = { key: string; label: string; money?: boolean; num?: boolean; width?: number };
-type Report = {
-  key: string; group: string; title: string;
-  permission: 'reports.view' | 'reports.view_margin' | 'catalog.view_cost' | 'sale.create' | 'expense.record';
-  sql: string; cols: Col[]; dated: boolean;
-  /** A summary already ends in its own net line; a "Kul" row under it is noise. */
-  noTotals?: boolean;
+// -----------------------------------------------------------------------------
+// The six figures, in one statement
+// -----------------------------------------------------------------------------
+
+/**
+ * NOTE ON `expenses.is_personal`
+ *
+ * A partner taking money out of the drawer for himself is NOT a business
+ * expense — counting it would make the shop look like it lost money on a day
+ * somebody paid their own house rent. Those rows are marked `is_personal = 1`
+ * and are filtered out of Business Kharcha, in the total and in the
+ * drill-down, with `COALESCE(is_personal, 0) = 0` so an older row that predates
+ * the column still counts as a business expense.
+ *
+ * The withdrawal is not lost — it is just not a cost of running the shop. It
+ * belongs against the partner's account, not against munafa.
+ */
+
+const SUMMARY = `
+  SELECT
+    -- SALE. Posted invoices only. A draft is not money and a cancelled bill
+    -- never happened. Credit notes (doc_type='credit_note') are their own
+    -- document and are excluded here exactly as Home excludes them.
+    (SELECT COALESCE(SUM(grand_total), 0) FROM sales_invoices
+      WHERE doc_type = 'invoice' AND status = 'posted' AND doc_date BETWEEN ?1 AND ?2) AS sale,
+    (SELECT COUNT(*) FROM sales_invoices
+      WHERE doc_type = 'invoice' AND status = 'posted' AND doc_date BETWEEN ?1 AND ?2) AS bills,
+
+    -- MAAL KI COST. What the maal that went out had cost US. Taken from the
+    -- movement's own unit_cost, which posting stamped with the moving average
+    -- at the moment of sale — so it is the cost of THOSE pieces, not today's
+    -- rate. Sale movements are negative, hence the sign flip.
+    --
+    -- This is also the only place maal becomes an expense. A purchase is NOT
+    -- counted anywhere on this screen: buying stock swaps cash for maal, it
+    -- does not lose you anything. It turns into cost here, when it is sold.
+    (SELECT COALESCE(SUM(-qty * unit_cost), 0) FROM stock_movements
+      WHERE movement_type = 'sale' AND date(occurred_at) BETWEEN ?1 AND ?2) AS cogs,
+
+    -- BUSINESS KHARCHA. Rent, bijli, diesel, chai — money that left and
+    -- brought back nothing you can sell.
+    -- NOT counted here: paying a supplier, because that is settling the bill
+    -- for maal whose cost is already in Maal Ki Cost. Counting both would
+    -- charge the same maal twice.
+    -- NOT counted here either: a partner's personal withdrawal. Those rows
+    -- carry is_personal = 1 and are dropped. COALESCE keeps older rows, which
+    -- predate the column and are all business, on the business side.
+    (SELECT COALESCE(SUM(amount), 0) FROM expenses
+      WHERE expense_date BETWEEN ?1 AND ?2 AND COALESCE(is_personal, 0) = 0) AS kharcha,
+    (SELECT COUNT(*) FROM expenses
+      WHERE expense_date BETWEEN ?1 AND ?2 AND COALESCE(is_personal, 0) = 0) AS kharcha_rows,
+
+    -- KHARAB / LOSS. Maal that broke, leaked or went missing. Same stamped
+    -- cost, same sign flip. It never reached a customer, so it is not in Maal
+    -- Ki Cost — it is its own loss.
+    (SELECT COALESCE(SUM(-qty * unit_cost), 0) FROM stock_movements
+      WHERE movement_type = 'damage' AND date(occurred_at) BETWEEN ?1 AND ?2) AS damage,
+    (SELECT COUNT(*) FROM stock_movements
+      WHERE movement_type = 'damage' AND date(occurred_at) BETWEEN ?1 AND ?2) AS damage_rows`;
+
+// -----------------------------------------------------------------------------
+// Drill-downs — "ye figure kahan se aaya"
+// -----------------------------------------------------------------------------
+
+/**
+ * Every drill-down returns the same four columns so one `useQuery` can serve
+ * all of them (a hook per figure would be five hooks that mostly do nothing).
+ * `a2` / `a3` carry the extra numbers a particular list needs.
+ */
+type DetailRow = {
+  id: string;
+  title: string;
+  sub: string | null;
+  amount: number;
+  a2: number | null;
+  a3: number | null;
 };
 
-const REPORTS: Report[] = [
-  { key: 'hisaab', group: 'Hisaab', title: 'Poora hisaab', permission: 'reports.view', dated: true, noTotals: true,
+type FigureKey = 'sale' | 'cogs' | 'gross' | 'kharcha' | 'damage' | 'munafa';
+type ListKey = Exclude<FigureKey, 'munafa'>;
+
+const NO_ROWS = `SELECT '' AS id, '' AS title, NULL AS sub, 0 AS amount, NULL AS a2, NULL AS a3 WHERE 0`;
+
+const DETAIL: Record<ListKey, { title: string; hint: string; sub: (r: DetailRow) => string; sql: string }> = {
+  sale: {
+    title: 'Sale',
+    hint: 'Jo bill bane — har ek ka total.',
+    sub: (r) => r.sub ?? '',
     sql: `
-      SELECT 1 AS ord, 'Bill banaye' AS item, COUNT(*) AS qty, NULL AS amount
-        FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND doc_date BETWEEN ?1 AND ?2
-      UNION ALL SELECT 2, 'Bikri', NULL, COALESCE(SUM(grand_total),0)
-        FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND doc_date BETWEEN ?1 AND ?2
-      UNION ALL SELECT 3, 'Return (wapas aaya)', NULL, -COALESCE(SUM(grand_total),0)
-        FROM sales_invoices WHERE doc_type='credit_note' AND status='posted' AND doc_date BETWEEN ?1 AND ?2
-      UNION ALL SELECT 4, 'Paisa aaya', NULL, COALESCE(SUM(amount),0)
-        FROM payments WHERE direction='in' AND status='posted' AND payment_date BETWEEN ?1 AND ?2
-      UNION ALL SELECT 5, 'Maal kharida', NULL, -COALESCE(SUM(grand_total),0)
-        FROM purchases WHERE doc_type='purchase' AND status='posted' AND doc_date BETWEEN ?1 AND ?2
-      UNION ALL SELECT 6, 'Supplier ko diya', NULL, -COALESCE(SUM(amount),0)
-        FROM payments WHERE direction='out' AND status='posted' AND payment_date BETWEEN ?1 AND ?2
-      UNION ALL SELECT 7, 'Kharcha', NULL, -COALESCE(SUM(amount),0)
-        FROM expenses WHERE expense_date BETWEEN ?1 AND ?2
-      UNION ALL SELECT 8, 'Haath mein aaya (net cash)', 0,
-        COALESCE((SELECT SUM(amount) FROM payments WHERE direction='in' AND status='posted' AND payment_date BETWEEN ?1 AND ?2),0)
-        - COALESCE((SELECT SUM(amount) FROM payments WHERE direction='out' AND status='posted' AND payment_date BETWEEN ?1 AND ?2),0)
-        - COALESCE((SELECT SUM(amount) FROM expenses WHERE expense_date BETWEEN ?1 AND ?2),0)
-      ORDER BY ord`,
-    cols: [{ key: 'item', label: 'Kya', width: 240 }, { key: 'qty', label: 'Ginti', num: true }, { key: 'amount', label: 'Rupaye', money: true }] },
+      SELECT i.id, i.doc_no AS title,
+             i.doc_date || ' · ' || COALESCE(c.name, '—') AS sub,
+             i.grand_total AS amount, NULL AS a2, NULL AS a3
+        FROM sales_invoices i
+        LEFT JOIN customers c ON c.id = i.customer_id
+       WHERE i.doc_type = 'invoice' AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2
+       ORDER BY i.doc_date DESC, i.doc_no DESC
+       LIMIT 200`,
+  },
 
-  { key: 'expense_register', group: 'Hisaab', title: 'Kharcha register', permission: 'expense.record', dated: true,
-    sql: `SELECT expense_date, category, paid_to, mode, note, amount
-          FROM expenses WHERE expense_date BETWEEN ?1 AND ?2 ORDER BY expense_date DESC, created_at DESC`,
-    cols: [{ key: 'expense_date', label: 'Date' }, { key: 'category', label: 'Kis cheez ka', width: 150 }, { key: 'paid_to', label: 'Kisko' }, { key: 'mode', label: 'Mode' }, { key: 'note', label: 'Note', width: 180 }, { key: 'amount', label: 'Amount', money: true }] },
+  cogs: {
+    title: 'Maal Ki Cost',
+    hint: 'Jo maal bika, wo humein kitne ka pada tha.',
+    sub: (r) => `${Math.round(r.a2 ?? 0)} pcs gaya`,
+    sql: `
+      SELECT pv.id AS id,
+             p.name || CASE WHEN COALESCE(pv.variant_name, '') <> '' THEN ' · ' || pv.variant_name ELSE '' END AS title,
+             NULL AS sub,
+             SUM(-m.qty * m.unit_cost) AS amount,
+             SUM(-m.qty) AS a2, NULL AS a3
+        FROM stock_movements m
+        JOIN product_variants pv ON pv.id = m.variant_id
+        JOIN products p ON p.id = pv.product_id
+       WHERE m.movement_type = 'sale' AND date(m.occurred_at) BETWEEN ?1 AND ?2
+       GROUP BY pv.id, p.name, pv.variant_name
+       ORDER BY amount DESC
+       LIMIT 200`,
+  },
 
-  { key: 'expense_by_category', group: 'Hisaab', title: 'Kharcha — kis cheez par', permission: 'expense.record', dated: true,
-    sql: `SELECT category, COUNT(*) AS entries, SUM(amount) AS amount
-          FROM expenses WHERE expense_date BETWEEN ?1 AND ?2 GROUP BY category ORDER BY amount DESC`,
-    cols: [{ key: 'category', label: 'Kis cheez ka', width: 220 }, { key: 'entries', label: 'Entries', num: true }, { key: 'amount', label: 'Amount', money: true }] },
-  { key: 'sales_register', group: 'Bikri', title: 'Bikri ka register', permission: 'sale.create', dated: true,
-    sql: `SELECT i.doc_no, i.doc_date, c.name AS customer, i.payment_mode, i.taxable_total, i.cgst_total + i.sgst_total + i.igst_total AS tax, i.grand_total, i.paid_total, i.grand_total - i.paid_total AS due
-          FROM sales_invoices i JOIN customers c ON c.id = i.customer_id WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2 ORDER BY i.doc_date, i.doc_no`,
-    cols: [{ key: 'doc_no', label: 'Invoice', width: 160 }, { key: 'doc_date', label: 'Date' }, { key: 'customer', label: 'Customer', width: 180 }, { key: 'payment_mode', label: 'Mode' }, { key: 'taxable_total', label: 'Taxable', money: true }, { key: 'tax', label: 'Tax', money: true }, { key: 'grand_total', label: 'Total', money: true }, { key: 'due', label: 'Due', money: true }] },
-  { key: 'sales_by_product', group: 'Bikri', title: 'Item ke hisaab se bikri', permission: 'reports.view', dated: true,
-    sql: `SELECT p.name AS product, pv.variant_name, pv.sku, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value, COUNT(DISTINCT i.id) AS invoices
-          FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
-          JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY value DESC`,
-    cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'sku', label: 'SKU' }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }, { key: 'invoices', label: 'Invoices', num: true }] },
-  { key: 'sales_by_family', group: 'Bikri', title: 'Category ke hisaab se bikri', permission: 'reports.view', dated: true,
-    sql: `SELECT f.name AS family, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
-          JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id LEFT JOIN product_families f ON f.id = p.family_id GROUP BY f.id ORDER BY value DESC`,
-    cols: [{ key: 'family', label: 'Family', width: 200 }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'sales_by_brand', group: 'Bikri', title: 'Brand ke hisaab se bikri', permission: 'reports.view', dated: true,
-    sql: `SELECT COALESCE(b.name,'—') AS brand, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
-          JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id GROUP BY b.id ORDER BY value DESC`,
-    cols: [{ key: 'brand', label: 'Brand', width: 200 }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'sales_by_customer', group: 'Bikri', title: 'Grahak ke hisaab se bikri', permission: 'reports.view', dated: true,
-    sql: `SELECT c.name AS customer, c.customer_type, COUNT(*) AS invoices, SUM(i.grand_total) AS total, SUM(i.grand_total - i.paid_total) AS due FROM sales_invoices i JOIN customers c ON c.id = i.customer_id
-          WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2 GROUP BY c.id ORDER BY total DESC`,
-    cols: [{ key: 'customer', label: 'Customer', width: 200 }, { key: 'customer_type', label: 'Type' }, { key: 'invoices', label: 'Invoices', num: true }, { key: 'total', label: 'Total', money: true }, { key: 'due', label: 'Due', money: true }] },
-  { key: 'sales_by_vehicle', group: 'Bikri', title: 'Gaadi ke hisaab se bikri', permission: 'reports.view', dated: true,
-    sql: `SELECT mk.name || ' ' || vm.name AS model, SUM(l.qty) AS qty, SUM(l.taxable_value) AS value FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
-          JOIN product_fitments pf ON pf.product_id = (SELECT product_id FROM product_variants WHERE id = l.variant_id) AND (pf.variant_id IS NULL OR pf.variant_id = l.variant_id)
-          JOIN vehicle_models vm ON vm.id = pf.model_id JOIN vehicle_makes mk ON mk.id = vm.make_id GROUP BY vm.id ORDER BY value DESC`,
-    cols: [{ key: 'model', label: 'Model', width: 200 }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'sales_by_salesperson', group: 'Bikri', title: 'Kis aadmi ne kitna becha', permission: 'reports.view', dated: true,
-    sql: `SELECT COALESCE(pr.full_name,'—') AS salesperson, COUNT(*) AS invoices, SUM(i.grand_total) AS total FROM sales_invoices i LEFT JOIN profiles pr ON pr.id = i.salesperson_id WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2 GROUP BY pr.id ORDER BY total DESC`,
-    cols: [{ key: 'salesperson', label: 'Bechne wala', width: 200 }, { key: 'invoices', label: 'Invoices', num: true }, { key: 'total', label: 'Total', money: true }] },
-  { key: 'gst_sales', group: 'GST', title: 'GST bikri ka hisaab (rate ke hisaab se)', permission: 'reports.view', dated: true,
-    sql: `SELECT CASE WHEN i.customer_gstin IS NOT NULL THEN 'B2B' ELSE 'B2C' END AS type, CASE WHEN i.is_interstate THEN 'IGST' ELSE 'CGST+SGST' END AS supply, l.tax_rate_pct AS rate, l.hsn_code,
-                 SUM(l.taxable_value) AS taxable, SUM(l.cgst) AS cgst, SUM(l.sgst) AS sgst, SUM(l.igst) AS igst, COUNT(DISTINCT i.id) AS docs
-          FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
-          GROUP BY type, supply, l.tax_rate_pct, l.hsn_code ORDER BY type, supply, rate`,
-    cols: [{ key: 'type', label: 'Type' }, { key: 'supply', label: 'Supply' }, { key: 'rate', label: 'Rate %', num: true }, { key: 'hsn_code', label: 'HSN' }, { key: 'taxable', label: 'Taxable', money: true }, { key: 'cgst', label: 'CGST', money: true }, { key: 'sgst', label: 'SGST', money: true }, { key: 'igst', label: 'IGST', money: true }, { key: 'docs', label: 'Docs', num: true }] },
-  { key: 'gst_purchase', group: 'GST', title: 'GST purchase ka hisaab (input credit)', permission: 'reports.view', dated: true,
-    sql: `SELECT s.name AS supplier, s.gstin, p.doc_no, p.supplier_invoice_no, p.doc_date, p.taxable_total, p.cgst_total, p.sgst_total, p.igst_total, p.grand_total
-          FROM purchases p JOIN suppliers s ON s.id = p.supplier_id WHERE p.status='posted' AND p.doc_date BETWEEN ?1 AND ?2 ORDER BY p.doc_date`,
-    cols: [{ key: 'supplier', label: 'Supplier', width: 180 }, { key: 'gstin', label: 'GSTIN' }, { key: 'doc_no', label: 'Our no.' }, { key: 'supplier_invoice_no', label: 'Their bill' }, { key: 'doc_date', label: 'Date' }, { key: 'taxable_total', label: 'Taxable', money: true }, { key: 'cgst_total', label: 'CGST', money: true }, { key: 'sgst_total', label: 'SGST', money: true }, { key: 'igst_total', label: 'IGST', money: true }, { key: 'grand_total', label: 'Total', money: true }] },
-  { key: 'purchase_register', group: 'Purchase', title: 'Purchase register', permission: 'reports.view', dated: true,
-    sql: `SELECT p.doc_no, p.doc_date, s.name AS supplier, p.doc_type, p.grand_total, p.paid_total, p.grand_total - p.paid_total AS due FROM purchases p JOIN suppliers s ON s.id = p.supplier_id WHERE p.status='posted' AND p.doc_date BETWEEN ?1 AND ?2 ORDER BY p.doc_date`,
-    cols: [{ key: 'doc_no', label: 'No.' }, { key: 'doc_date', label: 'Date' }, { key: 'supplier', label: 'Supplier', width: 180 }, { key: 'doc_type', label: 'Type' }, { key: 'grand_total', label: 'Total', money: true }, { key: 'paid_total', label: 'Paid', money: true }, { key: 'due', label: 'Due', money: true }] },
-  { key: 'purchase_by_product', group: 'Purchase', title: 'Purchases by product (price trend)', permission: 'catalog.view_cost', dated: true,
-    sql: `SELECT p.name AS product, pv.variant_name, pv.sku, SUM(l.qty) AS qty, MIN(l.rate) AS min_rate, MAX(l.rate) AS max_rate, SUM(l.taxable_value)/SUM(l.qty) AS avg_rate, pv.avg_cost AS current_avg
-          FROM purchase_lines l JOIN purchases pu ON pu.id = l.purchase_id AND pu.doc_type='purchase' AND pu.status='posted' AND pu.doc_date BETWEEN ?1 AND ?2
-          JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY qty DESC`,
-    cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'qty', label: 'Qty', num: true }, { key: 'min_rate', label: 'Min', money: true }, { key: 'avg_rate', label: 'Avg', money: true }, { key: 'max_rate', label: 'Max', money: true }, { key: 'current_avg', label: 'Avg cost now', money: true }] },
-  { key: 'receivables', group: 'Paisa', title: 'Grahak se kitna baaki, kitna purana', permission: 'reports.view', dated: false,
-    sql: `SELECT c.name AS customer, c.mobile, COALESCE(pb.balance,0) AS outstanding, c.credit_limit,
-                 COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) BETWEEN 1 AND 30),0) AS d0_30,
-                 COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) BETWEEN 31 AND 60),0) AS d31_60,
-                 COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) BETWEEN 61 AND 90),0) AS d61_90,
-                 COALESCE((SELECT SUM(grand_total - paid_total) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND grand_total>paid_total AND julianday(?2)-julianday(i.due_date) > 90),0) AS d90p
-          FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id WHERE COALESCE(pb.balance,0) <> 0 ORDER BY outstanding DESC`,
-    cols: [{ key: 'customer', label: 'Customer', width: 200 }, { key: 'mobile', label: 'Mobile' }, { key: 'outstanding', label: 'Baaki paisa', money: true }, { key: 'credit_limit', label: 'Limit', money: true }, { key: 'd0_30', label: '1-30', money: true }, { key: 'd31_60', label: '31-60', money: true }, { key: 'd61_90', label: '61-90', money: true }, { key: 'd90p', label: '90+', money: true }] },
-  { key: 'payables', group: 'Paisa', title: 'Supplier ko kitna dena hai', permission: 'reports.view', dated: false,
-    sql: `SELECT s.name AS supplier, s.mobile, s.payment_terms_days, COALESCE(pb.balance,0) AS payable FROM suppliers s LEFT JOIN party_balance_live pb ON pb.party_type='supplier' AND pb.party_id=s.id WHERE COALESCE(pb.balance,0) <> 0 ORDER BY payable DESC`,
-    cols: [{ key: 'supplier', label: 'Supplier', width: 200 }, { key: 'mobile', label: 'Mobile' }, { key: 'payment_terms_days', label: 'Terms', num: true }, { key: 'payable', label: 'Humein dena hai', money: true }] },
-  { key: 'collections', group: 'Paisa', title: 'Collections & payments', permission: 'reports.view', dated: true,
-    sql: `SELECT p.payment_date, p.doc_no, p.direction, COALESCE(c.name, s.name) AS party, p.mode, p.reference_no, p.amount FROM payments p LEFT JOIN customers c ON c.id=p.party_id AND p.party_type='customer' LEFT JOIN suppliers s ON s.id=p.party_id AND p.party_type='supplier'
-          WHERE p.status='posted' AND p.payment_date BETWEEN ?1 AND ?2 ORDER BY p.payment_date`,
-    cols: [{ key: 'payment_date', label: 'Date' }, { key: 'doc_no', label: 'No.' }, { key: 'direction', label: 'In/Out' }, { key: 'party', label: 'Party', width: 180 }, { key: 'mode', label: 'Mode' }, { key: 'reference_no', label: 'Ref' }, { key: 'amount', label: 'Amount', money: true }] },
-  { key: 'margin', group: 'Paisa', title: 'Kis item par kitna bacha', permission: 'reports.view_margin', dated: true,
-    sql: `SELECT p.name AS product, pv.variant_name, SUM(l.qty) AS qty, SUM(l.taxable_value) AS sales, SUM(l.unit_cost_at_sale * l.qty) AS cost, SUM(l.taxable_value) - SUM(l.unit_cost_at_sale * l.qty) AS margin,
-                 ROUND((SUM(l.taxable_value) - SUM(l.unit_cost_at_sale * l.qty)) * 100.0 / NULLIF(SUM(l.taxable_value),0), 1) AS margin_pct
-          FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date BETWEEN ?1 AND ?2
-          JOIN product_variants pv ON pv.id = l.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY margin DESC`,
-    cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'qty', label: 'Qty', num: true }, { key: 'sales', label: 'Bikri', money: true }, { key: 'cost', label: 'Cost', money: true }, { key: 'margin', label: 'Margin', money: true }, { key: 'margin_pct', label: '%', num: true }] },
-  { key: 'stock_valuation', group: 'Inventory', title: 'Stock ki keemat', permission: 'catalog.view_cost', dated: false,
-    sql: `SELECT l.name AS location, f.name AS family, SUM(sl.qty) AS units, SUM(sl.qty * pv.avg_cost) AS value FROM stock_on_hand sl JOIN locations l ON l.id = sl.location_id JOIN product_variants pv ON pv.id = sl.variant_id JOIN products p ON p.id = pv.product_id LEFT JOIN product_families f ON f.id = p.family_id
-          WHERE sl.qty <> 0 GROUP BY l.id, f.id ORDER BY l.sort_order, value DESC`,
-    cols: [{ key: 'location', label: 'Location' }, { key: 'family', label: 'Family', width: 180 }, { key: 'units', label: 'Units', num: true }, { key: 'value', label: 'Value', money: true }] },
-  { key: 'stock_current', group: 'Inventory', title: 'Abhi kitna stock hai (saare SKU)', permission: 'sale.create', dated: false,
-    sql: `SELECT p.name AS product, pv.variant_name, pv.sku, f.name AS family, COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id=pv.id),0) AS qty, pv.min_stock, pv.reorder_level
-          FROM product_variants pv JOIN products p ON p.id = pv.product_id LEFT JOIN product_families f ON f.id = p.family_id WHERE pv.is_active=1 ORDER BY f.sort_order, p.name, pv.variant_name`,
-    cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'sku', label: 'SKU' }, { key: 'family', label: 'Family' }, { key: 'qty', label: 'Qty', num: true }, { key: 'min_stock', label: 'Min', num: true }, { key: 'reorder_level', label: 'Reorder', num: true }] },
-  { key: 'dead_stock', group: 'Inventory', title: 'Jo maal nahi bik raha', permission: 'reports.view', dated: true,
-    sql: `SELECT p.name AS product, pv.variant_name, pv.sku, COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id=pv.id),0) AS qty, pv.avg_cost, COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id=pv.id),0) * pv.avg_cost AS value,
-                 (SELECT MAX(i.doc_date) FROM sales_invoice_lines l JOIN sales_invoices i ON i.id=l.invoice_id AND i.status='posted' WHERE l.variant_id=pv.id) AS last_sold,
-                 COALESCE((SELECT SUM(l.qty) FROM sales_invoice_lines l JOIN sales_invoices i ON i.id=l.invoice_id AND i.status='posted' AND i.doc_type='invoice' AND i.doc_date BETWEEN ?1 AND ?2 WHERE l.variant_id=pv.id),0) AS sold_in_period
-          FROM product_variants pv JOIN products p ON p.id = pv.product_id WHERE pv.is_active=1 AND qty > 0 ORDER BY sold_in_period ASC, value DESC`,
-    cols: [{ key: 'product', label: 'Product', width: 200 }, { key: 'variant_name', label: 'Variant' }, { key: 'qty', label: 'Qty', num: true }, { key: 'value', label: 'Value', money: true }, { key: 'last_sold', label: 'Last sold' }, { key: 'sold_in_period', label: 'Sold in period', num: true }] },
-  { key: 'stock_movements', group: 'Inventory', title: 'Stock ka aana-jaana', permission: 'reports.view', dated: true,
-    sql: `SELECT m.movement_type, l.name AS location, COUNT(*) AS rows_, SUM(CASE WHEN m.qty>0 THEN m.qty ELSE 0 END) AS qty_in, SUM(CASE WHEN m.qty<0 THEN -m.qty ELSE 0 END) AS qty_out, SUM(m.qty*m.unit_cost) AS value
-          FROM stock_movements m JOIN locations l ON l.id = m.location_id WHERE date(m.occurred_at) BETWEEN ?1 AND ?2 GROUP BY m.movement_type, l.id ORDER BY l.sort_order, m.movement_type`,
-    cols: [{ key: 'movement_type', label: 'Type', width: 160 }, { key: 'location', label: 'Location' }, { key: 'rows_', label: 'Rows', num: true }, { key: 'qty_in', label: 'In', num: true }, { key: 'qty_out', label: 'Out', num: true }, { key: 'value', label: 'Value', money: true }] },
+  gross: {
+    title: 'Gross Profit',
+    hint: 'Har bill par kitna bacha — bikri minus us maal ki cost.',
+    sub: (r) => `${r.sub ?? ''} — bikri ${formatINR(r.a2 ?? 0)}, cost ${formatINR(r.a3 ?? 0)}`,
+    // The per-bill cost here is matched by the movement's ref_id, not by date,
+    // so a bill posted on the last day of the range with its stock movement
+    // stamped the next morning can make this list total a few rupees away from
+    // the headline. The headline is the figure of record; this list is only
+    // "kis bill par kitna bacha".
+    sql: `
+      SELECT i.id, i.doc_no AS title,
+             i.doc_date || ' · ' || COALESCE(c.name, '—') AS sub,
+             i.grand_total - COALESCE((SELECT SUM(-m.qty * m.unit_cost) FROM stock_movements m
+                                        WHERE m.movement_type = 'sale' AND m.ref_id = i.id), 0) AS amount,
+             i.grand_total AS a2,
+             COALESCE((SELECT SUM(-m.qty * m.unit_cost) FROM stock_movements m
+                        WHERE m.movement_type = 'sale' AND m.ref_id = i.id), 0) AS a3
+        FROM sales_invoices i
+        LEFT JOIN customers c ON c.id = i.customer_id
+       WHERE i.doc_type = 'invoice' AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2
+       ORDER BY amount DESC
+       LIMIT 200`,
+  },
+
+  kharcha: {
+    title: 'Business Kharcha',
+    hint: 'Dukaan ka kharcha. Supplier ka paisa aur partner ka apna nikala paisa isme nahi hai.',
+    sub: (r) => r.sub ?? '',
+    sql: `
+      SELECT e.id, COALESCE(e.category, 'Kharcha') AS title,
+             e.expense_date || CASE WHEN COALESCE(e.paid_to, '') <> '' THEN ' · ' || e.paid_to ELSE '' END
+               || CASE WHEN COALESCE(e.note, '') <> '' THEN ' · ' || e.note ELSE '' END AS sub,
+             e.amount AS amount, NULL AS a2, NULL AS a3
+        FROM expenses e
+       -- Partner ka apna nikala paisa yahan nahi — wo dukaan ka kharcha nahi hai.
+       WHERE e.expense_date BETWEEN ?1 AND ?2 AND COALESCE(e.is_personal, 0) = 0
+       ORDER BY e.expense_date DESC, e.created_at DESC
+       LIMIT 200`,
+  },
+
+  damage: {
+    title: 'Kharab / Loss',
+    hint: 'Toota, kharab ya gum hua maal — uski cost.',
+    sub: (r) => `${r.sub ?? ''} · ${Math.round(r.a2 ?? 0)} pcs`,
+    sql: `
+      SELECT m.id,
+             p.name || CASE WHEN COALESCE(pv.variant_name, '') <> '' THEN ' · ' || pv.variant_name ELSE '' END AS title,
+             date(m.occurred_at) || CASE WHEN COALESCE(m.note, '') <> '' THEN ' · ' || m.note ELSE '' END AS sub,
+             -m.qty * m.unit_cost AS amount,
+             -m.qty AS a2, NULL AS a3
+        FROM stock_movements m
+        JOIN product_variants pv ON pv.id = m.variant_id
+        JOIN products p ON p.id = pv.product_id
+       WHERE m.movement_type = 'damage' AND date(m.occurred_at) BETWEEN ?1 AND ?2
+       ORDER BY m.occurred_at DESC
+       LIMIT 200`,
+  },
+};
+
+// -----------------------------------------------------------------------------
+// Dates
+// -----------------------------------------------------------------------------
+
+type Preset = 'aaj' | '7din' | 'mahina' | 'custom';
+
+const PRESETS: [Preset, string][] = [
+  ['aaj', 'Aaj'],
+  ['7din', '7 Din'],
+  ['mahina', 'Is Mahine'],
+  ['custom', 'Custom'],
 ];
 
-/** Monday of the week `d` falls in. Indian shops count the week from Monday. */
-function weekStart(d: Date): Date {
-  const x = new Date(d);
-  const dow = (x.getDay() + 6) % 7; // 0 = Monday
-  x.setDate(x.getDate() - dow);
-  return x;
-}
-
-function range(key: string): [string, string] {
+function presetRange(p: Preset): [string, string] {
   const now = new Date();
   const today = toDateString(now);
-  if (key === 'today') return [today, today];
-  if (key === 'yesterday') { const d = new Date(now); d.setDate(d.getDate() - 1); const y = toDateString(d); return [y, y]; }
-  if (key === 'week') return [toDateString(weekStart(now)), today];
-  if (key === 'last_week') {
-    const start = weekStart(now); start.setDate(start.getDate() - 7);
-    const end = new Date(start); end.setDate(end.getDate() + 6);
-    return [toDateString(start), toDateString(end)];
+  if (p === '7din') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 6); // aaj sameth saat din
+    return [toDateString(d), today];
   }
-  if (key === 'month') return [toDateString(new Date(now.getFullYear(), now.getMonth(), 1)), today];
-  if (key === 'last_month') return [toDateString(new Date(now.getFullYear(), now.getMonth() - 1, 1)), toDateString(new Date(now.getFullYear(), now.getMonth(), 0))];
-  if (key === 'fy') return [toDateString(financialYearStart(now)), today];
-  if (key === '30') { const d = new Date(now); d.setDate(d.getDate() - 30); return [toDateString(d), today]; }
-  if (key === '90') { const d = new Date(now); d.setDate(d.getDate() - 90); return [toDateString(d), today]; }
+  if (p === 'mahina') return [toDateString(new Date(now.getFullYear(), now.getMonth(), 1)), today];
   return [today, today];
 }
 
-export default function ReportsScreen() {
-  const { can } = useSession();
-  const shop = useShopSettings();
+/** "17 Sep" — short enough to sit under the chips without wrapping. */
+function pretty(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+// -----------------------------------------------------------------------------
+// Screen
+// -----------------------------------------------------------------------------
+
+/** One line of the statement. Tappable — every figure owes an explanation. */
+function Line({
+  label,
+  hint,
+  value,
+  onPress,
+  tone,
+  minus,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  onPress: () => void;
+  tone?: 'rule' | 'plain';
+  /** Draw it as money going out, so the subtraction is visible, not implied. */
+  minus?: boolean;
+}) {
   const t = useTheme();
-  const available = REPORTS.filter((r) => can(r.permission));
-  // Open on the summary: it is the one report that answers the question the
-  // owner came with. `available` is often still empty on the first render
-  // while permissions sync, so seeding from available[0] used to leave it on
-  // whichever report happened to be first in the file.
-  const [key, setKey] = useState('hisaab');
-  const [preset, setPreset] = useState('month');
-  const [custom, setCustom] = useState<[string, string]>(range('month'));
-  const report = REPORTS.find((r) => r.key === key) ?? available[0];
-  const [from, to] = preset === 'custom' ? custom : range(preset);
-  const { data, isLoading } = useQuery<Record<string, unknown>>(report?.sql ?? 'SELECT 1 WHERE 0', report?.dated || report?.sql.includes('?2') ? [from, to] : []);
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} ${formatINR(value)}`}
+      style={({ pressed }) => [
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.sm,
+          paddingHorizontal: space.lg,
+          paddingVertical: 11,
+          backgroundColor: pressed ? t.surfaceAlt : 'transparent',
+        },
+      ]}>
+      <View style={{ flex: 1, gap: 1 }}>
+        <Text variant={tone === 'rule' ? 'heading' : 'rowTitle'}>{label}</Text>
+        <Text variant="small" color="textFaint">
+          {hint}
+        </Text>
+      </View>
+      <Text variant="number" mono color={minus ? 'textMuted' : 'text'}>
+        {minus ? '− ' : ''}
+        {formatINR(value)}
+      </Text>
+      <Text style={{ color: t.textFaint, fontSize: 18, marginLeft: 2 }}>›</Text>
+    </Pressable>
+  );
+}
 
-  const totals = useMemo(() => {
-    const out: Record<string, number> = {};
-    if (report?.noTotals) return out;
-    for (const c of report?.cols ?? []) if (c.money || c.num) out[c.key] = (data ?? []).reduce((a, r) => a + (Number(r[c.key]) || 0), 0);
-    return out;
-  }, [data, report]);
+export default function HisabScreen() {
+  const { can } = useSession();
+  const t = useTheme();
 
-  function exportCsv() {
-    if (!report || !data?.length) return;
-    const csv = toCsv(data.map((r) => Object.fromEntries(report.cols.map((c) => [c.label, r[c.key]]))));
-    if (Platform.OS === 'web') {
-      const a = document.createElement('a');
-      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-      a.download = `autogrid-${report.key}-${from}-${to}.csv`;
-      a.click();
-    } else notify('CSV export web par milta hai. Phone par screen se hi aankde bhej do.');
+  const [preset, setPreset] = useState<Preset>('mahina');
+  const [custom, setCustom] = useState<[string, string]>(presetRange('mahina'));
+  const [open, setOpen] = useState<FigureKey | null>(null);
+
+  const [from, to] = preset === 'custom' ? custom : presetRange(preset);
+
+  // Hooks rule: every useQuery lives above every early return, including the
+  // permission guard below. A hook after a conditional return blanks the whole
+  // screen at runtime and tsc will not catch it.
+  const { data: rows } = useQuery<Record<string, number>>(SUMMARY, [from, to]);
+  const listKey: ListKey | null = open && open !== 'munafa' ? open : null;
+  const { data: detail } = useQuery<DetailRow>(
+    listKey ? DETAIL[listKey].sql : NO_ROWS,
+    listKey ? [from, to] : []
+  );
+
+  const s = rows?.[0];
+  const sale = s?.sale ?? 0;
+  const cogs = s?.cogs ?? 0;
+  const kharcha = s?.kharcha ?? 0;
+  const damage = s?.damage ?? 0;
+  const gross = sale - cogs;
+  // Sab kharcha aur maal ki cost nikalne ke baad kitna bacha. Same line as Home.
+  const munafa = gross - kharcha - damage;
+
+  if (!can('reports.view')) {
+    return (
+      <Screen>
+        <View>
+          <Text variant="display">Hisab</Text>
+        </View>
+        <Empty title="Ye sirf owner dekh sakta hai" hint="Munafa ka hisaab maalik ke liye hai. Apne kaam ke liye Ghar ya Stock kholo." />
+      </Screen>
+    );
   }
 
-  async function exportPdf() {
-    if (!report) return;
-    try {
-      const html = reportHtml({
-        shopName: shop.company?.trade_name || shop.company?.legal_name || shop.wa.shopName || 'AutoLoom',
-        shopLine: shop.company?.trade_name ? shop.company.legal_name : null,
-        title: report.title,
-        from: report.dated ? from : undefined,
-        to: report.dated ? to : undefined,
-        cols: report.cols.map((c) => ({ key: c.key, label: c.label, num: c.num, money: c.money })),
-        rows: (data ?? []) as Record<string, unknown>[],
-        totals: report.noTotals ? undefined : totals,
-      });
-      await shareInvoiceHtml(html, `${report.title} ${from} ${to}`);
-    } catch (e) {
-      notify(String((e as Error).message ?? e));
-    }
-  }
-
-  if (!report) return <Screen><Empty title="Aapke role ke liye koi hisaab nahi hai" /></Screen>;
-  const groups = [...new Set(available.map((r) => r.group))];
+  const listRows = detail ?? [];
+  const listTotal = listRows.reduce((a, r) => a + (Number(r.amount) || 0), 0);
+  const headline =
+    open === 'sale' ? sale
+    : open === 'cogs' ? cogs
+    : open === 'gross' ? gross
+    : open === 'kharcha' ? kharcha
+    : open === 'damage' ? damage
+    : munafa;
 
   return (
     <Screen>
-      <Text variant="display">Hisaab-kitab</Text>
-      {groups.map((g) => (
-        <View key={g} style={{ gap: 4 }}>
-          <Text variant="label" color="textMuted">{g}</Text>
-          <Row gap={space.xs} wrap>{available.filter((r) => r.group === g).map((r) => <Chip key={r.key} label={r.title} selected={key === r.key} onPress={() => setKey(r.key)} />)}</Row>
-        </View>
-      ))}
-      {report.dated ? (
-        <>
-          <Row gap={space.xs} wrap>
-            {[['today', 'Aaj'], ['yesterday', 'Kal'], ['week', 'Is hafte'], ['last_week', 'Pichhle hafte'], ['month', 'Is mahine'], ['last_month', 'Pichhle mahine'], ['30', '30 din'], ['90', '90 din'], ['fy', 'Is saal (FY)'], ['custom', 'Apni date']].map(([k, l]) => <Chip key={k} label={l} selected={preset === k} onPress={() => setPreset(k)} />)}
-          </Row>
-          {preset === 'custom' ? <Row gap={12}><Input containerStyle={{ flex: 1 }} label="Se" value={custom[0]} onChangeText={(v) => setCustom([v, custom[1]])} /><Input containerStyle={{ flex: 1 }} label="Tak" value={custom[1]} onChangeText={(v) => setCustom([custom[0], v])} /></Row> : null}
-        </>
-      ) : null}
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="title">{report.title}</Text>
-        <Row gap={8}><Text variant="small" color="textMuted">{(data ?? []).length} rows</Text><Button title="PDF" size="sm" onPress={exportPdf} disabled={!data?.length} /><Button title="CSV" size="sm" tone="secondary" onPress={exportCsv} disabled={!data?.length} /></Row>
+      <View>
+        <Text variant="display">Hisab</Text>
+        <Text variant="small" color="textMuted">
+          Kitna bika, kitna kharcha hua, aur kitna bacha.
+        </Text>
+      </View>
+
+      <Row gap={space.xs} wrap>
+        {PRESETS.map(([k, label]) => (
+          <Chip
+            key={k}
+            label={label}
+            selected={preset === k}
+            onPress={() => {
+              // Switching into Custom seeds the boxes with what is on screen,
+              // so the figures never jump to a blank range mid-thought.
+              if (k === 'custom') setCustom([from, to]);
+              setPreset(k);
+            }}
+          />
+        ))}
       </Row>
-      <Card style={{ padding: 0 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator>
-          <View style={{ minWidth: '100%' }}>
-            <Row gap={0} style={{ paddingHorizontal: 8, paddingVertical: 8, backgroundColor: t.surfaceAlt }}>
-              {report.cols.map((c) => <Text key={c.key} variant="label" color="textMuted" style={{ width: c.width ?? 110, textAlign: c.money || c.num ? 'right' : 'left', paddingHorizontal: 6 }}>{c.label}</Text>)}
-            </Row>
-            {isLoading ? <Text style={{ padding: 12 }} color="textMuted">Running…</Text> : null}
-            {(data ?? []).slice(0, 500).map((r, i) => (
-              <React.Fragment key={i}>
-                <Row gap={0} style={{ paddingHorizontal: 8, paddingVertical: 6 }}>
-                  {report.cols.map((c) => <Text key={c.key} variant="small" mono={c.money || c.num} style={{ width: c.width ?? 110, textAlign: c.money || c.num ? 'right' : 'left', paddingHorizontal: 6 }} numberOfLines={1}>{r[c.key] == null ? '' : c.money ? formatINR(Number(r[c.key]) || 0) : String(r[c.key])}</Text>)}
-                </Row>
-                <Divider />
-              </React.Fragment>
-            ))}
-            {(data ?? []).length && !report.noTotals ? (
-              <Row gap={0} style={{ paddingHorizontal: 8, paddingVertical: 8, backgroundColor: t.surfaceAlt }}>
-                {report.cols.map((c, i) => <Text key={c.key} variant="small" mono style={{ width: c.width ?? 110, textAlign: 'right', paddingHorizontal: 6, fontWeight: '700' }}>{i === 0 ? 'Total' : c.money ? formatINR(totals[c.key] ?? 0) : c.num && c.key !== 'margin_pct' && c.key !== 'rate' ? String(Math.round(totals[c.key] ?? 0)) : ''}</Text>)}
-              </Row>
-            ) : !isLoading ? <Empty title="Is waqt ka koi record nahi" /> : null}
-          </View>
-        </ScrollView>
+
+      {preset === 'custom' ? (
+        <Row gap={space.md}>
+          <Input containerStyle={{ flex: 1 }} label="Se" value={custom[0]} onChangeText={(v) => setCustom([v, custom[1]])} placeholder="2026-09-01" autoCapitalize="none" />
+          <Input containerStyle={{ flex: 1 }} label="Tak" value={custom[1]} onChangeText={(v) => setCustom([custom[0], v])} placeholder="2026-09-30" autoCapitalize="none" />
+        </Row>
+      ) : null}
+
+      <Text variant="small" color="textFaint">
+        {from === to ? pretty(from) : `${pretty(from)} se ${pretty(to)} tak`}
+        {s?.bills ? ` · ${Math.round(s.bills)} bill` : ''}
+      </Text>
+
+      <Card keyline style={{ padding: 0, gap: 0, paddingVertical: space.sm }}>
+        <Line label="Sale" hint="Posted bill ka total" value={sale} onPress={() => setOpen('sale')} />
+        <Line label="Maal Ki Cost" hint="Jo maal bika, uski cost" value={cogs} minus onPress={() => setOpen('cogs')} />
+
+        <Divider style={{ marginVertical: 4 }} />
+        <Line label="Gross Profit" hint="Sale minus maal ki cost" value={gross} tone="rule" onPress={() => setOpen('gross')} />
+        <Divider style={{ marginVertical: 4 }} />
+
+        <Line label="Business Kharcha" hint="Rent, bijli, diesel, chai" value={kharcha} minus onPress={() => setOpen('kharcha')} />
+        <Line label="Kharab / Loss" hint="Toota-phoota maal ki cost" value={damage} minus onPress={() => setOpen('damage')} />
+
+        <Divider style={{ marginTop: 4 }} />
+
+        {/* The reason the screen exists — so it gets the one hero figure. */}
+        <Pressable
+          onPress={() => setOpen('munafa')}
+          accessibilityRole="button"
+          accessibilityLabel={`Munafa ${formatINR(munafa)}`}
+          style={({ pressed }) => [
+            { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm, gap: 2, backgroundColor: pressed ? t.surfaceAlt : 'transparent' },
+          ]}>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Text variant="label" color="textMuted">
+              Munafa
+            </Text>
+            <Text variant="small" color="textFaint">
+              kya gina, kya nahi ›
+            </Text>
+          </Row>
+          <Text variant="hero" mono color={munafa < 0 ? 'danger' : 'text'}>
+            {formatINR(munafa)}
+          </Text>
+          <Text variant="small" color="textMuted">
+            {munafa < 0 ? 'Is period mein nuksan hua.' : 'Maal ki cost aur saara kharcha nikaal ke.'}
+          </Text>
+        </Pressable>
       </Card>
-      {(data ?? []).length > 500 ? <Text variant="small" color="textFaint">Pehli 500 row dikha rahe hain — poora chahiye to CSV export karo.</Text> : null}
+
+      <Text variant="small" color="textFaint">
+        Maal kharidna kharcha nahi hai — wo cost tab banta hai jab maal bikta hai. Kisi bhi figure par tap karo, peeche ki entries khul jayengi.
+      </Text>
+
+      {/* --------------------------------------------------------------- */}
+
+      <Sheet
+        open={open !== null}
+        onClose={() => setOpen(null)}
+        title={open === 'munafa' ? 'Munafa kaise nikla' : open ? DETAIL[open].title : undefined}
+        hint={open === 'munafa' ? 'Har figure kyun gina gaya, aur kya jaan-boojh ke nahi gina.' : open ? DETAIL[open].hint : undefined}>
+        {open === 'munafa' ? (
+          <View style={{ gap: space.sm }}>
+            <Card tone="alt" style={{ gap: 6 }}>
+              <KVLine k="Sale" v={sale} />
+              <KVLine k="− Maal Ki Cost" v={cogs} />
+              <Divider />
+              <KVLine k="= Gross Profit" v={gross} />
+              <KVLine k="− Business Kharcha" v={kharcha} />
+              <KVLine k="− Kharab / Loss" v={damage} />
+              <Divider />
+              <KVLine k="= MUNAFA" v={munafa} strong />
+            </Card>
+
+            <SectionTitle>Ye jaan-boojh ke nahi gina</SectionTitle>
+            <Card tone="alt" style={{ gap: space.sm }}>
+              <Note
+                k="Maal kharidna"
+                v="Purchase kharcha nahi hai — cash gaya, maal aaya. Wahi maal jab bikta hai tab “Maal Ki Cost” ban jata hai. Dono ginenge to ek hi maal do baar kata jayega."
+              />
+              <Note
+                k="Supplier ko diya paisa"
+                v="Wo purani udhaar chukana hai, naya kharcha nahi. Us maal ki cost pehle hi gin chuke hain."
+              />
+              <Note
+                k="Grahak se aaya paisa"
+                v="Bikri us din gini gayi jis din bill bana. Paisa baad mein aaye to wo sirf paisa ghoomna hai, munafa nahi."
+              />
+              <Note
+                k="Partner ka apna nikala paisa"
+                v="Ghar ka kharcha dukaan ka kharcha nahi hai. Jo entry “personal” mark hai wo Business Kharcha mein nahi aati — wo partner ke khate mein jaati hai."
+              />
+            </Card>
+          </View>
+        ) : (
+          <View style={{ gap: space.sm }}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Text variant="label" color="textMuted">
+                Kul
+              </Text>
+              <Text variant="number" mono>
+                {formatINR(headline)}
+              </Text>
+            </Row>
+
+            {listRows.length === 0 ? (
+              <Empty title="Is period mein koi entry nahi" />
+            ) : (
+              <>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator>
+                  {listRows.map((r, i) => (
+                    <ListRow
+                      key={`${r.id}-${i}`}
+                      title={r.title}
+                      subtitle={listKey ? DETAIL[listKey].sub(r) : undefined}
+                      chevron={false}
+                      right={
+                        <Text variant="mono" mono color={r.amount < 0 ? 'danger' : 'text'}>
+                          {formatINR(r.amount)}
+                        </Text>
+                      }
+                    />
+                  ))}
+                </ScrollView>
+                {listRows.length >= 200 ? (
+                  <Text variant="small" color="textFaint">
+                    Pehli 200 entry dikh rahi hain. Chhota range chuno.
+                  </Text>
+                ) : Math.abs(listTotal - headline) > 1 ? (
+                  // Only the Gross Profit list can land here: it matches each
+                  // bill to its own movements rather than to the date window.
+                  <Text variant="small" color="textFaint">
+                    Upar wala figure hi asli hai — neeche har bill apni cost ke saath dikh raha hai, aur kuch cost dusre din stamp hui thi.
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        )}
+      </Sheet>
     </Screen>
+  );
+}
+
+/** One line of the munafa arithmetic, money right-aligned. */
+function KVLine({ k, v, strong }: { k: string; v: number; strong?: boolean }) {
+  return (
+    <Row style={{ justifyContent: 'space-between' }}>
+      <Text variant={strong ? 'heading' : 'body'} color={strong ? 'text' : 'textMuted'}>
+        {k}
+      </Text>
+      <Text variant={strong ? 'number' : 'mono'} mono color={strong && v < 0 ? 'danger' : 'text'}>
+        {formatINR(v)}
+      </Text>
+    </Row>
+  );
+}
+
+/** "Ye kyun nahi gina" — heading and one plain-language reason. */
+function Note({ k, v }: { k: string; v: string }) {
+  return (
+    <View style={{ gap: 2 }}>
+      <Text variant="rowTitle">{k}</Text>
+      <Text variant="small" color="textMuted">
+        {v}
+      </Text>
+    </View>
   );
 }

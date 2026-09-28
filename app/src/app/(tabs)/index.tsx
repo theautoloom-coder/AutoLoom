@@ -23,32 +23,17 @@ import { formatINR, formatINRShort, toDateString } from '@domain';
 import { DASHBOARD_TODAY, TODAY_FEED } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { Card, Empty, Grid, IconBadge, ListRow, Row, Screen, SectionTitle, StatTile, Text } from '@/ui';
+import { clockOf, KIND } from '@/ui/kinds';
 import { useCountUp } from '@/ui/motion';
 import { space } from '@/ui/theme';
 
 type Feed = { kind: string; id: string; at: string; who: string; amount: number | null; qty: number | null };
-
-/** What each kind of entry is called, and what it looks like. */
-const KIND: Record<string, { label: string; icon: string; accent: string; sign: '+' | '−' | '' }> = {
-  sale: { label: 'Maal gaya', icon: 'arrow-up-circle-outline', accent: 'blue', sign: '' },
-  purchase: { label: 'Maal aaya', icon: 'arrow-down-circle-outline', accent: 'green', sign: '' },
-  expense: { label: 'Kharcha', icon: 'wallet-outline', accent: 'amber', sign: '−' },
-  payment: { label: 'Payment', icon: 'cash-outline', accent: 'teal', sign: '' },
-  damage: { label: 'Kharab maal', icon: 'alert-circle-outline', accent: 'rose', sign: '' },
-  adjust: { label: 'Stock sudhar', icon: 'swap-vertical-outline', accent: 'violet', sign: '' },
-};
 
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Subah bakhair';
   if (h < 17) return 'Namaste';
   return 'Shubh sandhya';
-}
-
-function clockOf(at: string): string {
-  const d = new Date(at);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
 }
 
 export default function HomeScreen() {

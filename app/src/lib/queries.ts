@@ -299,7 +299,11 @@ export const DASHBOARD_TODAY = {
       -- Sale movements are negative, hence the sign flip.
       (SELECT COALESCE(SUM(-qty * unit_cost),0) FROM stock_movements WHERE movement_type='sale' AND date(occurred_at) = ?1) AS cogs_today,
       (SELECT COALESCE(SUM(-qty * unit_cost),0) FROM stock_movements WHERE movement_type='damage' AND date(occurred_at) = ?1) AS damage_today,
-      (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date = ?1) AS spent_today,
+      -- A partner taking money for themselves is money leaving the business
+      -- but it is NOT a business expense. Hisab filters it out; without the
+      -- same clause here, Home's kharcha and munafa would disagree with Hisab
+      -- on exactly the days somebody made a withdrawal.
+      (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date = ?1 AND COALESCE(is_personal,0) = 0) AS spent_today,
       (SELECT COUNT(*) FROM product_variants pv JOIN products p ON p.id = pv.product_id
         WHERE pv.is_active = 1 AND p.is_active = 1
           AND COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id),0)
@@ -427,5 +431,5 @@ export const TODAY_FEED = {
              COALESCE(a.notes, a.reason), NULL,
              (SELECT COALESCE(SUM(qty_delta),0) FROM stock_adjustment_lines WHERE adjustment_id = a.id)
         FROM stock_adjustments a WHERE a.status='posted' AND a.doc_date = ?1
-    ) ORDER BY at DESC LIMIT 40`,
+    ) feed ORDER BY at DESC LIMIT 40`,
 };

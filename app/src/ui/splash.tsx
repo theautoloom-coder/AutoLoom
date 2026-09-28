@@ -23,8 +23,14 @@ const LOUVRES = 6;
 const MARK = 132;
 /** The glow sits well outside the mark so its falloff never shows an edge. */
 const GLOW = Math.round(MARK * 2.4);
-/** 120 delay + staggered louvres + wordmark + hold + lift-off. */
-const TOTAL_MS = 120 + 64 * (LOUVRES - 1) + 520 + 480 + 420 + 340;
+/**
+ * 80 delay + staggered louvres + wordmark + a short hold + lift-off.
+ *
+ * Deliberately about 1.2s, not the 2.2s this used to run. A splash is charming
+ * the first time and a toll every time after, and a counter phone opens this
+ * app dozens of times a day. The beats are unchanged; only the waiting is.
+ */
+const TOTAL_MS = 80 + 42 * (LOUVRES - 1) + 300 + 220 + 160 + 240;
 
 export function AnimatedSplash({ onDone }: { onDone: () => void }) {
   const { width } = useWindowDimensions();
@@ -50,28 +56,28 @@ export function AnimatedSplash({ onDone }: { onDone: () => void }) {
     };
 
     const open = Animated.stagger(
-      64,
+      42,
       louvres.map((v) =>
-        Animated.timing(v, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+        Animated.timing(v, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true })
       )
     );
     Animated.sequence([
-      Animated.delay(120),
+      Animated.delay(80),
       Animated.parallel([
         open,
-        Animated.timing(glow, { toValue: 1, duration: 620, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 1, duration: 380, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(word, { toValue: 1, duration: 360, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(word, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }),
         Animated.sequence([
-          Animated.delay(140),
-          Animated.timing(tag, { toValue: 1, duration: 340, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.delay(90),
+          Animated.timing(tag, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
         ]),
       ]),
-      Animated.delay(420),
+      Animated.delay(160),
       Animated.parallel([
-        Animated.timing(sheet, { toValue: 0, duration: 340, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-        Animated.timing(lift, { toValue: 1, duration: 340, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(sheet, { toValue: 0, duration: 240, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(lift, { toValue: 1, duration: 240, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       ]),
     ]).start();
 

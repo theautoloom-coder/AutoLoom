@@ -200,14 +200,25 @@ export default function InvoiceEdit() {
   if (doc.status !== 'draft') { router.replace(`/invoice/${doc.id}`); return null; }
   const isCN = doc.doc_type === 'credit_note';
   const showCost = can('catalog.view_cost');
+
+  // The cost of the maal on this bill, from each variant's moving average —
+  // the same figure posting is about to stamp on the stock movement, so the
+  // profit shown here is the profit Hisab will report later.
+  const costOfGoods = (lines ?? []).reduce((a, l) => a + l.qty * (l.avg_cost || 0), 0);
+  const billProfit = totals.totals.grand_total - costOfGoods;
   const sourceLabel: Record<string, string> = { last: 'last price', customer: 'special price', price_list: 'list price', dealer: 'dealer price', wholesale: 'wholesale price', retail: 'admin price', manual: 'typed' };
 
   return (
     <>
-      <Stack.Screen options={{ title: isCN ? 'Return' : 'New bill' }} />
+      <Stack.Screen options={{ title: isCN ? 'Wapasi' : 'Maal Gaya' }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }} align="flex-start">
-          <Text variant="display">{isCN ? 'Return / credit' : gst ? 'Naya invoice' : 'Naya bill'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text variant="display">{isCN ? 'Wapasi' : 'Maal Gaya'}</Text>
+            <Text variant="small" color="textMuted">
+              {isCN ? 'Jo maal wapas aaya, yahan likhein.' : 'Jab maal bike ya godown se bahar jaye, yahan entry karein.'}
+            </Text>
+          </View>
           <Text variant="mono" color="textFaint">{statusLabel(doc.status)}</Text>
         </Row>
         {isCN && original?.[0] ? <Text variant="small" color="textMuted">Against {original[0].doc_no}. Reduce quantities to what came back and mark faulty items so they stay out of sellable stock.</Text> : null}
@@ -215,7 +226,6 @@ export default function InvoiceEdit() {
         <FormSection title="Grahak">
           <SelectField label="Grahak" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${c.customer_type}${c.balance ? ` · ${formatINR(c.balance)} pending` : ''}` }))} onChange={chooseCustomer} onCreate={() => router.push('/customer/edit')} />
           {customer ? <CreditBlock customer={customer} credit={credit} gst={gst} interstate={interstate} /> : null}
-          {customer && (vehicles ?? []).length ? <SelectField label="Gaadi (zaroori nahi)" value={doc.customer_vehicle_id} options={(vehicles ?? []).map((v) => ({ value: v.id, label: v.registration_no, sublabel: v.model_name ?? undefined }))} onChange={(v) => patch({ customer_vehicle_id: v })} allowClear /> : null}
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} />
             <View style={{ flex: 1 }}><SelectField label="Maal kahan se" value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} /></View>
@@ -278,6 +288,22 @@ export default function InvoiceEdit() {
           {gst ? (<><KV k="Taxable" v={formatINR(totals.totals.taxable_total)} mono />{interstate ? <KV k="IGST" v={formatINR(totals.totals.igst_total)} mono /> : <><KV k="CGST" v={formatINR(totals.totals.cgst_total)} mono /><KV k="SGST" v={formatINR(totals.totals.sgst_total)} mono /></>}</>) : null}
           {doc.other_charges ? <KV k="Aur kharcha" v={formatINR(doc.other_charges)} mono /> : null}
           {totals.totals.round_off ? <KV k="Round off" v={formatINR(totals.totals.round_off, { paise: true })} mono /> : null}
+          {/* What this bill is actually worth to the shop.
+              Selling is grand_total — the same basis Hisab sums, so a day's
+              bills and the day's Hisab can never disagree. Cost is each line's
+              qty times the variant's moving average, which is what posting
+              will stamp on the stock movement a moment from now. */}
+          {!isCN && showCost && costOfGoods > 0 ? (
+            <View style={{ gap: 2, paddingTop: space.xs }}>
+              <KV k="Maal ki cost" v={formatINR(costOfGoods)} mono />
+              <KV k="Bechne ka" v={formatINR(totals.totals.grand_total)} mono />
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Text variant="label" color="textMuted">Is bill par munafa</Text>
+                <Text mono color={billProfit < 0 ? 'danger' : 'ok'}>{formatINR(billProfit)}</Text>
+              </Row>
+            </View>
+          ) : null}
+
           <View style={{ borderTopWidth: 1.5, borderTopColor: t.keyline, paddingTop: space.md, marginTop: space.xs }}>
             <Row style={{ justifyContent: 'space-between' }} align="center">
               <Text variant="title">{isCN ? 'Credit' : 'Total'}</Text>

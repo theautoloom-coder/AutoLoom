@@ -12,12 +12,14 @@ import { formatINR } from '@domain';
 
 import { SEARCH_VARIANTS, tokenize } from '@/lib/queries';
 import { Badge, Button, Divider, Empty, IconButton, Input, ListRow, Row, Text, useTheme } from './index';
+import { ItemPhoto } from './photo';
 import { radius, shadow, space } from './theme';
 
 export type PickedVariant = {
   id: string; sku: string; barcode: string | null; variant_name: string; product_id: string; product_name: string; brand_name: string | null; family_name: string | null;
   retail_price: number; dealer_price: number | null; wholesale_price: number | null; mrp: number | null; avg_cost: number; last_purchase_cost: number; qty: number;
   hsn_code?: string | null; tax_rate_pct?: number | null; unit_code?: string | null; min_selling_price?: number | null;
+  photo_path?: string | null;
 };
 
 const PICK_SQL = (tokens: string[]) => {
@@ -85,6 +87,7 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
           {(hits ?? []).map((h) => (
             <ListRow
               key={h.id}
+              left={<ItemPhoto path={h.photo_path} name={h.product_name} size={40} />}
               title={`${h.product_name} · ${h.variant_name}`}
               subtitle={
                 <Row gap={space.xs} wrap>

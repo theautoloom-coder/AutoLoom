@@ -28,10 +28,11 @@ import {
 } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
-import { insertRow } from '@/lib/writes';
+import { insertRow, updateRow } from '@/lib/writes';
 import { NumberField, notify } from '@/ui/forms';
 import { Badge, Button, Card, Chip, Divider, Empty, Input, KV, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
 import { space } from '@/ui/theme';
+import { PhotoPicker } from '@/ui/photo';
 
 type Product = {
   id: string; name: string; description: string | null; hsn_code: string | null; is_universal_fit: number;
@@ -121,6 +122,13 @@ export default function ProductScreen() {
   const showPrice = can('sale.create') || showCost;
   const totalQty = (locStock ?? []).reduce((a, l) => a + l.qty, 0);
 
+  // The photo for whichever variant is selected, and the plumbing to set it.
+  const { data: photoRows } = useQuery<{ id: string; storage_path: string }>(
+    'SELECT id, storage_path FROM product_images WHERE variant_id = ? ORDER BY sort_order LIMIT 1',
+    [variant?.id ?? '']
+  );
+  const photo = photoRows?.[0] ?? null;
+
   if (!product) {
     return (
       <Screen>
@@ -129,12 +137,33 @@ export default function ProductScreen() {
     );
   }
 
+  async function setPhoto(storagePath: string | null) {
+    if (!variant) return;
+    if (storagePath) {
+      if (photo) await updateRow(db, 'product_images', photo.id, { storage_path: storagePath });
+      else await insertRow(db, 'product_images', {
+        product_id: product.id, variant_id: variant.id, storage_path: storagePath, sort_order: 0,
+      }, actor);
+    } else if (photo) {
+      await db.execute('DELETE FROM product_images WHERE id = ?', [photo.id]);
+    }
+  }
+
   return (
     <>
       <Stack.Screen options={{ title: product.name }} />
       <Screen>
         <View>
-          <Row gap={space.xs} wrap>
+          {/* What the thing actually looks like — the reason someone opened
+              this page instead of trusting the SKU. */}
+          <PhotoPicker
+            variantId={variant?.id}
+            path={photo?.storage_path}
+            name={product.name}
+            onChange={setPhoto}
+            canEdit={can('catalog.edit')}
+          />
+          <Row gap={space.xs} wrap style={{ marginTop: space.md }}>
             {product.family_name ? <Badge tone="accent">{product.family_name}</Badge> : null}
             {product.brand_name ? <Badge>{product.brand_name}</Badge> : null}
             {product.is_universal_fit ? <Badge tone="info">Sab gaadi mein lagta hai</Badge> : null}

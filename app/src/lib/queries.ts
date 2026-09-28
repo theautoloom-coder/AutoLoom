@@ -31,7 +31,9 @@ export const SEARCH_VARIANTS = (tokens: string[], limit = 40) => {
              pv.mrp, pv.min_stock, pv.reorder_level, pv.avg_cost, pv.last_purchase_cost,
              p.id AS product_id, p.name AS product_name, p.is_universal_fit,
              b.name AS brand_name, f.name AS family_name, f.code AS family_code,
-             COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id), 0) AS qty
+             COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id), 0) AS qty,
+             (SELECT pi.storage_path FROM product_images pi
+               WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
       FROM product_variants pv
       JOIN products p ON p.id = pv.product_id
       LEFT JOIN brands b ON b.id = p.brand_id

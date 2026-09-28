@@ -25,8 +25,10 @@ import {
   type ChangeRequest, type ItemProposal,
 } from '@/lib/requests';
 import { insertRow, searchText, updateRow } from '@/lib/writes';
+import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
 import { Button, Input, Row, Screen, Text } from '@/ui';
 import { Disclosure, FormSection, NumberField, SelectField, notify } from '@/ui/forms';
+import { PhotoPicker } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
 type Family = { id: string; name: string; sku_prefix: string };
@@ -123,6 +125,16 @@ export default function ItemForm() {
     }
   }
 
+  // The photo already on this item, if any.
+  const { data: photoRows } = useQuery<{ id: string; storage_path: string }>(
+    'SELECT id, storage_path FROM product_images WHERE variant_id = ? ORDER BY sort_order LIMIT 1',
+    [existing?.variant_id ?? '']
+  );
+  const photo = photoRows?.[0] ?? null;
+  // A brand new item has no variant to attach a photo to, so one chosen now
+  // waits here and is uploaded once the save has minted the ids.
+  const [pendingPhoto, setPendingPhoto] = useState<PickedPhoto | null>(null);
+
   const { data: skuRows } = useQuery<{ sku: string }>('SELECT sku FROM product_variants');
   const takenSkus = useMemo(() => new Set((skuRows ?? []).map((r) => r.sku)), [skuRows]);
 
@@ -175,6 +187,19 @@ export default function ItemForm() {
     };
   }
 
+  /** Attach or detach the photo row for an item that already exists. */
+  async function setPhoto(storagePath: string | null) {
+    if (!existing) return;
+    if (storagePath) {
+      if (photo) await updateRow(db, 'product_images', photo.id, { storage_path: storagePath });
+      else await insertRow(db, 'product_images', {
+        product_id: existing.id, variant_id: existing.variant_id, storage_path: storagePath, sort_order: 0,
+      }, actor);
+    } else if (photo) {
+      await db.execute('DELETE FROM product_images WHERE id = ?', [photo.id]);
+    }
+  }
+
   async function save() {
     const proposal = buildProposal();
     const bad = validateProposal(proposal);
@@ -220,11 +245,26 @@ export default function ItemForm() {
       } else {
         // The same function an approval runs, so a hand-typed item and an
         // approved one are the same rows.
-        await db.writeTransaction(async (tx) => {
-          await applyItemProposal(tx, proposal, {
+        const made = await db.writeTransaction(async (tx) =>
+          applyItemProposal(tx, proposal, {
             actor, locationId, takenSkus, skuPrefix: fam?.sku_prefix,
-          });
-        });
+          })
+        );
+
+        // The photo could not be uploaded earlier because the item did not
+        // exist yet. Do it now — and if it fails, the item is still saved:
+        // losing the item because the network dropped would be far worse.
+        if (pendingPhoto) {
+          try {
+            const stored = await uploadPhoto(pendingPhoto, made.variantId);
+            await insertRow(db, 'product_images', {
+              product_id: made.productId, variant_id: made.variantId,
+              storage_path: stored, sort_order: 0,
+            }, actor);
+          } catch (e) {
+            notify(`Item ban gaya, par photo nahi chadhi: ${String((e as Error).message ?? e)}. Item kholke dobara lagao.`);
+          }
+        }
       }
       router.replace((back as never) ?? ('/admin/products' as never));
     } catch (e) {
@@ -248,6 +288,17 @@ export default function ItemForm() {
         {/* Naam, kitna aaya, kya rate — teen cheezein. Baaki sab neeche
             folded hai, kyunki das mein se ek item par hi zaroori hoti hai. */}
         <FormSection title="Maal" hint="Naam, qty aur rate — bas itna kaafi hai.">
+          {/* Forty kinds of black mat look identical in a list. The photo is
+              how the counter tells them apart. */}
+          <PhotoPicker
+            variantId={existing?.variant_id}
+            path={photo?.storage_path}
+            localUri={pendingPhoto?.uri}
+            name={name || 'Item'}
+            onChange={setPhoto}
+            onPickLocal={setPendingPhoto}
+            canEdit={canEdit}
+          />
           <SelectField
             label="Category"
             value={familyId}

@@ -8,11 +8,12 @@ import { formatINRShort, stockStatus } from '@domain';
 import { LOW_STOCK, SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { Badge, Button, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
 type LowRow = { id: string; sku: string; variant_name: string; product_name: string; family_name: string | null; qty: number; min_stock: number; reorder_level: number; reorder_qty: number };
 type LocRow = { id: string; code: string; name: string; type: string; value: number; units: number };
-type VariantHit = { id: string; sku: string; variant_name: string; product_id: string; product_name: string; family_name: string | null; qty: number; min_stock: number; reorder_level: number };
+type VariantHit = { id: string; sku: string; variant_name: string; product_id: string; product_name: string; family_name: string | null; qty: number; min_stock: number; reorder_level: number; photo_path: string | null };
 
 export default function StockScreen() {
   const router = useRouter();
@@ -26,6 +27,20 @@ export default function StockScreen() {
 
   const { data: low } = useQuery<LowRow>(LOW_STOCK(200).sql);
   const { data: locations } = useQuery<LocRow>(STOCK_VALUE_BY_LOCATION.sql);
+  // Stock that went below zero: something was billed from a place it had never
+  // arrived. Billing on zero is allowed on purpose — an offline phone cannot
+  // know the latest count — but the shop has to be told afterwards, or the
+  // difference quietly becomes the truth. Either a receipt was never entered
+  // or a bill is wrong; both need a person.
+  const { data: negative } = useQuery<{ id: string; sku: string; variant_name: string; product_name: string; location: string; qty: number; photo_path: string | null }>(
+    `SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, l.name AS location, s.qty,
+            (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
+       FROM stock_on_hand s
+       JOIN locations l ON l.id = s.location_id
+       JOIN product_variants pv ON pv.id = s.variant_id
+       JOIN products p ON p.id = pv.product_id
+      WHERE s.qty < 0 ORDER BY s.qty`);
+
   const { data: faulty } = useQuery<{ id: string; sku: string; variant_name: string; product_name: string; qty: number }>(
     `SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, s.qty FROM stock_on_hand s JOIN locations l ON l.id = s.location_id AND l.type = 'damaged'
      JOIN product_variants pv ON pv.id = s.variant_id JOIN products p ON p.id = pv.product_id WHERE s.qty > 0 ORDER BY s.qty DESC`);
@@ -62,6 +77,7 @@ export default function StockScreen() {
               return (
                 <ListRow
                   key={v.id}
+                  left={<ItemPhoto path={v.photo_path} name={v.product_name} size={40} />}
                   title={`${v.product_name} · ${v.variant_name}`}
                   subtitle={v.sku}
                   onPress={() => router.push(`/product/${v.product_id}?variant=${v.id}`)}
@@ -104,6 +120,27 @@ export default function StockScreen() {
             {can('purchase.create') || can('reports.view') ? <ListRow title="Kya mangwana hai" subtitle="Bikri dekh kar batata hai kya mangwana hai" onPress={() => router.push('/reorder')} /> : null}
             {can('jobcard.edit') ? <ListRow title="Job card" subtitle="Gaadi ka kaam — parts + labour" onPress={() => router.push('/job-cards')} /> : null}
           </Card>
+
+          {(negative ?? []).length > 0 ? (
+            <>
+              <SectionTitle right={<Badge tone="danger">{(negative ?? []).length}</Badge>}>Gadbad — stock minus mein hai</SectionTitle>
+              <Card style={{ gap: 0, paddingVertical: 4 }}>
+                {(negative ?? []).map((n) => (
+                  <ListRow
+                    key={`${n.id}-${n.location}`}
+                    left={<ItemPhoto path={n.photo_path} name={n.product_name} size={40} />}
+                    title={`${n.product_name} · ${n.variant_name}`}
+                    subtitle={`${n.sku} · ${n.location} — becha gaya par yahan aaya nahi`}
+                    onPress={() => router.push(`/stock/ledger/${n.id}`)}
+                    right={<Text mono color="danger">{n.qty}</Text>}
+                  />
+                ))}
+              </Card>
+              <Text variant="small" color="textFaint">
+                Ya to maal aane ki entry reh gayi, ya koi bill galat hai. “Maal aaya” se chadha do, ya bill dekh lo.
+              </Text>
+            </>
+          ) : null}
 
           <SectionTitle right={<Badge tone={(faulty ?? []).length ? 'danger' : 'ok'}>{(faulty ?? []).reduce((a, f) => a + f.qty, 0)} pcs</Badge>}>Kharab / damaged maal</SectionTitle>
           <Card style={{ gap: 0, paddingVertical: 4 }}>

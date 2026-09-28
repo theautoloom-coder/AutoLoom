@@ -97,7 +97,7 @@ export async function applyItemProposal(
     takenSkus: Set<string>;
     skuPrefix?: string | null;
   },
-): Promise<string> {
+): Promise<{ productId: string; variantId: string }> {
   const { actor, locationId, takenSkus } = opts;
 
   // A proposal may name a category that does not exist yet. Creating it here
@@ -174,7 +174,7 @@ export async function applyItemProposal(
     }, actor);
   }
 
-  return productId;
+  return { productId, variantId };
 }
 
 /** Staff sends a proposal up for review. */
@@ -250,7 +250,7 @@ export async function approveRequest(
   if (bad) throw new Error(bad);
 
   return db.writeTransaction(async (tx) => {
-    const productId = await applyItemProposal(tx, p, {
+    const { productId } = await applyItemProposal(tx, p, {
       actor: opts.actor,
       // The stock lands where the submitter said it was, not where the admin
       // happens to be standing.

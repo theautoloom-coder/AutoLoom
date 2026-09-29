@@ -136,7 +136,10 @@ export function PhotoPicker({
       <ItemPhoto path={path} localUri={localUri} name={name} size={96} />
       {canEdit ? (
         <View style={{ flex: 1, gap: space.sm }}>
-          <Row gap={space.sm}>
+          {/* wrap, because at 412dp the 96px thumbnail plus both buttons is two
+              pixels too wide and "Gallery se" hung off the right edge of the
+              screen on Maal Aaya and on the new-item form. */}
+          <Row gap={space.sm} wrap>
             <Button title="Photo kheencho" size="sm" onPress={() => take('camera')} loading={busy} />
             <Button title="Gallery se" tone="secondary" size="sm" onPress={() => take('library')} />
           </Row>

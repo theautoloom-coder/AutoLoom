@@ -18,7 +18,7 @@ export function SelectField({
   value,
   options,
   onChange,
-  placeholder = 'Choose…',
+  placeholder = 'Chuno…',
   allowClear,
   error,
   hint,
@@ -75,7 +75,7 @@ export function SelectField({
         <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
           <View style={[styles.sheet, { maxWidth: 640 }]}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <Text variant="title">{label ?? 'Choose'}</Text>
+              <Text variant="title">{label ?? 'Chuno'}</Text>
               <Button title="Band karo" tone="ghost" size="sm" onPress={() => setOpen(false)} />
             </Row>
             <Input value={q} onChangeText={setQ} placeholder="Type to filter" autoFocus autoCapitalize="none" autoCorrect={false} />
@@ -174,7 +174,7 @@ export function MultiSelectField({
       ) : null}
       <Pressable onPress={() => setOpen(true)} style={[styles.field, { backgroundColor: t.surface, borderColor: t.border, minHeight: 46 }]}>
         <Text style={{ flex: 1 }} color={chosen.length ? 'text' : 'textFaint'}>
-          {chosen.length ? chosen.map((c) => c.label).join(', ') : 'Choose…'}
+          {chosen.length ? chosen.map((c) => c.label).join(', ') : 'Chuno…'}
         </Text>
         <Text color="textFaint">▾</Text>
       </Pressable>
@@ -187,7 +187,7 @@ export function MultiSelectField({
         <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
           <View style={[styles.sheet, { maxWidth: 640 }]}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <Text variant="title">{label ?? 'Choose'}</Text>
+              <Text variant="title">{label ?? 'Chuno'}</Text>
               <Button title="Ho gaya" size="sm" onPress={() => setOpen(false)} />
             </Row>
             <Input value={q} onChangeText={setQ} placeholder="Type to filter" autoCapitalize="none" autoCorrect={false} />

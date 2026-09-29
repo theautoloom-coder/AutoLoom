@@ -35,7 +35,7 @@ function needsFloorCheck(l: { rate: number; list_price: number | null; price_sou
 }
 
 const MODES = [
-  { value: 'cash', label: 'Cash' }, { value: 'upi', label: 'Online / UPI' }, { value: 'credit', label: 'Udhaar (pay later)' },
+  { value: 'cash', label: 'Cash' }, { value: 'upi', label: 'Online / UPI' }, { value: 'credit', label: 'Udhaar' },
   { value: 'card', label: 'Card' }, { value: 'bank', label: 'Bank' }, { value: 'mixed', label: 'Kuch abhi, kuch baad mein' },
 ];
 
@@ -226,7 +226,7 @@ export default function InvoiceEdit() {
         {isCN && original?.[0] ? <Text variant="small" color="textMuted">Bill {original[0].doc_no} ke against. Qty utni hi rakho jitna maal sach mein wapas aaya. Jo toota ya kharab hai use "Kharab / toota hua" mark karo — wo bechne wale stock mein wapas nahi jayega.</Text> : null}
 
         <FormSection title="Grahak">
-          <SelectField label="Grahak" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${c.customer_type}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={() => router.push('/customer/edit')} />
+          <SelectField label="Kaun le raha hai" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${c.customer_type}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={() => router.push('/customer/edit')} />
           {customer ? <CreditBlock customer={customer} credit={credit} gst={gst} interstate={interstate} /> : null}
           <Row gap={12}>
             {/* Already today's date — the draft was created with it. The job

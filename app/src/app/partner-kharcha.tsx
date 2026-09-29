@@ -37,7 +37,7 @@ import { Disclosure, SelectField, confirm, notify } from '@/ui/forms';
 import { ItemPhoto, PhotoPicker } from '@/ui/photo';
 import { radius, space, type as type_ } from '@/ui/theme';
 
-const CATEGORIES = ['Transport', 'Petrol', 'Rent', 'Bijli', 'Loading', 'Packing', 'Repair', 'Chai/Pani', 'Other'];
+const CATEGORIES = ['Transport', 'Petrol', 'Rent', 'Bijli', 'Loading', 'Packing', 'Repair', 'Chai/Pani', 'Aur kuch'];
 
 /** 'bank' is what the column's check constraint calls "Online". */
 const METHODS = [
@@ -159,7 +159,7 @@ export default function PartnerKharchaScreen() {
   }, [rows]);
 
   const amount = Number(amountText.replace(/[^0-9.]/g, '')) || 0;
-  const typedCategory = category === 'Other' ? otherCategory.trim() : category;
+  const typedCategory = category === 'Aur kuch' ? otherCategory.trim() : category;
   // A withdrawal has no natural category, so it gets one rather than demanding
   // a tap for a field that does not mean anything on that side of the choice.
   const finalCategory = typedCategory || (isPersonal ? 'Personal nikala' : '');
@@ -310,7 +310,7 @@ export default function PartnerKharchaScreen() {
                 <Chip key={c} label={c} selected={category === c} onPress={() => setCategory(category === c ? '' : c)} />
               ))}
             </Row>
-            {category === 'Other' ? (
+            {category === 'Aur kuch' ? (
               <Input
                 value={otherCategory}
                 onChangeText={setOtherCategory}

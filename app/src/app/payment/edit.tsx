@@ -23,7 +23,7 @@ import { space } from '@/ui/theme';
 
 type Party = { id: string; name: string; mobile: string | null; balance: number };
 type OpenDoc = { id: string; doc_no: string; doc_date: string; outstanding: number; due_date: string | null };
-const MODES = [{ value: 'cash', label: 'Cash' }, { value: 'upi', label: 'Online / UPI' }, { value: 'bank', label: 'Bank transfer' }, { value: 'cheque', label: 'Cheque' }, { value: 'card', label: 'Card' }, { value: 'adjustment', label: 'Adjustment' }];
+const MODES = [{ value: 'cash', label: 'Cash' }, { value: 'upi', label: 'Online / UPI' }, { value: 'bank', label: 'Bank' }, { value: 'cheque', label: 'Cheque' }, { value: 'card', label: 'Card' }, { value: 'adjustment', label: 'Hisaab se kaat liya' }];
 
 export default function PaymentEdit() {
   const { direction: dirParam, party: partyParam, doc, amount: amountParam } = useLocalSearchParams<{ direction?: 'in' | 'out'; party?: string; doc?: string; amount?: string }>();
@@ -80,7 +80,7 @@ export default function PaymentEdit() {
 
   async function save() {
     if (!partyId) { notify(`Choose the ${isIn ? 'customer' : 'supplier'}.`); return; }
-    if (!amount || amount <= 0) { notify('Amount daalo.'); return; }
+    if (!amount || amount <= 0) { notify('Kitna paisa? Amount daalo.'); return; }
     if (useManual) {
       for (const [id, amt] of Object.entries(manual)) {
         const d = openDocs?.find((x) => x.id === id);
@@ -88,7 +88,12 @@ export default function PaymentEdit() {
       }
       if (manualTotal > amount + 0.005) { notify('Baant payment se zyada ho gaya.', 'danger'); return; }
     }
-    if (!(await confirm(isIn ? 'Mark payment received?' : 'Record payment?', `${formatINR(amount)} ${isIn ? 'from' : 'to'} ${party?.name} by ${MODES.find((m) => m.value === mode)?.label}.${unallocated > 0 ? ` ${formatINR(unallocated)} stays as advance.` : ''}`))) return;
+    const how = MODES.find((m) => m.value === mode)?.label;
+    const line = isIn
+      ? `${party?.name} se ${formatINR(amount)} ${how} mein aaya.`
+      : `${party?.name} ko ${formatINR(amount)} ${how} mein diya.`;
+    const extra = unallocated > 0 ? ` ${formatINR(unallocated)} advance mein rakh liya jaayega.` : '';
+    if (!(await confirm(isIn ? 'Paisa aaya, likh dein?' : 'Paisa diya, likh dein?', line + extra))) return;
     setBusy(true);
     try {
       let docNo = '';
@@ -123,7 +128,7 @@ export default function PaymentEdit() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isIn ? 'Mark payment' : 'Supplier ko paisa do' }} />
+      <Stack.Screen options={{ title: isIn ? 'Paisa aaya' : 'Supplier ko paisa do' }} />
       <Screen>
         <Text variant="display">{isIn ? 'Payment aaya' : 'Supplier ko paisa do'}</Text>
         <FormSection title={isIn ? 'From' : 'To'}>
@@ -137,7 +142,7 @@ export default function PaymentEdit() {
           <Row gap={space.xs} wrap>{MODES.map((m) => <Chip key={m.value} label={m.label} selected={mode === m.value} onPress={() => setMode(m.value)} />)}</Row>
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
-            <Input containerStyle={{ flex: 1 }} label={mode === 'cheque' ? 'Cheque no.' : mode === 'upi' ? 'UPI ref / UTR' : 'Reference'} value={ref} onChangeText={setRef} autoCapitalize="characters" />
+            <Input containerStyle={{ flex: 1 }} label={mode === 'cheque' ? 'Cheque no.' : mode === 'upi' ? 'UPI ref / UTR' : 'Ref number'} value={ref} onChangeText={setRef} autoCapitalize="characters" />
           </Row>
           <Input label="Remarks · kis account mein aaya / kisne liya" value={remarks} onChangeText={setRemarks} placeholder="Rakesh ji ke HDFC me · Ramesh ne cash liya" />
           {(accounts ?? []).length ? <Row gap={space.xs} wrap>{(accounts ?? []).map((a) => <Chip key={a.remarks} label={a.remarks} selected={remarks === a.remarks} onPress={() => setRemarks(a.remarks)} />)}</Row> : null}

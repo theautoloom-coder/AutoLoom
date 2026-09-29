@@ -51,10 +51,10 @@ import { space } from '@/ui/theme';
 const REASONS = [
   { key: 'kharab', label: 'Kharab', code: 'damage' },
   { key: 'reject', label: 'Reject', code: 'damage' },
-  { key: 'missing', label: 'Missing', code: 'missing' },
+  { key: 'missing', label: 'Nahi mila', code: 'missing' },
   { key: 'toota', label: 'Toot Gaya', code: 'damage' },
-  { key: 'count', label: 'Count Difference', code: 'counting_error' },
-  { key: 'other', label: 'Other', code: 'other' },
+  { key: 'count', label: 'Ginti ka farak', code: 'counting_error' },
+  { key: 'other', label: 'Aur kuch', code: 'other' },
 ] as const;
 
 type Line = { variantId: string; label: string; sku: string; qty: number; cost: number };

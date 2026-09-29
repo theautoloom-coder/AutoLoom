@@ -42,7 +42,7 @@ export default function SyncScreen() {
 
       <Card>
         <KV k="Net" v={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Juda hua' : 'Offline'}</Badge>} />
-        <KV k="Kaun logged in hai" v={session?.user.email ?? '—'} />
+        <KV k="Kaun chala raha hai" v={session?.user.email ?? '—'} />
         <KV k="Aakhri sync" v={status.lastSyncedAt ? status.lastSyncedAt.toLocaleString('en-IN') : 'Kabhi nahi'} />
         <KV k="Aa raha hai" v={status.dataFlowStatus.downloading ? 'Haan' : 'Nahi'} />
         <KV k="Ja raha hai" v={status.dataFlowStatus.uploading ? 'Haan' : 'Nahi'} />
@@ -63,7 +63,7 @@ export default function SyncScreen() {
       <SectionTitle>Sync kaise chalta hai</SectionTitle>
       <Card tone="alt">
         <Text variant="small" color="textMuted">
-          Har screen isi phone ke database se padhti aur likhti hai, isliye signal na ho tab bhi app chalti hai. Har badlav ruk kar rakha jaata hai aur net aate hi chala jaata hai. Post hua document, uska stock aur uska khata — teeno saath jaate hain, isliye server ko kabhi aadha bill nahi milta.
+          Har screen isi phone ke database se padhti aur likhti hai, isliye signal na ho tab bhi app chalti hai. Har badlav ruk kar rakha jaata hai aur net aate hi chala jaata hai. Pakka hua bill, uska stock aur uska khata — teeno saath jaate hain, isliye server ko kabhi aadha bill nahi milta.
         </Text>
       </Card>
 

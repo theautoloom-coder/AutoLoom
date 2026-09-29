@@ -187,7 +187,7 @@ function Sidebar() {
             Sync
           </Text>
           <Badge tone={!status.connected ? 'warn' : status.dataFlowStatus.uploading ? 'info' : 'ok'} dot>
-            {!status.connected ? 'Offline' : status.dataFlowStatus.uploading ? 'Syncing' : 'Synced'}
+            {!status.connected ? 'Offline' : status.dataFlowStatus.uploading ? 'Bhej raha hai' : 'Sab bhej diya'}
           </Badge>
         </Pressable>
 

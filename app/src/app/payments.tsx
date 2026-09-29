@@ -41,7 +41,7 @@ export default function PaymentsScreen() {
         </Row>
       </Row>
       <Row gap={space.xs}>
-        {(['all', 'in', 'out'] as const).map((d) => <Chip key={d} label={d === 'all' ? 'All' : d === 'in' ? 'Received' : 'Paid'} selected={dir === d} onPress={() => setDir(d)} />)}
+        {(['all', 'in', 'out'] as const).map((d) => <Chip key={d} label={d === 'all' ? 'Sab' : d === 'in' ? 'Aaya' : 'Diya'} selected={dir === d} onPress={() => setDir(d)} />)}
       </Row>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {(rows ?? []).map((p) => (

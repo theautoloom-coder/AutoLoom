@@ -31,14 +31,17 @@ const SCREENS = [
 // Words that stay English on purpose: trade vocabulary, statutory terms,
 // units, and proper nouns — plus the few English verbs this shop actually
 // says out loud. "Save karo" and "bill post karo" are what a Noida counter
-// says; translating them produces worse Hinglish, not better, and the point
-// of this scan is how it reads to the shopkeeper, not how pure it is.
+// says; so are advance, balance, packing, loading, opening, pending and
+// payment — every one of those is what the shop itself calls the thing.
+// Translating them produces worse Hinglish, not better, and the point of this
+// scan is how it reads to the shopkeeper, not how pure it is.
 const KEEP = new Set(`a about admin all and app apple autoloom bank batch bill bills brand
 cash cgst chrome code counter csv customer customers damaged dealer delivery discount draft
 email export fitting for gst gstin hsn id ifsc igst import in invoice item items job
 label led location locations margin mat mats mm mrp no note number of offline ok on online
 owner pack paid pan pcs pdf per phone pin pm am proof qr qty rate reset retail return returns
 role sale sales save post scan screenshot seat sgst share shop sku stock sub subtotal supply supplier
+advance balance packing loading opening pending payment adjustment transfer
 suppliers sync tax taxable template total transport type unit units upi upload uploads
 value van vs warehouse warranty whatsapp workshop www com http https new the to`.split(/\s+/));
 

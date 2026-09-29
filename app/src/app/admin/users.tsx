@@ -46,7 +46,7 @@ export default function UsersScreen() {
   const [draft, setDraft] = useState(emptyDraft);
 
   async function addStaff() {
-    if (draft.roles.length === 0) { notify('Kam se kam ek role choose karo.'); return; }
+    if (draft.roles.length === 0) { notify('Kam se kam ek role chuno.'); return; }
     setCreating(true);
     // The Edge Function takes one role — the primary — because that is what
     // profiles.role is. The rest are added here afterwards; the server trigger

@@ -35,7 +35,7 @@ import { ItemPhoto, PhotoPicker } from '@/ui/photo';
 import { space, type as type_ } from '@/ui/theme';
 
 /** What this shop actually spends on, in rough order of frequency. */
-const CATEGORIES = ['Transport', 'Petrol', 'Rent', 'Bijli', 'Loading', 'Packing', 'Repair', 'Chai/Pani', 'Other'];
+const CATEGORIES = ['Transport', 'Petrol', 'Rent', 'Bijli', 'Loading', 'Packing', 'Repair', 'Chai/Pani', 'Aur kuch'];
 
 /**
  * Three ways money goes out, in the shop's words. `mode` on the row keeps the
@@ -120,7 +120,7 @@ export default function KharchaScreen() {
   }, [shown]);
 
   const amount = Number(amountText.replace(/[^0-9.]/g, '')) || 0;
-  const finalCategory = category === 'Other' ? otherCategory.trim() : category;
+  const finalCategory = category === 'Aur kuch' ? otherCategory.trim() : category;
   const ready = amount > 0 && finalCategory.length > 0;
 
   function reset() {
@@ -225,7 +225,7 @@ export default function KharchaScreen() {
                     <Chip key={c} label={c} selected={category === c} onPress={() => setCategory(c)} />
                   ))}
                 </Row>
-                {category === 'Other' ? (
+                {category === 'Aur kuch' ? (
                   <Input
                     value={otherCategory}
                     onChangeText={setOtherCategory}

@@ -407,7 +407,7 @@ export default function HisabScreen() {
       </Text>
 
       <Card keyline style={{ padding: 0, gap: 0, paddingVertical: space.sm }}>
-        <Line label="Sale" hint="Posted bill ka total" value={sale} loading={isLoading} onPress={() => setOpen('sale')} />
+        <Line label="Sale" hint="Pakke bill ka total" value={sale} loading={isLoading} onPress={() => setOpen('sale')} />
         <Line label="Maal Ki Cost" hint="Jo maal bika, uski cost" value={cogs} minus loading={isLoading} onPress={() => setOpen('cogs')} />
 
         <Divider style={{ marginVertical: 4 }} />

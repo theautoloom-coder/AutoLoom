@@ -110,7 +110,10 @@ export default function PurchaseEdit() {
         if (ol && l.qty > ol.qty - ol.returned) { notify(`Cannot return ${l.qty} of ${l.description}: only ${ol.qty - ol.returned} left to return.`); return; }
       }
     }
-    const ok = await confirm(doc.doc_type === 'purchase' ? 'Post purchase?' : 'Post debit note?', `${formatINR(totals.totals.grand_total)} for ${supplier?.name}. Stock and the supplier ledger will be updated. This cannot be edited afterwards.`);
+    const ok = await confirm(
+      doc.doc_type === 'purchase' ? 'Purchase post kar dein?' : 'Debit note post kar dein?',
+      `${supplier?.name} ka ${formatINR(totals.totals.grand_total)}. Stock chadh jaayega aur supplier ke khate mein bhi lag jaayega. Uske baad ye bill badla nahi ja sakta.`
+    );
     if (!ok) return;
     setPosting(true);
     try {
@@ -127,7 +130,7 @@ export default function PurchaseEdit() {
 
   async function discard() {
     if (!id) return;
-    if (!(await confirm('Adhoora bill chhod dein?', 'The draft and its lines will be deleted.'))) return;
+    if (!(await confirm('Adhoora bill chhod dein?', 'Ye draft aur iski saari line mit jaayengi.'))) return;
     await db.writeTransaction(async (tx) => {
       await tx.execute('DELETE FROM purchase_lines WHERE purchase_id = ?', [id]);
       await deleteRow(tx, 'purchases', id);

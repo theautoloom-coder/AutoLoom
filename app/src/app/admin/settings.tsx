@@ -91,7 +91,7 @@ export default function SettingsScreen() {
     <Screen>
       <Text variant="display">Dukan settings</Text>
 
-      <FormSection title="WhatsApp & UPI" hint="Parchi aur yaad dilane wale message WhatsApp mein pehle se tayyar khulte hain — staff bas bhej deta hai. Message usi WhatsApp se jaata hai jo us phone par logged in hai (counter wale phone par aapka Business number).">
+      <FormSection title="WhatsApp & UPI" hint="Parchi aur yaad dilane wale message WhatsApp mein pehle se tayyar khulte hain — staff bas bhej deta hai. Message usi WhatsApp se jaata hai jo us phone par chalu hai (counter wale phone par aapka Business number).">
         <Input label="WhatsApp Business number" value={form.whatsapp_number ?? ''} onChangeText={(v) => set('whatsapp_number', v)} keyboardType="phone-pad" placeholder="98110 01100" editable={editable} hint="Parchi par chhapega taaki grahak jawab de sake." />
         <Row gap={12}>
           <Input containerStyle={{ flex: 1.3 }} label="UPI ID" value={form.upi_id ?? ''} onChangeText={(v) => set('upi_id', v)} autoCapitalize="none" placeholder="autoloom@upi" editable={editable} />
@@ -99,14 +99,14 @@ export default function SettingsScreen() {
         </Row>
         <Text variant="small" color="textFaint">Yaad dilane wale message mein UPI ID aur ek link jaata hai jisme baaki paisa pehle se bhara hota hai.</Text>
         <Row gap={8}>
-          {editable ? <Button title={dirty ? 'Save' : 'Saved'} onPress={save} disabled={!dirty} /> : null}
+          {editable ? <Button title={dirty ? 'Save karo' : 'Save ho gaya'} onPress={save} disabled={!dirty} /> : null}
           <Button title="Apne number par test message bhejo" tone="secondary" onPress={testWhatsApp} />
         </Row>
         {qrPreview ? (
           <Row gap={space.md} align="flex-start" style={{ marginTop: 4 }}>
             <Image source={{ uri: qrPreview }} style={{ width: 96, height: 96, borderRadius: radius.md }} />
             <View style={{ flex: 1, gap: 6 }}>
-              <Text variant="small" color="textMuted">Your payment QR — the same one reminders can share as an image attachment (WhatsApp text can&apos;t carry an image, so it&apos;s a separate tap on the Reminders screen). Print this and stick it at the counter too.</Text>
+              <Text variant="small" color="textMuted">Aapka payment QR — yahi “Yaad dilao” se photo ki tarah bheja jaata hai (WhatsApp ke message mein photo nahi jaati, isliye wahan uska alag button hai). Ise print karke counter par bhi chipka do.</Text>
               <Button title="Ye QR bhejo ya print karo" size="sm" tone="secondary" onPress={shareShopQr} />
             </View>
           </Row>
@@ -150,7 +150,7 @@ export default function SettingsScreen() {
         </Row>
         <SelectField label="State" value={form.state_code} options={INDIAN_STATES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))} onChange={(v) => { set('state_code', v ?? ''); set('state_name', INDIAN_STATES.find((s) => s.code === v)?.name ?? ''); }} />
         <Input label="Bill ke neeche ki line" value={form.invoice_footer ?? ''} onChangeText={(v) => set('invoice_footer', v)} editable={editable} placeholder="Har gaadi ka maal" />
-        <Input label="Terms (printed on bill)" value={form.invoice_terms ?? ''} onChangeText={(v) => set('invoice_terms', v)} editable={editable} multiline />
+        <Input label="Bill ke neeche kya chhape" value={form.invoice_terms ?? ''} onChangeText={(v) => set('invoice_terms', v)} editable={editable} multiline />
       </FormSection>
 
       <FormSection title="GST ki detail (tabhi jab bill par GST on ho)">
@@ -163,7 +163,7 @@ export default function SettingsScreen() {
         </Row>
         <SwitchRow label="Round bill total to the rupee" value={!!form.round_to_rupee} onChange={(v) => set('round_to_rupee', v ? 1 : 0)} />
       </FormSection>
-      {editable ? <Button title={dirty ? 'Save changes' : 'Saved'} onPress={save} disabled={!dirty} /> : null}
+      {editable ? <Button title={dirty ? 'Save karo' : 'Save ho gaya'} onPress={save} disabled={!dirty} /> : null}
     </Screen>
   );
 }

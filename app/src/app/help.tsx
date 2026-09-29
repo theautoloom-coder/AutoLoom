@@ -93,7 +93,7 @@ const TOPICS: Topic[] = [
     accent: 'rose',
     steps: [
       'Neeche laal “+” dabao, phir “Kharab Maal” chuno. (“Aur” tab → Godown mein bhi hai.)',
-      '“Kya hua?” mein se ek chuno — Kharab, Reject, Missing, Toot Gaya, Count Difference ya Other.',
+      '“Kya hua?” mein se ek chuno — Kharab, Reject, Nahi mila, Toot Gaya, Ginti ka farak ya Aur kuch.',
       'Maal scan karo ya naam likho.',
       '“Kitne kharab” bharo aur “Ek ka kharid rate” dekh lo.',
       'Photo aur note laga do, phir “Kharab likho” dabao.',

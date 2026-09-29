@@ -47,7 +47,7 @@ const REASONS = [
   { key: 'count', label: 'Count mistake', code: 'counting_error' },
   { key: 'kharab', label: 'Kharab', code: 'damage' },
   { key: 'missing', label: 'Missing', code: 'missing' },
-  { key: 'other', label: 'Other', code: 'other' },
+  { key: 'other', label: 'Aur kuch', code: 'other' },
 ] as const;
 
 type Row_ = { variantId: string; label: string; sku: string; cost: number; actual: string; reasonKey: string };

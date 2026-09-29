@@ -26,7 +26,7 @@ const REASONS = [
   { value: 'counting_error', label: 'Counting error' },
   { value: 'free_issue', label: 'Free / promotional issue', sublabel: 'Given away; removes stock' },
   { value: 'opening', label: 'Opening stock', sublabel: 'Go-live quantities' },
-  { value: 'other', label: 'Other' },
+  { value: 'other', label: 'Aur kuch' },
 ];
 
 export default function AdjustmentEdit() {

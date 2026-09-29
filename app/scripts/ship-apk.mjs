@@ -68,22 +68,43 @@ function currentBuild() {
   return buildId ? (list.find((b) => b.id === buildId) ?? null) : list[0];
 }
 
-console.log('▸ waiting for the build');
+// EAS's queue is not one you can predict: one build starts in seconds and the
+// next waits three quarters of an hour behind somebody else's. So this waits a
+// long time, prints only when the status actually changes rather than a wall of
+// identical lines, and says plainly which of the two things happened when it
+// gives up. It used to report "finished, but no artifact URL" after timing out
+// on a build that was still IN_QUEUE, which reads as a broken build rather than
+// a busy queue.
+const PATIENCE_MS = Number(process.env.APK_WAIT_MINUTES ?? 180) * 60 * 1000;
+console.log(`▸ waiting for the build (up to ${PATIENCE_MS / 60000} min)`);
+
+const started = Date.now();
 let build;
-for (let i = 0; i < 90; i++) {
+let last = '';
+let status = 'UNKNOWN';
+while (Date.now() - started < PATIENCE_MS) {
   build = currentBuild();
-  const status = build?.status ?? 'UNKNOWN';
+  status = build?.status ?? 'UNKNOWN';
   if (status === 'FINISHED') break;
   if (['ERRORED', 'CANCELED'].includes(status)) {
     console.error(`✗ build ${status.toLowerCase()} — ${build?.error?.message ?? 'see the EAS logs'}`);
     process.exit(1);
   }
-  process.stdout.write(`  ${status}… (${i * 30}s)\r`);
+  const mins = Math.round((Date.now() - started) / 60000);
+  if (status !== last) { console.log(`  ${status} (${mins} min)`); last = status; }
   await new Promise((r) => setTimeout(r, 30000));
 }
 
+if (status !== 'FINISHED') {
+  const mins = Math.round((Date.now() - started) / 60000);
+  console.error(`✗ gave up after ${mins} min — the build is still ${status}, not broken.`);
+  console.error('  It will finish on its own. Ship it then with:');
+  console.error(`    node scripts/ship-apk.mjs ${build?.id ?? '<build-id>'}`);
+  process.exit(1);
+}
+
 const url = build?.artifacts?.buildUrl ?? build?.artifacts?.applicationArchiveUrl;
-if (!url) { console.error('✗ finished, but no artifact URL'); process.exit(1); }
+if (!url) { console.error('✗ build finished but EAS listed no artifact — check the build page'); process.exit(1); }
 console.log(`\n▸ artifact ${url}`);
 
 console.log('▸ server is downloading it');

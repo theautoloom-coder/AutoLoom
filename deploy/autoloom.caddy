@@ -61,6 +61,17 @@ app.theautoloom.in {
         file_server
     }
 
+    # The printed manual, at a path somebody can say out loud. Served inline so
+    # it opens in the phone's browser instead of landing in Downloads, and
+    # no-cache so a rebuilt manual is not stuck behind Cloudflare for hours —
+    # the same trap the APK fell into.
+    handle /manual* {
+        root * /var/www/autoloom-manual
+        rewrite * /AutoLoom-Kaise-Chalayein.pdf
+        file_server
+        header Cache-Control "no-cache"
+    }
+
     # Everything else is the app. Single-page: an unknown path is a route, not
     # a missing file — without this every deep link 404s on refresh.
     handle {

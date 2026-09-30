@@ -28,7 +28,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useRef, useState } from 'react';
 import { View, type TextInput } from 'react-native';
 
-import { formatINR, toDateString } from '@domain';
+import { formatINR, isDateString, toDateString } from '@domain';
 
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
 import { postAdjustment } from '@/lib/posting';
@@ -130,6 +130,10 @@ export default function KharabLikho() {
 
   async function save() {
     if (usable.length === 0) { notify('Kam se kam ek maal daalo.', 'danger'); return; }
+    // A NOT NULL date column will not take "", and PowerSync discards the
+    // whole transaction server-side when it tries — silently, long after
+    // the screen said it saved. Catch it here, where the person can fix it.
+    if (!isDateString(date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
     if (!locationId) { notify('Location nahi mili. Admin se location set karwao.', 'danger'); return; }
 
     const ok = await confirm(

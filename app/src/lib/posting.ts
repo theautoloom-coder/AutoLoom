@@ -389,15 +389,29 @@ export async function postInvoice(tx: Transaction, invoiceId: string, actor: Act
   for (const [i, l] of lines.entries()) {
     const tl = taxed[i];
     const v = await one<{ avg_cost: number; family_code: string | null }>(tx, 'SELECT pv.avg_cost, f.code AS family_code FROM product_variants pv JOIN products p ON p.id = pv.product_id LEFT JOIN product_families f ON f.id = p.family_id WHERE pv.id = ?', [l.variant_id]);
+
+    // A return goes back at the cost it LEFT at, not today's.
+    //
+    // Both sides used to use the current moving average, so a bulb sold at
+    // ₹305 and returned after a restock at ₹900 came back into stock valued at
+    // ₹900 — the shop invented ₹595 of stock value out of a refund, and Hisab's
+    // "Maal Ki Cost" moved with it. The credit-note line carries
+    // against_line_id precisely so the original cost can be found; it simply
+    // was never read.
+    const original = !isInvoice && l.against_line_id
+      ? await one<{ unit_cost_at_sale: number }>(tx, 'SELECT unit_cost_at_sale FROM sales_invoice_lines WHERE id = ?', [l.against_line_id])
+      : null;
+    const unitCost = original?.unit_cost_at_sale ?? v?.avg_cost ?? 0;
+
     await updateRow(tx, 'sales_invoice_lines', l.id, {
-      taxable_value: tl.taxable_value, cgst: tl.cgst, sgst: tl.sgst, igst: tl.igst, line_total: tl.line_total, unit_cost_at_sale: v?.avg_cost ?? 0,
+      taxable_value: tl.taxable_value, cgst: tl.cgst, sgst: tl.sgst, igst: tl.igst, line_total: tl.line_total, unit_cost_at_sale: unitCost,
     });
     // Labour / services (family SRVC) are billed but never move stock.
     if (v?.family_code === 'SRVC') continue;
     const intoDamaged = !isInvoice && l.return_condition === 'damaged' && damaged?.id;
     await insertRow(tx, 'stock_movements', {
       variant_id: l.variant_id, location_id: intoDamaged ? damaged!.id : inv.location_id, qty: round(isInvoice ? -l.qty : l.qty, 3),
-      movement_type: isInvoice ? 'sale' : 'sale_return', ref_type: 'sales_invoice', ref_id: invoiceId, ref_line_id: l.id, unit_cost: v?.avg_cost ?? 0, occurred_at: now,
+      movement_type: isInvoice ? 'sale' : 'sale_return', ref_type: 'sales_invoice', ref_id: invoiceId, ref_line_id: l.id, unit_cost: unitCost, occurred_at: now,
       note: intoDamaged ? 'Returned damaged' : null,
     }, actor);
   }

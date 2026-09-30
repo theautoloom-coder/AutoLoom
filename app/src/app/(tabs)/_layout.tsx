@@ -210,6 +210,7 @@ export default function TabsLayout() {
   const t = useTheme();
   const wide = useIsWide();
   const items = useNavItems();
+  const here = usePathname();
 
   const tabs = (
     <Tabs
@@ -256,11 +257,15 @@ export default function TabsLayout() {
   );
 
   // The "+" floats over whichever tab is showing: every one of these screens
-  // is a place you might be standing when the next entry needs making.
+  // is a place you might be standing when the next entry needs making. Not on
+  // Aur, though — that is a menu of places to go, and a button offering to
+  // start an entry on top of it is one more thing to read past.
+  const showQuickAdd = !here.startsWith('/more');
+
   if (!wide) return (
     <View style={{ flex: 1 }}>
       {tabs}
-      <QuickAdd />
+      {showQuickAdd ? <QuickAdd /> : null}
     </View>
   );
 
@@ -273,7 +278,7 @@ export default function TabsLayout() {
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: t.bg }}>
       <Sidebar />
       <View style={{ flex: 1 }}>{tabs}</View>
-      <QuickAdd />
+      {showQuickAdd ? <QuickAdd /> : null}
     </View>
   );
 }

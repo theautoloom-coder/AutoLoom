@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments }
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
-import { Platform, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, Text as RNText, useColorScheme, View } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { ensureDailyPendingReminder } from '@/lib/daily-reminder';
@@ -22,6 +22,26 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 setupPwa();
 
 /** Sends signed-out users to the sign-in screen and signed-in users away from it. */
+/** The one control the stack header carries. See screenOptions for why. */
+function BackHome() {
+  const router = useRouter();
+  const t = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Peeche jao"
+      onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      style={(s) => [{
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        paddingVertical: 8, paddingRight: 14,
+        opacity: s.pressed ? 0.6 : 1,
+      }]}>
+      <RNText style={{ color: t.text, fontSize: 22, lineHeight: 24, marginTop: -2 }}>‹</RNText>
+      <RNText style={{ color: t.text, fontSize: 15, fontWeight: '600' }}>Peeche</RNText>
+    </Pressable>
+  );
+}
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { loading, session } = useSession();
   const segments = useSegments();
@@ -111,10 +131,19 @@ export default function RootLayout() {
                   headerTitleStyle: { fontWeight: '600' },
                   headerShadowVisible: false,
                   // Every screen already renders its own in-page heading, so the
-                  // native header stays as a slim bar for the back affordance
-                  // only — no redundant duplicate title text underneath it.
+                  // header carries no title — but with the title gone AND the
+                  // back arrow minimal, a screen opened without history showed
+                  // a 130px band of blank white and no way out at all. On the
+                  // web that is every screen reached by link or reload, which
+                  // is to say Kharcha Likho, Bill Banao and every other place
+                  // money is entered.
+                  //
+                  // So the header carries one thing, always: the way back. It
+                  // goes to the previous screen when there is one and to Ghar
+                  // when there is not, because a dead end is worse than a
+                  // slightly wrong destination.
                   headerTitle: () => null,
-                  headerBackButtonDisplayMode: 'minimal',
+                  headerLeft: () => <BackHome />,
                   contentStyle: { backgroundColor: p.bg },
                 }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

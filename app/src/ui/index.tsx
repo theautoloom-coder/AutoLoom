@@ -285,7 +285,12 @@ export function Card({
         elevated && shadow.xs,
         { backgroundColor: bg, borderColor: tone === 'navy' ? t.navy : t.border },
         keyline && { borderWidth: 1.5, borderColor: t.keyline, ...shadow.key },
-        spine && { borderLeftWidth: SPINE, borderLeftColor: spineColor, borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
+        // A spine INSIDE a keyline card drew a red bar that overshot the ink
+        // border's rounded corners at both ends, so the most important card on
+        // the screen looked like a rendering fault. They were never meant to
+        // stack: keyline says "this is the card", spine says "this row needs
+        // you". The card wins.
+        spine && !keyline && { borderLeftWidth: SPINE, borderLeftColor: spineColor, borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
         style,
       ]}>
       {body}
@@ -514,7 +519,13 @@ export const Input = React.forwardRef<TextInput, InputProps>(function Input(
             // Colour changes, width does not. Growing the border on focus moved
             // every field below it by half a pixel, and on a form that is being
             // tabbed through it made the whole page twitch.
-            borderColor: error ? t.danger : focused ? t.accent : t.border,
+            //
+            // Focus is INK, not red. Red was reading as a mistake: an
+            // autofocused field — the amount on Kharcha Likho, the search box
+            // — opened outlined in red with nothing wrong, and everyone in
+            // this shop has been taught that red means galti. Red on a field
+            // now means only one thing, which is that the field is wrong.
+            borderColor: error ? t.danger : focused ? t.keyline : t.border,
             borderWidth: 1,
           },
         ]}>
@@ -736,11 +747,13 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
   content: { flex: 1, width: '100%', alignSelf: 'center' },
   contentWide: { maxWidth: MAX_CONTENT },
-  // 96, not 32: the “+” floats over the bottom-right of every tab screen, and
-  // at 32 the last row of a long list sat underneath it — on Stock that is the
-  // qty, the one number the row exists for. Whitespace at the end of a scroll
-  // reads as deliberate; a number hidden under a red circle does not.
-  padded: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: 96, gap: space.md },
+  // 132, not 32. Two things float over the bottom of a tab screen — the nav
+  // bar and the "Nayi entry" pill — and between them they were eating the last
+  // row of every list: on Stock the qty, on Bill the grahak's name, on Ghar the
+  // oldest entry of the day. The pill grew wider when it got its label, so
+  // clearing its height was no longer enough. Whitespace at the end of a scroll
+  // reads as deliberate; a number hidden behind a red pill does not.
+  padded: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: 132, gap: space.md },
   // A full 1px border, not a hairline. On a 3x phone a hairline is a third of
   // a pixel and the card edge disappears; the panel then floats with nothing
   // holding it, which is what made the old screens look unfinished.

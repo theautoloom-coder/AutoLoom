@@ -39,8 +39,17 @@ export async function createStaff(input: NewStaff): Promise<string | null> {
     if (!res.ok) {
       // A 404 means the function was never deployed — say that plainly
       // instead of showing the raw platform error.
-      if (res.status === 404) return 'Staff function server par deploy nahi hai. Ek baar deploy karna padega.';
-      return body.error ?? `Nahi bana (${res.status}).`;
+      // 404 means it was never deployed; 503 means it is deployed but not
+      // running. Both are the same thing to the owner — the server half is not
+      // there — and neither is anything he did wrong. A bare "(503)" tells him
+      // nothing he can act on.
+      if (res.status === 404 || res.status === 503) {
+        return 'Staff banane wala server abhi chalu nahi hai. Ye ek baar setup karna padta hai — kisi tech wale se bolo.';
+      }
+      if (res.status === 401 || res.status === 403) {
+        return 'Aapke paas staff banane ka haq nahi hai. Sirf owner ya admin bana sakta hai.';
+      }
+      return body.error ?? `Staff nahi bana. Server ne ${res.status} bheja.`;
     }
     return null;
   } catch {

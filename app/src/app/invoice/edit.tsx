@@ -12,7 +12,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { checkCredit, checkPrice, formatINR, isInterstate, resolvePrice, statusLabel, toDateString } from '@domain';
+import { checkCredit, checkPrice, formatINR, isDateString, isInterstate, resolvePrice, statusLabel, toDateString } from '@domain';
 
 import { CUSTOMER_LAST_RATE, CUSTOMER_PRICE_CONTEXT } from '@/lib/queries';
 import { postInvoice, totalLines, type DraftLine } from '@/lib/posting';
@@ -72,12 +72,28 @@ export default function InvoiceEdit() {
 
   useEffect(() => {
     if (id || creating || !locationId) return;
+    // A wapasi has to wait for the bill it is against. This effect used to run
+    // on the first render, before the two useQuery calls had come back, so
+    // `original` and `originalLines` were both undefined: the credit note was
+    // created with no grahak and none of the sold lines copied across. Then it
+    // set creating = true and never ran again, and because a credit note
+    // deliberately has no item picker, there was no way to add a line by hand
+    // either. Every return was a dead end — MAAL · 0, total ₹0, button
+    // disabled — and each visit left another empty draft behind.
+    if (against && (original === undefined || originalLines === undefined)) return;
     setCreating(true);
     (async () => {
       const base = original?.[0];
       const newId = await insertRow(db, 'sales_invoices', {
         doc_type: against ? 'credit_note' : 'invoice', doc_date: toDateString(), customer_id: base?.customer_id ?? (customerParam || null), location_id: base?.location_id ?? locationId,
-        price_list_id: base?.price_list_id ?? null, is_interstate: base?.is_interstate ?? false, other_charges: 0, payment_mode: 'credit', credit_days: 0, status: 'draft',
+        price_list_id: base?.price_list_id ?? null, is_interstate: base?.is_interstate ?? false, other_charges: 0,
+        // Cash, not credit. Every new bill used to open on Udhaar, so a bill
+        // made by tapping straight through went into the grahak's khata as
+        // money owed — money the shop had actually taken in hand. The books
+        // then showed receivables that were never receivable, and the owner
+        // chased people who had already paid. A counter sale is cash until
+        // somebody says otherwise.
+        payment_mode: 'cash', credit_days: 0, status: 'draft',
         against_invoice_id: against || null, salesperson_id: profile?.id ?? null,
       }, actor);
       if (against && originalLines) {
@@ -142,6 +158,9 @@ export default function InvoiceEdit() {
   async function post() {
     if (!id || !doc) return;
     if (!doc.customer_id) { notify('Grahak chuno.'); return; }
+    // See isDateString: a blank date is discarded by the sync long after the
+    // screen has said the bill was made.
+    if (!isDateString(doc.doc_date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
     if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
     for (const l of lines ?? []) {
       if (l.qty <= 0) { notify(`${l.description}: qty zero se zyada honi chahiye.`); return; }

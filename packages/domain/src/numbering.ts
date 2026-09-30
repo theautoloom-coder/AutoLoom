@@ -49,6 +49,25 @@ export function dueDate(docDate: Date | string, creditDays: number): Date {
 }
 
 /** ISO date (YYYY-MM-DD) in local time, which is what date columns store. */
+/**
+ * Is this a date Postgres will accept?
+ *
+ * Every date on every form is a free-text box, and a `date NOT NULL` column
+ * will not take "". Blanking one and saving looked like it worked: the screen
+ * allocated a document number and moved on, and PowerSync then threw the whole
+ * transaction away server-side with `22007 invalid input syntax for type date`.
+ * The purchase, its lines and its stock movements all went with it, and the
+ * shopkeeper had no way to know — he had watched it succeed.
+ *
+ * So every save asks this first. A cheap check at the edge beats a silent loss
+ * at the far end of the sync.
+ */
+export function isDateString(value: string | null | undefined): boolean {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(d.getTime()) && toDateString(d) === value;
+}
+
 export function toDateString(date: Date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

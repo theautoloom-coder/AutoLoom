@@ -27,7 +27,7 @@ import { Stack, useRouter } from 'expo-router';
 import React, { useMemo, useRef, useState } from 'react';
 import { View, type TextInput } from 'react-native';
 
-import { formatINR, toDateString } from '@domain';
+import { formatINR, isDateString, toDateString } from '@domain';
 
 import { postAdjustment } from '@/lib/posting';
 import { useSession } from '@/lib/session';
@@ -118,6 +118,10 @@ export default function GintiKaro() {
     // Read the differences again at the moment of writing: the numbers the
     // confirm screen showed are only as fresh as the last render.
     if (changes.length === 0) { notify('Ab koi farak nahi bacha.', 'danger'); setStep('count'); return; }
+    // A NOT NULL date column will not take "", and PowerSync discards the
+    // whole transaction server-side when it tries — silently, long after
+    // the screen said it saved. Catch it here, where it can be fixed.
+    if (!isDateString(date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
     if (!locationId) { notify('Location nahi mili.', 'danger'); return; }
     if (!(await confirm('Ginti theek kar dein?', `${changes.length} item ka stock abhi badal jaayega. Yeh wapas nahi hota.`))) return;
 

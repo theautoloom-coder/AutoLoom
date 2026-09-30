@@ -74,9 +74,20 @@ export function parseProposal(req: Pick<ChangeRequest, 'payload'>): ItemProposal
 
 /** Everything a proposal must have before anyone's time is wasted on it. */
 export function validateProposal(p: ItemProposal): string | null {
-  if (!p.family_id && !p.family_name?.trim()) return 'Category choose karo ya nayi likho.';
+  if (!p.family_id && !p.family_name?.trim()) return 'Category chuno ya nayi likho.';
   if (!p.name.trim()) return 'Item ka naam likho.';
-  if (p.price == null || p.price <= 0) return 'Price daalo.';
+  if (p.price == null || p.price <= 0) return 'Bechne ka rate daalo.';
+  // Opening stock with no purchase rate books itself at zero cost, and every
+  // piece of it later sells as pure profit. It had already happened here: four
+  // 7D mat sets at ₹3,200 sitting at avg_cost 0, ₹12,800 of sale that would
+  // have read as ₹12,800 of munafa. Stock Chadhao has warned about this in its
+  // help text from the start; this screen let it through.
+  //
+  // The rate is only demanded when there is stock to cost. An item created
+  // with no opening qty can wait for its first purchase to set the cost.
+  if ((p.qty ?? 0) > 0 && (p.cost == null || p.cost <= 0)) {
+    return 'Opening stock daala hai to kharid rate bhi daalo — warna ye maal bikte waqt poora munafa dikhayega.';
+  }
   return null;
 }
 

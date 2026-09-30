@@ -65,7 +65,10 @@ export function QuickAdd() {
       icon: 'wallet-outline',
       accent: 'amber',
       href: '/expenses',
-      allowed: true,
+      // This file's own rule, broken in this one place: a counter hand with no
+      // permission was shown Kharcha Likho and then landed on a screen with no
+      // form on it. expense.record belongs to owner, admin and accounts only.
+      allowed: can('expense.record'),
     },
     {
       label: 'Kharab Likho',

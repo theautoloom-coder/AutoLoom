@@ -20,7 +20,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { formatINR, toDateString } from '@domain';
+import { formatINR, isDateString, toDateString } from '@domain';
 
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
@@ -104,6 +104,10 @@ export default function StockChadhao() {
     if (!supplierId) { notify('Supplier chuno — ya naam likh ke naya bana lo.', 'danger'); return; }
     if (usable.length === 0) { notify('Kam se kam ek item daalo.', 'danger'); return; }
     if (!locationId) { notify('Location nahi mili. Admin se location set karwao.', 'danger'); return; }
+    // A NOT NULL date column will not take "", and PowerSync discards the
+    // whole transaction server-side when it tries — silently, long after
+    // the screen said it saved. Catch it here, where the person can fix it.
+    if (!isDateString(date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
 
     setSaving(true);
     try {

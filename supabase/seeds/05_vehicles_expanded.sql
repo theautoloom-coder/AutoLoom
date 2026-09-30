@@ -516,3 +516,43 @@ on conflict (model_id, alias) do nothing;
 --   Chevrolet Forester, Daewoo Matiz, Premier Rio, Opel Astra/Corsa — all real
 --     Indian cars, all too rare now to be worth a guessed year range.
 -- =============================================================================
+
+-- =============================================================================
+-- TRIM — cars nobody buys accessories for any more.
+--
+-- The owner's rule, and he is right: parts for a dead car do not sell, and
+-- every one of them is a row somebody has to scroll past while a customer
+-- waits. The cutoff is 2015 — a car still on sale that year is at most about
+-- eleven years old today, which is still well inside the age where people buy
+-- mats, seat covers and bulbs.
+--
+-- It cuts both ways:
+--   * a MODEL goes if its newest generation ended before 2015 (Maruti 800,
+--     Zen, Esteem, Qualis, Ambassador, Lancer, Pajero, Getz, Palio);
+--   * a GENERATION goes if it ended before 2015 even when the model lives on,
+--     so Swift keeps 2011+ but loses 2005-2010.
+--
+-- What stays and might look old: Omni, Gypsy, Ritz, Indica, Beat, Datsun GO.
+-- All of them sold into 2017-2020 and all of them are still on Noida roads.
+--
+-- Deletes cascade to fitments, so run this before tagging products, not after.
+-- =============================================================================
+
+delete from public.vehicle_generations g
+ where coalesce(g.year_to, 9999) < 2015
+   and exists (
+     select 1 from public.vehicle_generations g2
+      where g2.model_id = g.model_id and coalesce(g2.year_to, 9999) >= 2015
+   );
+
+delete from public.vehicle_models vm
+ where not exists (
+   select 1 from public.vehicle_generations g
+    where g.model_id = vm.id and coalesce(g.year_to, 9999) >= 2015
+ );
+
+-- Hindustan Motors only ever had the Ambassador, which the trim above removed,
+-- so the make is now an empty heading in every picker. Any make left with no
+-- models goes the same way.
+delete from public.vehicle_makes mk
+ where not exists (select 1 from public.vehicle_models vm where vm.make_id = mk.id);

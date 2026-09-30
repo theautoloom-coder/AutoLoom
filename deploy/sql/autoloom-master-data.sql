@@ -1,17 +1,17 @@
 -- =============================================================================
 -- AutoLoom master data — vehicles and accessory specs, for PRODUCTION.
 --
--- Paste the whole file into the Supabase SQL editor and run it. It is safe to
--- run more than once: every insert is guarded, so a second run changes nothing.
+-- Paste the whole file into the Supabase SQL editor and run it. Safe to run
+-- more than once: every insert is guarded, so a second run changes nothing.
 --
--- It adds only master data — makes, models, generations, categories and the
--- spec options behind them. It does not touch a single stock, bill, customer
--- or payment row.
+-- Master data only — makes, models, generations, categories and the spec
+-- options behind them. It does not touch a stock, bill, customer or payment row.
 --
--- Built 2026-09-30 from:
---   supabase/seeds/00_seed_util.sql        (helper functions)
---   supabase/seeds/05_vehicles_expanded.sql
---   supabase/seeds/06_specs_expanded.sql
+-- Cars that stopped selling before 2015 are deliberately left out: their parts
+-- do not sell, and each one is a row somebody scrolls past while a customer
+-- waits. Omni, Gypsy, Ritz, Indica and Beat stay — they sold into 2017-2020.
+--
+-- Built 2026-09-30.
 -- =============================================================================
 
 -- =============================================================================
@@ -835,6 +835,46 @@ on conflict (model_id, alias) do nothing;
 --     Indian cars, all too rare now to be worth a guessed year range.
 -- =============================================================================
 
+-- =============================================================================
+-- TRIM — cars nobody buys accessories for any more.
+--
+-- The owner's rule, and he is right: parts for a dead car do not sell, and
+-- every one of them is a row somebody has to scroll past while a customer
+-- waits. The cutoff is 2015 — a car still on sale that year is at most about
+-- eleven years old today, which is still well inside the age where people buy
+-- mats, seat covers and bulbs.
+--
+-- It cuts both ways:
+--   * a MODEL goes if its newest generation ended before 2015 (Maruti 800,
+--     Zen, Esteem, Qualis, Ambassador, Lancer, Pajero, Getz, Palio);
+--   * a GENERATION goes if it ended before 2015 even when the model lives on,
+--     so Swift keeps 2011+ but loses 2005-2010.
+--
+-- What stays and might look old: Omni, Gypsy, Ritz, Indica, Beat, Datsun GO.
+-- All of them sold into 2017-2020 and all of them are still on Noida roads.
+--
+-- Deletes cascade to fitments, so run this before tagging products, not after.
+-- =============================================================================
+
+delete from public.vehicle_generations g
+ where coalesce(g.year_to, 9999) < 2015
+   and exists (
+     select 1 from public.vehicle_generations g2
+      where g2.model_id = g.model_id and coalesce(g2.year_to, 9999) >= 2015
+   );
+
+delete from public.vehicle_models vm
+ where not exists (
+   select 1 from public.vehicle_generations g
+    where g.model_id = vm.id and coalesce(g.year_to, 9999) >= 2015
+ );
+
+-- Hindustan Motors only ever had the Ambassador, which the trim above removed,
+-- so the make is now an empty heading in every picker. Any make left with no
+-- models goes the same way.
+delete from public.vehicle_makes mk
+ where not exists (select 1 from public.vehicle_models vm where vm.make_id = mk.id);
+
 
 -- =============================================================================
 -- SEED 06 — the spec options 02 left out.
@@ -1272,6 +1312,4 @@ delete from public.spec_options so
    and so.value in ('PVC Coil (Noodle)', 'Coil/Noodle ');
 
 
--- The helpers were only needed while loading. Dropping them leaves the database
--- with nothing but the data.
 drop schema if exists seed_util cascade;

@@ -269,16 +269,22 @@ describe('payments', () => {
 });
 
 describe('transfers, adjustments, audits', () => {
-  it('moves stock out on dispatch and in on receipt, and can be cancelled while in transit', async () => {
+  it('moves stock in one step and never loses any of it in between', async () => {
+    const before = stock(ID.h4, ID.main) + stock(ID.h4, ID.shop);
     const tid = await insertRow(asTx(db), 'stock_transfers', { doc_date: '2026-09-15', from_location_id: ID.main, to_location_id: ID.shop, status: 'draft' }, actor);
     await insertRow(asTx(db), 'stock_transfer_lines', { transfer_id: tid, variant_id: ID.h4, qty: 6, unit_cost: 0 });
     const no = await db.writeTransaction((tx) => dispatchTransfer(tx as unknown as Transaction, tid, actor));
     expect(no).toBe('TRF/26-27/0001');
     expect(stock(ID.h4, ID.main)).toBe(14);
-    expect(stock(ID.h4, ID.shop)).toBe(0);
-    await db.writeTransaction((tx) => receiveTransfer(tx as unknown as Transaction, tid, actor));
     expect(stock(ID.h4, ID.shop)).toBe(6);
+
+    // The point of the change. Both legs used to be split across a dispatch
+    // and a separate receive, and between them the stock was in no location at
+    // all — this sum dropped by 6 and no screen said where it had gone.
+    expect(stock(ID.h4, ID.main) + stock(ID.h4, ID.shop)).toBe(before);
+
     expect(one<{ status: string }>(db, 'SELECT status FROM stock_transfers WHERE id = ?', tid).status).toBe('received');
+    // Nothing is left to receive, so receiving again is refused.
     await expect(db.writeTransaction((tx) => receiveTransfer(tx as unknown as Transaction, tid, actor))).rejects.toThrow();
   });
 

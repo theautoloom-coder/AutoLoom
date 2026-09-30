@@ -57,7 +57,7 @@ export default function TransferEdit() {
     if (doc.from_location_id === doc.to_location_id) { notify('Kahan se aur kahan tak alag hone chahiye.'); return; }
     if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
     const short = (lines ?? []).filter((l) => l.qty > l.here);
-    if (short.length && !(await confirm('Kuch line mein wahan ke stock se zyada qty hai', `${short.map((l) => l.description).join(', ')}. Dispatch anyway? Stock will go negative at the source until corrected.`))) return;
+    if (short.length && !(await confirm('Kuch line mein wahan ke stock se zyada qty hai', `${short.map((l) => l.description).join(', ')}. Phir bhi bhejein? Jahan se ja raha hai wahan stock minus mein chala jayega, jab tak theek na karo.`))) return;
     if (!(await confirm('Transfer bhej dein?', 'Stock leaves the source location now and will be in transit until received.'))) return;
     setBusy(true);
     try {
@@ -78,7 +78,7 @@ export default function TransferEdit() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'New transfer' }} />
+      <Stack.Screen options={{ title: 'Maal doosri jagah bhejo' }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}><Text variant="display">Transfer</Text><Badge>draft</Badge></Row>
         <FormSection title="Kahan se kahan">
@@ -94,9 +94,9 @@ export default function TransferEdit() {
         <SectionTitle>Maal · {(lines ?? []).length}</SectionTitle>
         <Card><VariantPicker onPick={addLine} locationId={doc.from_location_id} autoFocus={false} /></Card>
         {(lines ?? []).map((l) => (
-          <LineCard key={l.id} title={l.description} subtitle={`${l.sku} · ${l.here} at source`} onRemove={() => deleteRow(db, 'stock_transfer_lines', l.id)}>
+          <LineCard key={l.id} title={l.description} subtitle={`${l.sku} · wahan ${l.here} pade hain`} onRemove={() => deleteRow(db, 'stock_transfer_lines', l.id)}>
             <Row gap={12}>
-              <View style={{ flex: 1 }}><NumberField label="Qty" value={l.qty} onChange={(v) => updateRow(db, 'stock_transfer_lines', l.id, { qty: v ?? 0 })} decimals={3} error={l.qty > l.here ? `Only ${l.here} here` : null} /></View>
+              <View style={{ flex: 1 }}><NumberField label="Kitne" value={l.qty} onChange={(v) => updateRow(db, 'stock_transfer_lines', l.id, { qty: v ?? 0 })} decimals={3} error={l.qty > l.here ? `Wahan sirf ${l.here} hain` : null} /></View>
             </Row>
           </LineCard>
         ))}

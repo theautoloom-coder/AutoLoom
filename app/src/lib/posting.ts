@@ -207,6 +207,23 @@ export async function reverseMovements(tx: Transaction, refType: string, refId: 
 // -----------------------------------------------------------------------------
 // Transfers
 // -----------------------------------------------------------------------------
+/**
+ * Move stock from one place in the shop to another, in one step.
+ *
+ * This used to write only the `transfer_out` leg and leave the `transfer_in`
+ * to a separate "receive" press. Between the two the stock was in no location
+ * at all: the total across every location dropped by the amount in transit,
+ * Ghar's "Total stock" fell, and nothing on any screen said where it had gone.
+ * A `transit` location was clearly once intended — transfer/edit still filters
+ * it out of the pickers — but it was never created, so there was nowhere for
+ * in-transit stock to be.
+ *
+ * Both legs post together now. This shop's godown, counter and workshop are
+ * the same premises; maal does not spend days on a lorry between them, and
+ * tracking a van that does not exist is the kind of warehouse-management
+ * machinery the owner asked to be kept out. A transfer that is wrong is
+ * corrected by transferring back, exactly as the cancel path already says.
+ */
 export async function dispatchTransfer(tx: Transaction, transferId: string, actor: Actor): Promise<string> {
   const t = await one<{ status: string; from_location_id: string; to_location_id: string; doc_date: string }>(tx, 'SELECT * FROM stock_transfers WHERE id = ?', [transferId]);
   if (!t || t.status !== 'draft') throw new Error('Only a draft transfer can be dispatched');
@@ -218,11 +235,17 @@ export async function dispatchTransfer(tx: Transaction, transferId: string, acto
     const v = await one<{ avg_cost: number }>(tx, 'SELECT avg_cost FROM product_variants WHERE id = ?', [l.variant_id]);
     await updateRow(tx, 'stock_transfer_lines', l.id, { unit_cost: v?.avg_cost ?? 0 });
     await insertRow(tx, 'stock_movements', { variant_id: l.variant_id, location_id: t.from_location_id, qty: round(-l.qty, 3), movement_type: 'transfer_out', ref_type: 'stock_transfer', ref_id: transferId, ref_line_id: l.id, unit_cost: v?.avg_cost ?? 0, occurred_at: now }, actor);
+    await insertRow(tx, 'stock_movements', { variant_id: l.variant_id, location_id: t.to_location_id, qty: round(l.qty, 3), movement_type: 'transfer_in', ref_type: 'stock_transfer', ref_id: transferId, ref_line_id: l.id, unit_cost: v?.avg_cost ?? 0, occurred_at: now }, actor);
   }
-  await updateRow(tx, 'stock_transfers', transferId, { doc_no: docNo, status: 'dispatched', dispatched_at: now, dispatched_by: actor.userId });
+  await updateRow(tx, 'stock_transfers', transferId, { doc_no: docNo, status: 'received', dispatched_at: now, dispatched_by: actor.userId, received_at: now, received_by: actor.userId });
   return docNo;
 }
 
+/**
+ * Kept for transfers dispatched before the move to one step — those are sitting
+ * with an `out` leg and no `in`, and this is what completes them. Nothing
+ * creates that state any more.
+ */
 export async function receiveTransfer(tx: Transaction, transferId: string, actor: Actor): Promise<void> {
   const t = await one<{ status: string; to_location_id: string }>(tx, 'SELECT * FROM stock_transfers WHERE id = ?', [transferId]);
   if (!t || t.status !== 'dispatched') throw new Error('Only a dispatched transfer can be received');

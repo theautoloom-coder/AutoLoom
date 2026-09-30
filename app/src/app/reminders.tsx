@@ -28,7 +28,7 @@ import { notify } from '@/ui/forms';
 import { Enter, useCountUp } from '@/ui/motion';
 import { radius, space, type as typeScale } from '@/ui/theme';
 
-type Pending = { id: string; name: string; mobile: string | null; balance: number; oldest_due: string | null; bills_today: number };
+type Pending = { id: string; name: string; mobile: string | null; balance: number; oldest_due: string | null; bills_today: number; carried_over: number };
 type Bill = { id: string; doc_no: string; doc_date: string; grand_total: number; paid_total: number; customer_id: string; customer_name: string; mobile: string | null; balance: number };
 
 const FILTERS = [
@@ -55,7 +55,18 @@ export default function RemindersScreen() {
 
   const { data: pending } = useQuery<Pending>(`
     SELECT c.id, c.name, c.mobile, COALESCE(pb.balance,0) AS balance,
-           (SELECT MIN(due_date) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND i.grand_total>i.paid_total) AS oldest_due,
+           -- The oldest unpaid bill — and failing that, the date the khata was
+           -- carried in. Money brought over as an opening balance has no
+           -- invoice behind it, so this used to come back NULL and the whole
+           -- customer dropped out of "Purana udhaar". On a shop that migrated
+           -- its register that was every rupee it was owed.
+           COALESCE(
+             (SELECT MIN(due_date) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND i.grand_total>i.paid_total),
+             c.opening_balance_date
+           ) AS oldest_due,
+           CASE WHEN COALESCE(pb.balance,0) > 0
+                 AND NOT EXISTS (SELECT 1 FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND i.grand_total>i.paid_total)
+                THEN 1 ELSE 0 END AS carried_over,
            (SELECT COUNT(*) FROM sales_invoices i WHERE i.customer_id=c.id AND i.doc_type='invoice' AND i.status='posted' AND i.doc_date=?1) AS bills_today
     FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id
     WHERE COALESCE(pb.balance,0) > 0 AND c.is_active=1 ORDER BY balance DESC`, [today]);
@@ -64,10 +75,15 @@ export default function RemindersScreen() {
     FROM sales_invoices i JOIN customers c ON c.id=i.customer_id LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id
     WHERE i.doc_type='invoice' AND i.status='posted' AND i.doc_date=?1 ORDER BY i.doc_no DESC`, [today]);
 
+  // Purana udhaar is "owed and not from today's bills". Debt carried in from
+  // the old register counts: it has no due date because it predates the app,
+  // not because it is fresh.
+  const isOverdue = (p: Pending) =>
+    p.carried_over === 1 || (!!p.oldest_due && p.oldest_due < today);
   const visible = (pending ?? []).filter((p) =>
-    filter === 'all' ? true : filter === 'today' ? p.bills_today > 0 : !!p.oldest_due && p.oldest_due < today);
+    filter === 'all' ? true : filter === 'today' ? p.bills_today > 0 : isOverdue(p));
   const total = visible.reduce((a, p) => a + p.balance, 0);
-  const overdueCount = (pending ?? []).filter((p) => !!p.oldest_due && p.oldest_due < today).length;
+  const overdueCount = (pending ?? []).filter(isOverdue).length;
   const shown = useCountUp(total);
 
   async function remind(p: Pending) {

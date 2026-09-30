@@ -45,7 +45,7 @@ export default function TransferDetail() {
         </Card>
         {t.status === 'dispatched' && can('stock.transfer') ? (
           <Row gap={space.sm}>
-            <Button title={`Receive at ${t.to_name}`} size="lg" style={{ flex: 1 }} loading={busy} onPress={async () => { if (await confirm('Transfer le lein?', 'Stock arrives at the destination now.')) run('Received.', () => db.writeTransaction((tx) => receiveTransfer(tx, t.id, actor))); }} />
+            <Button title={`${t.to_name} mein le lo`} size="lg" style={{ flex: 1 }} loading={busy} onPress={async () => { if (await confirm('Transfer le lein?', 'Maal wahan pahunch jayega.')) run('Maal wahan pahunch gaya.', () => db.writeTransaction((tx) => receiveTransfer(tx, t.id, actor))); }} />
             <Button title="Rehne do" tone="danger" onPress={async () => { if (await confirm('Transfer cancel karein?', 'Stock returns to the source.')) run('Cancel ho gaya.', () => db.writeTransaction((tx) => cancelTransfer(tx, t.id, actor))); }} />
           </Row>
         ) : null}

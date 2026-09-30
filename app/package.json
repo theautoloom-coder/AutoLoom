@@ -69,7 +69,8 @@
     "smoke": "node test/smoke.mjs",
     "types": "expo customize tsconfig.json",
     "routes": "node test/routes.mjs",
-    "check": "npm run typecheck && npm run routes && npm test"
+    "check": "npm run typecheck && npm run routes && npm test",
+    "web:local": "node scripts/build-local.mjs"
   },
   "private": true
 }

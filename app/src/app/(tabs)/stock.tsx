@@ -177,7 +177,7 @@ export default function StockScreen() {
       ) : shown.length === 0 ? (
         <Empty art="maal"
           title={q ? 'Kuch nahi mila' : filter === 'sab' ? 'Abhi koi maal add nahi hua' : 'Yahan kuch nahi'}
-          hint={q ? 'Naam, SKU ya barcode se dhoondo.' : filter === 'sab' ? 'Neeche “+” dabao aur “Maal Aaya” se shuru karo.' : undefined}
+          hint={q ? 'Naam, SKU ya barcode se dhoondo.' : filter === 'sab' ? 'Neeche “+” dabao aur “Stock Chadhao” se shuru karo.' : undefined}
         />
       ) : (
         <Card style={{ gap: 0, paddingVertical: 4 }}>

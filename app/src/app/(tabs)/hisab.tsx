@@ -226,7 +226,7 @@ const PRESETS: [Preset, string][] = [
   ['aaj', 'Aaj'],
   ['7din', '7 Din'],
   ['mahina', 'Is Mahine'],
-  ['custom', 'Custom'],
+  ['custom', 'Tareekh'],
 ];
 
 function presetRange(p: Preset): [string, string] {
@@ -452,7 +452,7 @@ export default function HisabScreen() {
             <View style={{ height: 18 }} />
           ) : (
             <Text variant="small" color="textMuted">
-              {munafa < 0 ? 'Is period mein nuksan hua.' : 'Maal ki cost aur saara kharcha nikaal ke.'}
+              {munafa < 0 ? 'In dinon mein nuksan hua.' : 'Maal ki cost aur saara kharcha nikaal ke.'}
             </Text>
           )}
         </Pressable>
@@ -514,7 +514,7 @@ export default function HisabScreen() {
             </Row>
 
             {listRows.length === 0 ? (
-              <Empty art="parchi" title="Is period mein koi entry nahi" />
+              <Empty art="parchi" title="In dinon mein koi entry nahi" />
             ) : (
               <>
                 <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator>
@@ -534,7 +534,7 @@ export default function HisabScreen() {
                 </ScrollView>
                 {listRows.length >= 200 ? (
                   <Text variant="small" color="textFaint">
-                    Pehli 200 entry dikh rahi hain. Chhota range chuno.
+                    Pehli 200 entry dikh rahi hain. Kam din chuno.
                   </Text>
                 ) : Math.abs(listTotal - headline) > 1 ? (
                   // Only the Gross Profit list can land here: it matches each

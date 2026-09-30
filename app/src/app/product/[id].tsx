@@ -217,7 +217,7 @@ export default function ProductScreen() {
               {/* Standing on the item's own page is the moment you know its
                   stock is wrong. Before this the fix was four screens away. */}
               {can('stock.adjust') ? (
-                <Button title="Maal aaya" size="sm" onPress={() => router.push(`/stock/add?variant=${variant.id}` as never)} />
+                <Button title="Stock chadhao" size="sm" onPress={() => router.push(`/stock/add?variant=${variant.id}` as never)} />
               ) : null}
               <Button title="Aana-jaana ka hisaab" tone="ghost" size="sm" onPress={() => router.push(`/stock/ledger/${variant.id}`)} />
             </Row>

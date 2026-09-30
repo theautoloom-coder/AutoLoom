@@ -1,5 +1,5 @@
 /**
- * Does Maal Aaya move the stock AND fix the cost?
+ * Does Stock Chadhao move the stock AND fix the cost?
  *
  *   APP_EMAIL=... APP_PASSWORD=... node test/maal-aaya.mjs http://127.0.0.1:8208 <sku> <qty> <rate>
  *
@@ -41,7 +41,7 @@ step(!(await page.getByPlaceholder('you@shop.in').isVisible().catch(() => false)
 
 await page.goto(`${base}/stock/add`, { waitUntil: 'domcontentloaded', timeout: 40000 });
 await page.waitForTimeout(4000);
-step(await page.getByText('Maal Aaya').first().isVisible(), 'screen renders');
+step(await page.getByText('Stock Chadhao').first().isVisible(), 'screen renders');
 
 // Supplier. The picker opens a sheet with a filter box at the top, so type
 // into that and take the row it leaves — clicking blind hits the filter.

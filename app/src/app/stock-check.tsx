@@ -1,5 +1,5 @@
 /**
- * STOCK CHECK — godown mein jitna maal sach mein hai, wahi app mein ho jaaye.
+ * GINTI KARO — godown mein jitna maal sach mein hai, wahi app mein ho jaaye.
  *
  * This replaces the old two-screen audit (open an audit, snapshot a count
  * sheet, come back later and close it). Counting a shelf is one job done
@@ -52,7 +52,7 @@ const REASONS = [
 
 type Row_ = { variantId: string; label: string; sku: string; cost: number; actual: string; reasonKey: string };
 
-export default function StockCheck() {
+export default function GintiKaro() {
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
@@ -119,7 +119,7 @@ export default function StockCheck() {
     // confirm screen showed are only as fresh as the last render.
     if (changes.length === 0) { notify('Ab koi farak nahi bacha.', 'danger'); setStep('count'); return; }
     if (!locationId) { notify('Location nahi mili.', 'danger'); return; }
-    if (!(await confirm('Stock theek kar dein?', `${changes.length} item ka stock abhi badal jaayega. Yeh wapas nahi hota.`))) return;
+    if (!(await confirm('Ginti theek kar dein?', `${changes.length} item ka stock abhi badal jaayega. Yeh wapas nahi hota.`))) return;
 
     setSaving(true);
     try {
@@ -151,10 +151,10 @@ export default function StockCheck() {
         await postAdjustment(tx, id, actor);
       });
 
-      notify(`${changes.length} item ka stock theek ho gaya.`, 'ok');
+      notify(`Ginti theek ho gayi — ${changes.length} item ka stock badal diya.`, 'ok');
       router.back();
     } catch (e) {
-      notify(`Stock theek nahi hua: ${String((e as Error).message ?? e)}. Ginti waise ki waise padi hai — dobara koshish karo.`, 'danger');
+      notify(`Ginti theek nahi hui: ${String((e as Error).message ?? e)}. Ginti waise ki waise padi hai — dobara koshish karo.`, 'danger');
     } finally {
       setSaving(false);
     }
@@ -163,9 +163,9 @@ export default function StockCheck() {
   if (!can('stock.adjust')) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Stock Check' }} />
+        <Stack.Screen options={{ title: 'Ginti Karo' }} />
         <Screen>
-          <Text variant="display">Stock Check</Text>
+          <Text variant="display">Ginti Karo</Text>
           <Empty title="Iski permission nahi hai" hint="Admin se stock badalne ka haq maango." />
         </Screen>
       </>
@@ -175,7 +175,7 @@ export default function StockCheck() {
   if (step === 'confirm') {
     return (
       <>
-        <Stack.Screen options={{ title: 'Stock Check' }} />
+        <Stack.Screen options={{ title: 'Ginti Karo' }} />
         <Screen>
           <View>
             <Text variant="display">Ek baar dekh lo</Text>
@@ -217,7 +217,7 @@ export default function StockCheck() {
               while this screen sat open can empty the list, and pressing a
               live button on an empty list is how a no-op document gets made. */}
           <Button
-            title="Haan, stock theek kar do"
+            title="Haan, ginti theek kar do"
             size="lg"
             full
             onPress={apply}
@@ -232,12 +232,12 @@ export default function StockCheck() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Stock Check' }} />
+      <Stack.Screen options={{ title: 'Ginti Karo' }} />
       <Screen>
         <View>
-          <Text variant="display">Stock Check</Text>
+          <Text variant="display">Ginti Karo</Text>
           <Text variant="small" color="textMuted">
-            Godown mein jitna maal sach mein hai, woh count karke yahan dalein.
+            Shelf par ginti karo aur jo nikla wo yahan bharo — app ka stock ussi ke hisab se theek ho jayega.
           </Text>
         </View>
 
@@ -268,7 +268,7 @@ export default function StockCheck() {
                   value={c.actual === null ? '' : String(c.actual)}
                   onChangeText={(v) => patch(c.variantId, { actual: v.replace(/[^0-9]/g, '') })}
                   keyboardType="number-pad"
-                  placeholder="Apna number likho"
+                  placeholder="Jitne gine, wo likho"
                   returnKeyType="done"
                 />
 
@@ -341,7 +341,7 @@ export default function StockCheck() {
         ) : null}
 
         <Button
-          title={changes.length ? `${changes.length} item theek karo` : 'Aage badho'}
+          title={changes.length ? `${changes.length} item theek kar do` : 'Ginti theek kar do'}
           size="lg"
           full
           onPress={review}

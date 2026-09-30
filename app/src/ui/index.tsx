@@ -25,7 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { accentFor, accents, MAX_CONTENT, palette, radius, shadow, space, spine as SPINE, type, WIDE, type AccentName, type Palette } from './theme';
+import { accentFor, accents, MAX_CONTENT, palette, radius, shadow, space, spine as SPINE, tap as tapSize, type, WIDE, type AccentName, type Palette } from './theme';
 import { Illustration, type IllustrationName } from './illustrations';
 import { tap } from './haptics';
 
@@ -390,13 +390,16 @@ export function Button({ title, tone = 'primary', size = 'md', loading, left, fu
     (e: Parameters<NonNullable<typeof onPress>>[0]) => { tap(); onPress?.(e); },
     [onPress]
   );
+  // Flat fills, and a border on every tone so the four sit on one baseline —
+  // a secondary button that is white-on-white with no edge is invisible on the
+  // light ground, which is how people miss "Rehne do" and tap the red one.
   const colors = {
-    primary: { bg: t.accent, fg: t.accentText, border: t.accent, shadow: true },
-    secondary: { bg: t.surface, fg: t.text, border: t.border, shadow: false },
-    ghost: { bg: 'transparent', fg: t.textMuted, border: 'transparent', shadow: false },
-    danger: { bg: t.dangerSoft, fg: t.danger, border: t.dangerSoft, shadow: false },
+    primary: { bg: t.accent, fg: t.accentText, border: t.accent },
+    secondary: { bg: t.surface, fg: t.text, border: t.borderStrong },
+    ghost: { bg: 'transparent', fg: t.textMuted, border: 'transparent' },
+    danger: { bg: t.surface, fg: t.danger, border: t.danger },
   }[tone];
-  const pad = size === 'lg' ? 17 : size === 'sm' ? 9 : 13;
+  const minHeight = size === 'lg' ? tapSize.lg : size === 'sm' ? tapSize.sm : tapSize.md;
 
   return (
     <Pressable
@@ -407,14 +410,16 @@ export function Button({ title, tone = 'primary', size = 'md', loading, left, fu
       {...rest}
       style={(state) => [
         styles.button,
-        colors.shadow && shadow.xs,
         {
           backgroundColor: colors.bg,
           borderColor: colors.border,
-          paddingVertical: pad,
+          minHeight,
+          paddingHorizontal: size === 'sm' ? space.md : space.lg,
           alignSelf: full ? 'stretch' : 'flex-start',
-          opacity: disabled ? 0.45 : 1,
-          transform: [{ scale: state.pressed && !disabled ? 0.97 : 1 }],
+          opacity: disabled ? 0.4 : 1,
+          // 0.97 was a wobble. 0.985 plus the ripple reads as a press without
+          // the whole button appearing to shrink away from the thumb.
+          transform: [{ scale: state.pressed && !disabled ? 0.985 : 1 }],
         },
         typeof style === 'function' ? style(state) : style,
       ]}>
@@ -423,7 +428,7 @@ export function Button({ title, tone = 'primary', size = 'md', loading, left, fu
       ) : (
         <Row gap={space.xs} style={{ justifyContent: 'center' }}>
           {left}
-          <RNText style={[type.heading, { color: colors.fg, fontSize: size === 'sm' ? 13 : 15 }]}>{title}</RNText>
+          <RNText style={[type.heading, { color: colors.fg, fontSize: size === 'sm' ? 13 : size === 'lg' ? 16 : 15 }]}>{title}</RNText>
         </Row>
       )}
     </Pressable>
@@ -506,8 +511,11 @@ export const Input = React.forwardRef<TextInput, InputProps>(function Input(
           styles.inputWrap,
           {
             backgroundColor: t.surface,
+            // Colour changes, width does not. Growing the border on focus moved
+            // every field below it by half a pixel, and on a form that is being
+            // tabbed through it made the whole page twitch.
             borderColor: error ? t.danger : focused ? t.accent : t.border,
-            borderWidth: focused || error ? 1.5 : 1,
+            borderWidth: 1,
           },
         ]}>
         {left}
@@ -733,21 +741,31 @@ const styles = StyleSheet.create({
   // qty, the one number the row exists for. Whitespace at the end of a scroll
   // reads as deliberate; a number hidden under a red circle does not.
   padded: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: 96, gap: space.md },
-  card: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, padding: space.lg, gap: space.sm },
-  button: { borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 26, alignItems: 'center', justifyContent: 'center' },
+  // A full 1px border, not a hairline. On a 3x phone a hairline is a third of
+  // a pixel and the card edge disappears; the panel then floats with nothing
+  // holding it, which is what made the old screens look unfinished.
+  card: { borderRadius: radius.lg, borderWidth: 1, padding: space.lg, gap: space.sm },
+  // Not a pill. A 999-radius button reads as a tag; a 6px one reads as a
+  // control, and lines up with the cards and inputs around it.
+  button: { borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   iconButton: { borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, minHeight: 48 },
   // minWidth 0 is load-bearing on web: react-native-web renders this as a real
   // <input>, which carries an intrinsic width of about twenty characters, and
   // flex:1 will not shrink a box below its intrinsic width. Two fields side by
   // side then overflowed the card on a 360dp phone.
   input: { flex: 1, minWidth: 0, paddingVertical: 12, fontSize: 16, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, alignSelf: 'flex-start' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm, alignSelf: 'flex-start' },
   badgeDot: { width: 5, height: 5, borderRadius: 3 },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, borderWidth: 1 },
-  listRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth },
-  tile: { flex: 1, minWidth: 150, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: space.lg, gap: 4, overflow: 'hidden' },
-  tileAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
+  // Chips stay pills — they are the one thing on screen that is a tag and not
+  // a control, and the shape is what says so.
+  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1 },
+  // 15, not 13: a row has to be 48dp before a thumb hits it reliably while
+  // standing at a counter.
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 15, borderBottomWidth: StyleSheet.hairlineWidth },
+  tile: { flex: 1, minWidth: 150, borderRadius: radius.lg, borderWidth: 1, padding: space.lg, gap: 4, overflow: 'hidden' },
+  // A 2px rule, not a 3px band. It marks the tile; it is not decoration.
+  tileAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 2 },
   emptyGlyph: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   avatar: { alignItems: 'center', justifyContent: 'center' },
 });

@@ -70,6 +70,9 @@ export default function HomeScreen() {
         <Text variant="small" color="textMuted">
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
         </Text>
+        <Text variant="small" color="textMuted">
+          Aaj dukan ka kya haal hai — ek nazar mein.
+        </Text>
       </View>
 
       {kpiLoading ? (
@@ -118,7 +121,7 @@ export default function HomeScreen() {
         // and then collapse to two.
         <SkeletonList rows={3} size={38} />
       ) : (feed ?? []).length === 0 ? (
-        <Empty art="parchi" title="Aaj abhi tak kuch nahi hua" hint="Neeche “+” dabao — maal aaya, maal gaya, ya kharcha." />
+        <Empty art="parchi" title="Aaj abhi tak kuch nahi hua" hint="Neeche “+” dabao — Bill Banao, Stock Chadhao ya Kharcha Likho." />
       ) : (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(feed ?? []).map((f) => {

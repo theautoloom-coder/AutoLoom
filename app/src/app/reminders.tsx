@@ -1,5 +1,7 @@
 /**
- * Reminders — "kisse paise lene hain" (screen P4 of the light pass).
+ * Yaad dilao — kisse paise lene hain, aur unhe yaad dila do.
+ *
+ * Named on screen for the button in Aur that opens it, not for the route.
  *
  * The day-end screen. One keyline card holds the total owed; every row is a
  * decision — share the QR, mark it paid, or send the message. A row that has
@@ -84,7 +86,7 @@ export default function RemindersScreen() {
   }
 
   async function shareQr(name: string, amount: number) {
-    if (!shop.wa.upiId) { notify('Pehle More → Settings mein UPI ID daalo.'); return; }
+    if (!shop.wa.upiId) { notify('Pehle “Aur” → “Dukan settings” mein UPI ID daalo.'); return; }
     const url = paymentQrDataUrl({ upiId: shop.wa.upiId, payee: shop.wa.upiPayeeName, amount, note: name.slice(0, 20) });
     await shareImageDataUrl(url, { dialogTitle: `Payment QR · ${name}`, fileName: 'payment-qr.gif' });
   }
@@ -98,7 +100,10 @@ export default function RemindersScreen() {
         <Text variant="label" color="textFaint">
           {new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })} · {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
         </Text>
-        <Text variant="display" style={{ marginTop: 3 }}>Kisse paise lene hain</Text>
+        <Text variant="display" style={{ marginTop: 3 }}>Yaad dilao</Text>
+        <Text variant="small" color="textMuted">
+          Kisse paise lene hain — WhatsApp par yaad dila do.
+        </Text>
       </View>
 
       <Enter>
@@ -156,7 +161,7 @@ export default function RemindersScreen() {
                     {old ? <Text variant="label" color="textFaint">{old} din</Text> : null}
                   </Row>
                   <Text variant="mono" color="textFaint" numberOfLines={1}>
-                    {p.mobile ?? 'no mobile'}{p.bills_today ? ` · ${p.bills_today} bill aaj` : ''}
+                    {p.mobile ?? 'mobile number nahi hai'}{p.bills_today ? ` · ${p.bills_today} bill aaj` : ''}
                   </Text>
                 </Pressable>
 
@@ -196,7 +201,7 @@ export default function RemindersScreen() {
             );
           }) : (
             <View style={{ paddingVertical: space.xxl, alignItems: 'center' }}>
-              <Text variant="small" color="textFaint">Is filter mein koi nahi</Text>
+              <Text variant="small" color="textFaint">Is list mein koi nahi</Text>
             </View>
           )}
         </Card>
@@ -207,7 +212,7 @@ export default function RemindersScreen() {
           <View style={{ gap: space.sm }}>
             <Row style={{ justifyContent: 'space-between', paddingHorizontal: 2 }}>
               <Row gap={space.sm}>
-                <Text variant="label" color="textMuted">Aaj ke slip</Text>
+                <Text variant="label" color="textMuted">Aaj ke bill — slip bhejo</Text>
                 <Text variant="label" color="textFaint">{bills.length}</Text>
               </Row>
             </Row>
@@ -262,7 +267,7 @@ export default function RemindersScreen() {
                 {upiLink(shop.wa.upiId, shop.wa.upiPayeeName, visible[0]?.balance ?? null)}
               </Text>
             ) : (
-              <Text variant="small" color="warn">UPI ID nahi hai — Settings mein daalo, tab pay link jayega.</Text>
+              <Text variant="small" color="warn">UPI ID nahi hai — “Dukan settings” mein daalo, tab paisa bhejne ka link bhi jayega.</Text>
             )}
           </Card>
         </View>

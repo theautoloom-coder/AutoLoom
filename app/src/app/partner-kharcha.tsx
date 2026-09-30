@@ -1,5 +1,5 @@
 /**
- * PARTNER KHARCHA — the one screen whose whole job is a distinction.
+ * PARTNER KA PAISA LIKHO — the one screen whose whole job is a distinction.
  *
  * A partner does two different things at the cash drawer and they look
  * identical while they are happening.
@@ -228,9 +228,9 @@ export default function PartnerKharchaScreen() {
   if (!can('reports.view')) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Partner Kharcha' }} />
+        <Stack.Screen options={{ title: 'Partner ka paisa likho' }} />
         <Screen>
-          <Text variant="display">Partner Kharcha</Text>
+          <Text variant="display">Partner ka paisa likho</Text>
           <Empty
             title="Ye sirf owner dekh sakta hai"
             hint="Partner ka paisa kaun le gaya, ye sabko dikhane wali cheez nahi hai."
@@ -242,12 +242,12 @@ export default function PartnerKharchaScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Partner Kharcha' }} />
+      <Stack.Screen options={{ title: 'Partner ka paisa likho' }} />
       <Screen>
         <View>
-          <Text variant="display">Partner Kharcha</Text>
+          <Text variant="display">Partner ka paisa likho</Text>
           <Text variant="small" color="textMuted">
-            Partner ne jo paisa kharch kiya ya nikala, yahan likhein.
+            Partner ne dukan ke liye kharch kiya ya apne liye nikala — dono alag likho.
           </Text>
         </View>
 

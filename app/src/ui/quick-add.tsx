@@ -10,6 +10,11 @@
  * a button and not a sixth tab — and why it sits where a thumb already rests
  * rather than at the top of a screen.
  *
+ * Every label here is a verb, and it is the SAME wording as the heading of the
+ * screen it opens. People were telling the owner they could not follow the
+ * app, and a button called "Maal Gaya" opening a screen about making a bill
+ * is exactly how that happens.
+ *
  * What is offered depends on what the person may actually do. A counter hand
  * with no stock permission is not shown a stock correction and then refused.
  */
@@ -34,40 +39,40 @@ export function QuickAdd() {
 
   const actions: Action[] = [
     {
-      label: 'Maal Aaya',
-      hint: 'Godown mein naya maal aaye to yahan',
+      label: 'Stock Chadhao',
+      hint: 'Supplier se naya maal aaya',
       icon: 'arrow-down-circle-outline',
       accent: 'green',
       href: '/stock/add',
       allowed: can('stock.adjust') || can('purchase.create'),
     },
     {
-      label: 'Maal Gaya',
-      hint: 'Maal bika ya bahar gaya',
+      label: 'Bill Banao',
+      hint: 'Grahak ko maal de rahe ho',
       icon: 'arrow-up-circle-outline',
       accent: 'blue',
       href: '/invoice/edit',
       allowed: can('sale.create'),
     },
     {
-      label: 'Kharcha',
-      hint: 'Business mein jo paisa kharch hua',
+      label: 'Kharcha Likho',
+      hint: 'Dukaan ka paisa bahar gaya',
       icon: 'wallet-outline',
       accent: 'amber',
       href: '/expenses',
       allowed: true,
     },
     {
-      label: 'Kharab Maal',
-      hint: 'Toot gaya, kharab hua ya kam nikla',
+      label: 'Kharab Likho',
+      hint: 'Toota, kharab nikla ya gum ho gaya',
       icon: 'alert-circle-outline',
       accent: 'rose',
       href: '/kharab-maal',
       allowed: can('stock.adjust'),
     },
     {
-      label: 'Stock Check',
-      hint: 'Ginke mila lo — farak ho to theek karo',
+      label: 'Ginti Karo',
+      hint: 'Shelf par gino, farak ho to theek karo',
       icon: 'checkbox-outline',
       accent: 'violet',
       href: '/stock-check',

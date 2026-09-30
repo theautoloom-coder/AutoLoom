@@ -134,25 +134,25 @@ export default function RootLayout() {
                 <Stack.Screen name="admin/settings" options={{ title: 'Dukan settings' }} />
                 <Stack.Screen name="admin/users" options={{ title: 'Staff aur role' }} />
                 <Stack.Screen name="admin/import" options={{ title: 'Import' }} />
-                <Stack.Screen name="purchases" options={{ title: 'Purchase' }} />
+                <Stack.Screen name="purchases" options={{ title: 'Supplier ke bill' }} />
                 <Stack.Screen name="purchase/edit" options={{ title: 'Purchase' }} />
                 <Stack.Screen name="purchase/[id]" options={{ title: 'Purchase' }} />
-                <Stack.Screen name="transfers" options={{ title: 'Transfer' }} />
-                <Stack.Screen name="transfer/edit" options={{ title: 'Transfer' }} />
-                <Stack.Screen name="transfer/[id]" options={{ title: 'Transfer' }} />
-                <Stack.Screen name="adjustments" options={{ title: 'Adjustment' }} />
-                <Stack.Screen name="adjustment/edit" options={{ title: 'Adjustment' }} />
-                <Stack.Screen name="adjustment/[id]" options={{ title: 'Adjustment' }} />
-                <Stack.Screen name="stock/add" options={{ title: 'Maal Aaya' }} />
-                <Stack.Screen name="kharab-maal" options={{ title: 'Kharab Maal' }} />
-                <Stack.Screen name="stock-check" options={{ title: 'Stock Check' }} />
-                <Stack.Screen name="warehouse" options={{ title: 'Warehouse' }} />
-                <Stack.Screen name="expenses" options={{ title: 'Kharcha' }} />
-                <Stack.Screen name="partner-kharcha" options={{ title: 'Partner Kharcha' }} />
+                <Stack.Screen name="transfers" options={{ title: 'Maal doosri jagah bheja' }} />
+                <Stack.Screen name="transfer/edit" options={{ title: 'Maal doosri jagah bhejo' }} />
+                <Stack.Screen name="transfer/[id]" options={{ title: 'Maal doosri jagah bheja' }} />
+                <Stack.Screen name="adjustments" options={{ title: 'Stock sudhaara' }} />
+                <Stack.Screen name="adjustment/edit" options={{ title: 'Stock sudhaaro' }} />
+                <Stack.Screen name="adjustment/[id]" options={{ title: 'Stock sudhaara' }} />
+                <Stack.Screen name="stock/add" options={{ title: 'Stock Chadhao' }} />
+                <Stack.Screen name="kharab-maal" options={{ title: 'Kharab Likho' }} />
+                <Stack.Screen name="stock-check" options={{ title: 'Ginti Karo' }} />
+                <Stack.Screen name="warehouse" options={{ title: 'Maal kahan pada hai' }} />
+                <Stack.Screen name="expenses" options={{ title: 'Kharcha Likho' }} />
+                <Stack.Screen name="partner-kharcha" options={{ title: 'Partner ka paisa likho' }} />
                 <Stack.Screen name="stock/ledger/[id]" options={{ title: 'Stock ka hisaab' }} />
-                <Stack.Screen name="payments" options={{ title: 'Payment' }} />
+                <Stack.Screen name="payments" options={{ title: 'Paisa aaya, paisa diya' }} />
                 <Stack.Screen name="payment/edit" options={{ title: 'Payment' }} />
-                <Stack.Screen name="invoice/edit" options={{ title: 'Bill' }} />
+                <Stack.Screen name="invoice/edit" options={{ title: 'Bill Banao' }} />
                 <Stack.Screen name="invoice/[id]" options={{ title: 'Bill' }} />
                 <Stack.Screen name="reorder" options={{ title: 'Kya mangwana hai' }} />
                 <Stack.Screen name="reminders" options={{ title: 'Yaad dilao' }} />

@@ -1,5 +1,5 @@
 /**
- * KHARCHA — business mein jo paisa kharch hua.
+ * KHARCHA LIKHO — business mein jo paisa kharch hua.
  *
  * The shop spends all day: transport, petrol, loading, packing, chai, the
  * bijli bill. None of it could be written down before, so the day's cash never
@@ -58,7 +58,7 @@ type Expense = {
 
 type Window = 'aaj' | 'mahina' | 'sab';
 
-export default function KharchaScreen() {
+export default function KharchaLikho() {
   const { db } = useSystem();
   const { can, actor, locationId } = useSession();
   const mayRecord = can('expense.record');
@@ -135,7 +135,7 @@ export default function KharchaScreen() {
 
     setSaving(true);
     try {
-      // The photo goes up first, the way Maal Aaya does it: if the network is
+      // The photo goes up first, the way Stock Chadhao does it: if the network is
       // down we want to know before the row is written, not after.
       let photoPath: string | null = null;
       if (photo) {
@@ -161,7 +161,7 @@ export default function KharchaScreen() {
       reset();
       notify(`${formatINR(amount)} ka kharcha likh diya.`, 'ok');
     } catch (e) {
-      notify(`Save nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
+      notify(`Kharcha nahi likha gaya: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setSaving(false);
     }
@@ -182,12 +182,12 @@ export default function KharchaScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Kharcha' }} />
+      <Stack.Screen options={{ title: 'Kharcha Likho' }} />
       <Screen>
         <View>
-          <Text variant="display">Kharcha</Text>
+          <Text variant="display">Kharcha Likho</Text>
           <Text variant="small" color="textMuted">
-            Business mein jo paisa kharch hua, yahan likhein.
+            Dukaan ka paisa bahar gaya — transport, petrol, chai, bijli? Yahan likho, tabhi din ka cash sahi milega.
           </Text>
         </View>
 
@@ -291,7 +291,7 @@ export default function KharchaScreen() {
               />
 
               <Button
-                title={ready ? `${formatINR(amount)} likh do` : 'Likh do'}
+                title={ready ? `${formatINR(amount)} ka kharcha likh do` : 'Kharcha likh do'}
                 size="lg"
                 full
                 onPress={save}
@@ -314,7 +314,7 @@ export default function KharchaScreen() {
         ) : null}
 
         <SectionTitle right={<Text mono color="textMuted">{formatINR(shownTotal)}</Text>}>
-          Kharcha
+          Likha hua kharcha
         </SectionTitle>
         <Row gap={8} wrap>
           <Chip label="Aaj" selected={window_ === 'aaj'} onPress={() => setWindow('aaj')} />

@@ -1,11 +1,11 @@
 /**
  * Aur — the fifth place on the bar, and the only one that is not a place.
  *
- * Ghar, Stock, Parchi and Hisab are four questions the shop asks all day. The
- * "+" is the four entries it makes all day. Everything else in the app has to
- * be reachable from here, or it does not exist — which is exactly what had
- * happened to Warehouse, Kharab Maal, Stock Check and Partner Kharcha: four
- * screens that were built and then linked from nowhere.
+ * Ghar, Stock, Bill and Hisab are four questions the shop asks all day. The
+ * "+" is the entries it makes all day. Everything else in the app has to be
+ * reachable from here, or it does not exist — which is exactly what had
+ * happened to Maal kahan pada hai, Kharab Likho, Ginti Karo and the partner's
+ * money: four screens that were built and then linked from nowhere.
  *
  * The grouping is by WHEN somebody needs the thing, not by which table it
  * touches:
@@ -21,7 +21,7 @@
  * text rows and it was unreadable at a glance; the coloured square is what
  * makes a list of fourteen things scannable in one second.
  *
- * Two things deliberately do NOT appear here: a row for Parchi or Hisab (they
+ * Two things deliberately do NOT appear here: a row for Bill or Hisab (they
  * are tabs — repeating a tab teaches people the bar is not trustworthy) and
  * the old diagnostics panels (row counts per table, a wall of permission
  * strings). Those answered a developer's question, in a screen named for the
@@ -111,7 +111,12 @@ export default function MoreScreen() {
 
   return (
     <Screen>
-      <Text variant="display">Aur</Text>
+      <View>
+        <Text variant="display">Aur</Text>
+        <Text variant="small" color="textMuted">
+          Jo char tab mein nahi hai, wo sab yahan se khulta hai.
+        </Text>
+      </View>
 
       <Card>
         <Row gap={space.md} align="flex-start">
@@ -179,12 +184,12 @@ export default function MoreScreen() {
       </Card>
 
       {/* The things that happen every single day and are not already a tab or
-          a "+" job. Parchi and Hisab are deliberately absent — they are tabs. */}
+          a "+" job. Bill and Hisab are deliberately absent — they are tabs. */}
       <SectionTitle>Roz ka</SectionTitle>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         <ListRow
           left={<IconBadge name="wallet-outline" accent="amber" />}
-          title="Kharcha"
+          title="Kharcha Likho"
           subtitle="Transport, packing, chai, advance — jo bhi paisa bahar jaaye"
           onPress={() => router.push('/expenses')}
         />
@@ -199,8 +204,8 @@ export default function MoreScreen() {
         {!isReviewer ? (
           <ListRow
             left={<IconBadge name="paper-plane-outline" accent="violet" />}
-            title="Meri requests"
-            subtitle={myRejected > 0 ? `${myRejected} wapas aayi hai — theek karke dobara bhejo` : 'Naya maal ya rate ka badlav owner ko bheja hua'}
+            title="Maine kya bheja"
+            subtitle={myRejected > 0 ? `${myRejected} wapas aayi hai — theek karke dobara bhejo` : 'Naya maal ya rate ka badlav jo owner ko bheja hai'}
             onPress={() => router.push('/requests')}
             right={myRejected > 0 ? <Badge tone="danger">{String(myRejected)}</Badge> : undefined}
           />
@@ -231,7 +236,7 @@ export default function MoreScreen() {
         {canStock ? (
           <ListRow
             left={<IconBadge name="alert-circle-outline" accent="rose" />}
-            title="Kharab Maal"
+            title="Kharab Likho"
             subtitle="Toot gaya, kharab ho gaya, kam nikla — stock se nikal do"
             onPress={() => router.push('/kharab-maal')}
           />
@@ -239,7 +244,7 @@ export default function MoreScreen() {
         {canStock ? (
           <ListRow
             left={<IconBadge name="checkbox-outline" accent="teal" />}
-            title="Stock Check"
+            title="Ginti Karo"
             subtitle="Godown ka maal ginke app se mila lo"
             onPress={() => router.push('/stock-check')}
           />
@@ -247,8 +252,8 @@ export default function MoreScreen() {
         {can('stock.transfer') ? (
           <ListRow
             left={<IconBadge name="swap-horizontal-outline" accent="violet" />}
-            title="Transfer"
-            subtitle="Maal ek jagah se doosri jagah bhejo — godown, dukan, workshop"
+            title="Maal doosri jagah bhejo"
+            subtitle="Godown se dukan, dukan se workshop — jahan chahiye wahan"
             onPress={() => router.push('/transfers')}
           />
         ) : null}
@@ -269,8 +274,8 @@ export default function MoreScreen() {
         {canMoney ? (
           <ListRow
             left={<IconBadge name="cash-outline" accent="green" />}
-            title="Payment"
-            subtitle="Aaya hua paisa aur supplier ko diya hua — rasid ke saath"
+            title="Paisa aaya, paisa diya"
+            subtitle="Grahak se aaya aur supplier ko diya — rasid ke saath"
             onPress={() => router.push('/payments')}
           />
         ) : null}
@@ -289,15 +294,15 @@ export default function MoreScreen() {
         {can('purchase.create') ? (
           <ListRow
             left={<IconBadge name="documents-outline" accent="blue" />}
-            title="Purchase"
-            subtitle="Supplier ke bill, return, aur kitna paisa dena baaki hai"
+            title="Supplier ke bill"
+            subtitle="Jo maal aaya uske bill, return, aur kitna paisa dena baaki hai"
             onPress={() => router.push('/purchases')}
           />
         ) : null}
         {isOwner ? (
           <ListRow
             left={<IconBadge name="briefcase-outline" accent="rose" />}
-            title="Partner Kharcha"
+            title="Partner ka paisa likho"
             subtitle="Partner ne apne liye nikala ya dukan ke liye — dono alag"
             onPress={() => router.push('/partner-kharcha')}
           />
@@ -311,8 +316,8 @@ export default function MoreScreen() {
             {isReviewer ? (
               <ListRow
                 left={<IconBadge name="checkmark-done-outline" accent="amber" />}
-                title="Requests"
-                subtitle={pendingReq > 0 ? `${pendingReq} cheez aapke haan ya na ka intezaar kar rahi hai` : 'Staff ne jo naya maal bheja — abhi kuch pending nahi'}
+                title="Staff ne kya bheja"
+                subtitle={pendingReq > 0 ? `${pendingReq} cheez aapke haan ya na ka intezaar kar rahi hai` : 'Naya maal ya rate ka badlav — abhi kuch pending nahi'}
                 onPress={() => router.push('/requests')}
                 right={pendingReq > 0 ? <Badge tone="warn">{String(pendingReq)}</Badge> : undefined}
               />
@@ -344,8 +349,8 @@ export default function MoreScreen() {
             {can('catalog.edit') ? (
               <ListRow
                 left={<IconBadge name="cloud-upload-outline" accent="green" />}
-                title="Import"
-                subtitle="Excel se ek saath maal, grahak ya opening stock chadhao"
+                title="Excel se chadhao"
+                subtitle="Ek saath saara maal, grahak ya opening stock — Excel file se"
                 onPress={() => router.push('/admin/import')}
               />
             ) : null}
@@ -354,8 +359,8 @@ export default function MoreScreen() {
                 the row a phone cannot reach any of it. */}
             <ListRow
               left={<IconBadge name="options-outline" accent="amber" />}
-              title="Poora admin"
-              subtitle="Category, brand, rate list, location, bill number ka format"
+              title="Baaki sab settings"
+              subtitle="Category, brand, rate list, jagah, bill number ka format"
               onPress={() => router.push('/admin')}
             />
           </Card>

@@ -1,75 +1,84 @@
 /**
- * Visual language for AutoLoom — light evolution (Sept 2026 design pass).
+ * Visual language for AutoLoom — bold flat (Sept 2026 rebuild).
  *
- * Drop-in replacement for `app/src/ui/theme.ts`. Every key the app already
- * imports is still here; the additions are `keyline`, `shadow.key` and
- * `fontFamily` on the type scale.
+ * The shop's own users said the app was hard to understand, so this pass is
+ * about clarity before decoration: fewer surfaces, harder edges, one accent,
+ * and numbers big enough to read across a counter.
  *
- * Direction:
- * - Light grey ground (#EDEEF1), white paper cards, hairline borders.
- * - ONE keyline card per screen: 1.5px ink border + hard 3px offset shadow,
- *   no blur. It carries the number the user opened the screen for.
- * - Red is action + spine only. Status money is amber (late) / green (paid),
- *   never red, so red always means "tap me".
- * - Titles: Bricolage Grotesque. Body: IBM Plex Sans. Money/SKU/labels:
- *   IBM Plex Mono, tabular.
+ * Structure borrowed from Linear's system — not its colour. What is taken is
+ * the reasoning: surfaces are separated by a single hairline rather than by
+ * blur, radii are small enough that a card reads as a panel and not a pill,
+ * type tightens as it grows, and the accent appears only where something can
+ * be pressed. AutoLoom keeps its own signal red on garage black, and its tap
+ * targets are far larger than Linear's — this is a phone held in one hand by
+ * somebody standing up, not a mouse on a desk.
+ *
+ * Three rules that decide most arguments:
+ * - A border separates. A shadow only lifts something that genuinely floats
+ *   (sheet, toast, the "+"). Nothing else gets a shadow.
+ * - Red means "you can press this". Money that is late is amber, money that
+ *   is settled is green; neither is ever red, or red stops meaning anything.
+ * - Every figure is mono and tabular, so a column of rupees lines up and a
+ *   changing number does not make the row jump.
  */
 import { Platform } from 'react-native';
 
 export const palette = {
   light: {
-    bg: '#EDEEF1',
+    // A colder, quieter ground so white panels read as paper on a desk.
+    bg: '#F4F5F7',
     surface: '#FFFFFF',
-    surfaceAlt: '#F7F7F9',
+    surfaceAlt: '#F4F5F7',
     surfaceRaised: '#FFFFFF',
-    border: '#DEE0E6',
-    borderStrong: '#CBCCD4',
+    // One border colour. Two was always a guess about which to use.
+    border: '#E3E5EA',
+    borderStrong: '#C9CCD4',
     keyline: '#0B0D10',
-    text: '#12151A',
-    textMuted: '#5B5E68',
-    textFaint: '#8D8F99',
+    text: '#0B0D10',
+    textMuted: '#5A5E68',
+    textFaint: '#8E929C',
     accent: '#D91E2E',
-    accentStrong: '#AE1120',
+    accentStrong: '#B0151F',
     accentText: '#FFFFFF',
-    accentSoft: '#FBE4E4',
+    accentSoft: '#FDECEE',
     navy: '#0B0D10',
-    navyText: '#F6F6F8',
-    ok: '#1E8E5A',
-    okSoft: '#EDF7EE',
-    warn: '#C7791A',
-    warnSoft: '#FBECD5',
+    navyText: '#F7F8F9',
+    ok: '#137A48',
+    okSoft: '#E7F5EC',
+    warn: '#9A6413',
+    warnSoft: '#FBF0DC',
     danger: '#B3111A',
-    dangerSoft: '#FAE1E1',
-    info: '#1E5FA8',
-    infoSoft: '#DFEAF8',
-    overlay: 'rgba(11,13,16,0.44)',
+    dangerSoft: '#FCE8E9',
+    info: '#1B4FA0',
+    infoSoft: '#E6EDF9',
+    overlay: 'rgba(11,13,16,0.50)',
   },
   dark: {
-    bg: '#08090B',
-    surface: '#161619',
-    surfaceAlt: '#1F1F23',
-    surfaceRaised: '#202024',
-    border: '#2A2A30',
-    borderStrong: '#3C3C44',
-    keyline: '#F3F3F5',
-    text: '#F3F3F5',
-    textMuted: '#A6A8B2',
-    textFaint: '#6C6E78',
+    bg: '#0A0B0D',
+    surface: '#141518',
+    surfaceAlt: '#1B1D21',
+    surfaceRaised: '#1B1D21',
+    border: '#26282D',
+    borderStrong: '#3A3D44',
+    keyline: '#F7F8F9',
+    text: '#F7F8F9',
+    textMuted: '#A3A7B0',
+    textFaint: '#6B6F79',
     accent: '#FF4552',
-    accentStrong: '#FF5B60',
+    accentStrong: '#FF6B75',
     accentText: '#FFFFFF',
-    accentSoft: '#341315',
-    navy: '#13161B',
-    navyText: '#F3F3F5',
-    ok: '#3CC382',
-    okSoft: '#123324',
-    warn: '#F0A13A',
-    warnSoft: '#3A2A12',
+    accentSoft: '#2C1115',
+    navy: '#141518',
+    navyText: '#F7F8F9',
+    ok: '#3ECB86',
+    okSoft: '#0E2A1D',
+    warn: '#E8A33D',
+    warnSoft: '#31240F',
     danger: '#FF5C63',
-    dangerSoft: '#3D1A1A',
-    info: '#5B9BE6',
-    infoSoft: '#15283F',
-    overlay: 'rgba(0,0,0,0.68)',
+    dangerSoft: '#341416',
+    info: '#6CA4EE',
+    infoSoft: '#122238',
+    overlay: 'rgba(0,0,0,0.72)',
   },
 } as const;
 
@@ -77,27 +86,41 @@ export type Palette = { readonly [K in keyof (typeof palette)['light']]: string 
 export type ThemeColor = keyof Palette;
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
-export const radius = { sm: 9, md: 13, lg: 16, xl: 22, pill: 999 } as const;
+/**
+ * Small radii on purpose. At 13–22px every panel started to read as a pill and
+ * the screen lost its grid; at 6–8px a card reads as a panel with a straight
+ * edge, which is what makes a dense list look deliberate instead of soft.
+ */
+export const radius = { sm: 4, md: 6, lg: 8, xl: 12, pill: 999 } as const;
+
+/** Minimum tap heights. A counter phone is used standing up, often one-handed. */
+export const tap = { sm: 36, md: 44, lg: 52 } as const;
 
 /** Width of the red spine on an actionable row / active rail item. */
 export const spine = 3;
 
+/**
+ * The accent set is for telling one kind of row from another at a glance — the
+ * icon square in "Aur", the strip on a tile. It is deliberately muted: these
+ * are marks, not fills, and the only loud colour in the app is the red that
+ * means "press me".
+ */
 export const accents = {
   light: {
-    blue: { fg: '#1D4ED8', bg: '#E7EEFD' },
-    green: { fg: '#15803D', bg: '#E2F6E9' },
-    amber: { fg: '#B45309', bg: '#FDF0D9' },
-    violet: { fg: '#6D28D9', bg: '#EEE7FD' },
-    rose: { fg: '#BE123C', bg: '#FCE3E9' },
-    teal: { fg: '#0F766E', bg: '#DBF2F0' },
+    blue: { fg: '#1B4FA0', bg: '#E8EEF8' },
+    green: { fg: '#137A48', bg: '#E7F3EB' },
+    amber: { fg: '#8F5E12', bg: '#F9F0DE' },
+    violet: { fg: '#5B2FB5', bg: '#EDE9F8' },
+    rose: { fg: '#A81238', bg: '#F9E8ED' },
+    teal: { fg: '#0D6A63', bg: '#E2F0EF' },
   },
   dark: {
-    blue: { fg: '#7EA6FF', bg: '#16243F' },
-    green: { fg: '#5BD98C', bg: '#123123' },
-    amber: { fg: '#F5B34A', bg: '#3A2A12' },
-    violet: { fg: '#B694FF', bg: '#251A3D' },
-    rose: { fg: '#FF8098', bg: '#3A1620' },
-    teal: { fg: '#5AD6CB', bg: '#0F2E2C' },
+    blue: { fg: '#7FA8F0', bg: '#16233A' },
+    green: { fg: '#55CE8A', bg: '#102D1F' },
+    amber: { fg: '#E4A64C', bg: '#2F2411' },
+    violet: { fg: '#A98CF0', bg: '#211A38' },
+    rose: { fg: '#F07E95', bg: '#33161E' },
+    teal: { fg: '#4FC9BF', bg: '#0E2927' },
   },
 } as const;
 
@@ -112,18 +135,24 @@ export function accentFor(key: string): AccentName {
 }
 
 /**
- * Elevation. `xs`–`lg` stay for sheets, toasts and menus. `key` is the new
- * default for the single most important card on a screen: a hard ink offset,
- * no blur — readable on a cheap LCD in daylight and cheap to composite.
- * Pair it with `borderWidth: 1.5, borderColor: t.keyline`.
+ * Elevation, and there is much less of it than there used to be.
+ *
+ * A border separates two surfaces; a shadow says one of them is floating above
+ * the screen. Only three things in this app genuinely float — the sheet, the
+ * toast and the "+" — so only those get one. Cards do not. Blur on a cheap LCD
+ * in daylight reads as smudge, and twenty smudged cards is what made the old
+ * screens feel soft instead of sharp.
+ *
+ * `key` stays for the one card per screen carrying the figure the screen was
+ * opened for: a hard ink offset with no blur, which survives that LCD.
  */
 export const shadow = {
   none: {},
-  key: { shadowColor: '#0B0D10', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
-  xs: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 5 },
-  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.14, shadowRadius: 32, elevation: 12 },
+  key: { shadowColor: '#0B0D10', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 1, shadowRadius: 0, elevation: 2 },
+  xs: {},
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.10, shadowRadius: 12, elevation: 5 },
+  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 10 },
 } as const;
 
 /**
@@ -148,21 +177,30 @@ const sansMedium = Platform.OS === 'web' ? fonts.sans : 'IBMPlexSans_500Medium';
 const sansBold = Platform.OS === 'web' ? fonts.sans : 'IBMPlexSans_600SemiBold';
 const monoBold = Platform.OS === 'web' ? fonts.mono : 'IBMPlexMono_600SemiBold';
 
+/**
+ * The scale tightens as it grows. A 46px figure with normal tracking looks
+ * loose and amateur; the same figure at -2.2 reads as engineered. Below 15px
+ * tracking goes the other way, because small text needs air to stay legible on
+ * a phone held at arm's length in a shop.
+ *
+ * Three weights do all the work: 400 to read, 600 to emphasise, 800 for the
+ * display face. Anything else is a decision nobody can repeat.
+ */
 export const type = {
-  /** Screen titles, customer names, the money on the keyline card. */
-  display: { fontFamily: fonts.display, fontSize: 27, lineHeight: 29, fontWeight: '800' as const, letterSpacing: -0.8 },
-  title: { fontFamily: fonts.display, fontSize: 20, lineHeight: 25, fontWeight: '800' as const, letterSpacing: -0.4 },
-  heading: { fontFamily: sansBold, fontSize: 15, lineHeight: 21, fontWeight: '600' as const },
+  /** Screen titles. One per screen, at the top, saying where you are. */
+  display: { fontFamily: fonts.display, fontSize: 30, lineHeight: 32, fontWeight: '800' as const, letterSpacing: -1.1 },
+  title: { fontFamily: fonts.display, fontSize: 21, lineHeight: 26, fontWeight: '800' as const, letterSpacing: -0.55 },
+  heading: { fontFamily: sansBold, fontSize: 15.5, lineHeight: 21, fontWeight: '600' as const, letterSpacing: -0.15 },
   body: { fontFamily: fonts.sans, fontSize: 14.5, lineHeight: 21, fontWeight: '400' as const },
-  small: { fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 18, fontWeight: '400' as const },
+  small: { fontFamily: fonts.sans, fontSize: 12.5, lineHeight: 18, fontWeight: '400' as const, letterSpacing: 0.05 },
   /** Section labels and column headers: mono, uppercase, wide. */
-  label: { fontFamily: monoBold, fontSize: 10, lineHeight: 13, fontWeight: '600' as const, letterSpacing: 1, textTransform: 'uppercase' as const },
+  label: { fontFamily: monoBold, fontSize: 10, lineHeight: 13, fontWeight: '600' as const, letterSpacing: 1.1, textTransform: 'uppercase' as const },
   /** Every rupee figure, quantity, SKU and doc number. */
-  number: { fontFamily: monoBold, fontSize: 21, lineHeight: 26, fontWeight: '600' as const, fontVariant: ['tabular-nums' as const] },
+  number: { fontFamily: monoBold, fontSize: 21, lineHeight: 26, fontWeight: '600' as const, letterSpacing: -0.4, fontVariant: ['tabular-nums' as const] },
   /** The one figure per screen that is the reason the screen was opened. */
-  hero: { fontFamily: fonts.display, fontSize: 46, lineHeight: 47, fontWeight: '800' as const, letterSpacing: -1.8, fontVariant: ['tabular-nums' as const] },
+  hero: { fontFamily: fonts.display, fontSize: 50, lineHeight: 51, fontWeight: '800' as const, letterSpacing: -2.2, fontVariant: ['tabular-nums' as const] },
   mono: { fontFamily: fonts.mono, fontSize: 13, lineHeight: 18, fontWeight: '500' as const, fontVariant: ['tabular-nums' as const] },
-  rowTitle: { fontFamily: sansMedium, fontSize: 14, lineHeight: 19, fontWeight: '600' as const },
+  rowTitle: { fontFamily: sansMedium, fontSize: 14.5, lineHeight: 20, fontWeight: '600' as const, letterSpacing: -0.15 },
 };
 
 /** Breakpoint above which the web/desktop layout uses a left rail and wider content. */

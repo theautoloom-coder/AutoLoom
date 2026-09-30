@@ -172,8 +172,25 @@ export function useSession(): SessionState {
   return ctx;
 }
 
+/**
+ * Sign-in is the one screen the English sweep can never see — that scan signs
+ * in first and then reads, so the errors it shows on the way in stayed English
+ * for months. They are also the worst place for it: somebody is already stuck.
+ *
+ * Each one says what to do next, not just what went wrong.
+ */
 function friendlyAuthError(message: string): string {
-  if (/invalid login credentials/i.test(message)) return 'Wrong email or password.';
-  if (/network|fetch/i.test(message)) return 'Cannot reach the server. Check the connection and try again.';
-  return message;
+  if (/invalid login credentials/i.test(message)) {
+    return 'Email ya password galat hai. Dobara dekho — email poora likhna hai.';
+  }
+  if (/email not confirmed/i.test(message)) {
+    return 'Ye login abhi chalu nahi hua. Maalik se bolo.';
+  }
+  if (/too many|rate limit/i.test(message)) {
+    return 'Bahut baar koshish ho gayi. Do minute ruk ke phir try karo.';
+  }
+  if (/network|fetch|failed to fetch/i.test(message)) {
+    return 'Server tak nahi pahunch pa rahe. Net check karo, phir dobara dabao.';
+  }
+  return `Login nahi hua: ${message}`;
 }

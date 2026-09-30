@@ -10,13 +10,20 @@ import type { IconName } from './index';
 
 export type EntryKind = 'sale' | 'purchase' | 'expense' | 'payment' | 'damage' | 'adjust';
 
+/**
+ * These name what already happened, so they are not the verbs the buttons use
+ * — but each one echoes its button, because somebody who pressed "Bill Banao"
+ * has to recognise the row it produced. "Maal gaya" next to a button called
+ * "Bill Banao" is two names for one thing, which is how an app stops making
+ * sense.
+ */
 export const KIND: Record<string, { label: string; icon: IconName; accent: string; sign: '+' | '−' | '' }> = {
-  sale: { label: 'Maal gaya', icon: 'arrow-up-circle-outline', accent: 'blue', sign: '' },
-  purchase: { label: 'Maal aaya', icon: 'arrow-down-circle-outline', accent: 'green', sign: '' },
+  sale: { label: 'Bill bana', icon: 'arrow-up-circle-outline', accent: 'blue', sign: '' },
+  purchase: { label: 'Stock aaya', icon: 'arrow-down-circle-outline', accent: 'green', sign: '' },
   expense: { label: 'Kharcha', icon: 'wallet-outline', accent: 'amber', sign: '−' },
   payment: { label: 'Payment', icon: 'cash-outline', accent: 'teal', sign: '' },
-  damage: { label: 'Kharab maal', icon: 'alert-circle-outline', accent: 'rose', sign: '' },
-  adjust: { label: 'Stock sudhar', icon: 'swap-vertical-outline', accent: 'violet', sign: '' },
+  damage: { label: 'Kharab nikla', icon: 'alert-circle-outline', accent: 'rose', sign: '' },
+  adjust: { label: 'Ginti sudhri', icon: 'swap-vertical-outline', accent: 'violet', sign: '' },
 };
 
 /** The clock on a feed row. Shared so one entry shows the same time everywhere. */

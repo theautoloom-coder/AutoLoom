@@ -1,6 +1,9 @@
 /**
- * Reorder suggestions: recent sales velocity → days of cover → suggested
- * purchase quantity, with the last supplier and rate.
+ * Kya mangwana hai — the shopping list, worked out from what actually sold.
+ *
+ * Recent sales velocity → days of cover → suggested purchase quantity, with
+ * the last supplier and rate. The screen is named for the question and not for
+ * "reorder", because nobody at the counter has ever said reorder.
  */
 import { useQuery } from '@powersync/react';
 import { useRouter } from 'expo-router';
@@ -13,6 +16,18 @@ import { useSession } from '@/lib/session';
 import { Badge, Button, Card, Chip, Empty, ListRow, Row, Screen, Text } from '@/ui';
 import { notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
+
+/**
+ * The badge on each row. `movementClass` answers in English because it is a
+ * domain type; the shop needs to read it, so the words are translated here and
+ * not in the domain, where a rename would touch the tests and the migrations.
+ */
+const MOVE: Record<string, string> = {
+  fast: 'Tezi se bik raha',
+  medium: 'Theek chal raha',
+  slow: 'Dheere bik raha',
+  dead: 'Ruka pada hai',
+};
 
 type R = { id: string; sku: string; variant_name: string; product_name: string; product_id: string; family_name: string | null; qty: number; min_stock: number; reorder_level: number; reorder_qty: number; sold: number; last_sold: string | null; supplier_name: string | null; last_rate: number | null; avg_cost: number };
 
@@ -59,26 +74,26 @@ export default function ReorderScreen() {
         <Text variant="display">Kya mangwana hai</Text>
         <Button title="CSV" tone="secondary" size="sm" onPress={exportCsv} disabled={!visible.length} />
       </Row>
-      <Text variant="small" color="textMuted">Sujhaayi gayi qty = chune hue din mein roz ki bikri × kitne din chalana hai − jo abhi hai. Jo SKU apne minimum se neeche hai, uski apni reorder qty se kam kabhi nahi.</Text>
+      <Text variant="small" color="textMuted">Jo tezi se bik raha hai aur khatam hone wala hai. Roz ki bikri dekh ke bataya hai ki kitna mangwana chahiye.</Text>
       <Row gap={space.xs} wrap>
-        <Text variant="label" color="textMuted">Kitne din ka</Text>
-        {[30, 60, 90].map((d) => <Chip key={d} label={`${d} days`} selected={days === d} onPress={() => setDays(d)} />)}
-        <Text variant="label" color="textMuted" style={{ marginLeft: 8 }}>Kitne din chalega</Text>
-        {[15, 30, 45].map((d) => <Chip key={d} label={`${d} days`} selected={cover === d} onPress={() => setCover(d)} />)}
+        <Text variant="label" color="textMuted">Kitne din ki bikri dekhein</Text>
+        {[30, 60, 90].map((d) => <Chip key={d} label={`${d} din`} selected={days === d} onPress={() => setDays(d)} />)}
+        <Text variant="label" color="textMuted" style={{ marginLeft: 8 }}>Kitne din chalana hai</Text>
+        {[15, 30, 45].map((d) => <Chip key={d} label={`${d} din`} selected={cover === d} onPress={() => setCover(d)} />)}
       </Row>
       {families.length > 1 ? <Row gap={space.xs} wrap><Chip label="Sab" selected={!family} onPress={() => setFamily(null)} />{families.map((f) => <Chip key={f} label={f} selected={family === f} onPress={() => setFamily(family === f ? null : f)} />)}</Row> : null}
       <Card tone="alt">
         <Row gap={space.lg} wrap>
-          <View><Text variant="label" color="textMuted">SKUs to order</Text><Text variant="number">{visible.length}</Text></View>
-          {can('catalog.view_cost') ? <View><Text variant="label" color="textMuted">Takreeban kharid ka kharcha</Text><Text variant="number">{formatINR(value)}</Text></View> : null}
+          <View><Text variant="label" color="textMuted">Kitne item mangwane hain</Text><Text variant="number">{visible.length}</Text></View>
+          {can('catalog.view_cost') ? <View><Text variant="label" color="textMuted">Takreeban kitne ka maal</Text><Text variant="number">{formatINR(value)}</Text></View> : null}
         </Row>
       </Card>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {visible.map((r) => (
           <ListRow key={r.id} title={`${r.product_name} · ${r.variant_name}`}
-            subtitle={`${r.sku} · on hand ${r.qty} · sold ${r.sold} in ${days}d (${r.perDay.toFixed(1)}/day)${r.supplier_name ? ` · ${r.supplier_name}${r.last_rate && can('catalog.view_cost') ? ` @ ${formatINR(r.last_rate)}` : ''}` : ''}`}
+            subtitle={`${r.sku} · abhi ${r.qty} pcs · ${days} din mein ${r.sold} bike (roz ${r.perDay.toFixed(1)})${r.supplier_name ? ` · ${r.supplier_name}${r.last_rate && can('catalog.view_cost') ? ` @ ${formatINR(r.last_rate)}` : ''}` : ''}`}
             onPress={() => router.push(`/product/${r.product_id}?variant=${r.id}`)}
-            right={<View style={{ alignItems: 'flex-end' }}><Text variant="number" mono color="accent">{r.suggest}</Text><Badge tone={r.cls === 'fast' ? 'ok' : r.cls === 'dead' ? 'danger' : 'neutral'}>{r.cls}</Badge></View>} />
+            right={<View style={{ alignItems: 'flex-end' }}><Text variant="number" mono color="accent">{r.suggest}</Text><Badge tone={r.cls === 'fast' ? 'ok' : r.cls === 'dead' ? 'danger' : 'neutral'}>{MOVE[r.cls] ?? r.cls}</Badge></View>} />
         ))}
         {visible.length === 0 ? <Empty title="Kuch mangwane ki zaroorat nahi" hint="Chune hue din tak sab kuch kaafi hai." /> : null}
       </Card>

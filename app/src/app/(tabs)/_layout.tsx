@@ -96,7 +96,7 @@ function useNavItems(): NavItem[] {
   return [
     { key: 'index', href: '/', title: 'Ghar', symbol: 'home' },
     { key: 'stock', href: '/stock', title: 'Stock', symbol: 'cube-outline', visible: sections.stock },
-    { key: 'parchi', href: '/parchi', title: 'Parchi', symbol: 'receipt-outline' },
+    { key: 'parchi', href: '/parchi', title: 'Bill', symbol: 'receipt-outline' },
     { key: 'hisab', href: '/hisab', title: 'Hisab', symbol: 'stats-chart-outline' },
     { key: 'more', href: '/more', title: 'Aur', symbol: 'ellipsis-horizontal' },
   ];

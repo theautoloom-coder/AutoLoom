@@ -15,9 +15,14 @@
  * Hisaab-kitab"; none of those exist now, so those topics are gone rather than
  * reworded. A manual that names a button nobody can find is worse than none.
  *
- * Some of these screens have no other way in yet — Kisse paise lene hain,
- * Warehouse and Partner Kharcha are reached from their button here. That is
+ * Some of these screens have no other way in yet — Yaad dilao, Maal kahan pada
+ * hai and Partner ka paisa likho are reached from their button here. That is
  * why every topic carries the route rather than only directions.
+ *
+ * Every topic question and every button name in the steps is the string that is
+ * actually on the screen. When a screen is renamed, this file is renamed with
+ * it in the same commit — a manual that names a button nobody can find is worse
+ * than none.
  */
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -42,11 +47,11 @@ type Topic = {
 
 const TOPICS: Topic[] = [
   {
-    q: 'Maal bik gaya — bill kaise banayein?',
+    q: 'Bill Banao — maal bik gaya, bill kaise banayein?',
     icon: 'arrow-up-circle-outline',
     accent: 'blue',
     steps: [
-      'Neeche laal “+” dabao, phir “Maal Gaya” chuno.',
+      'Neeche laal “+” dabao, phir “Bill Banao” chuno.',
       'Grahak chuno. Naya ho to naam likho aur “+ Add” dabao — grahak wala form khul jaayega.',
       'Maal “Scan karo ya SKU / naam likho” wale box se daalo. Phone par “Scan” se barcode bhi padh lo.',
       'Har line par Qty, Rate aur “Chhoot %” dekh lo.',
@@ -55,14 +60,14 @@ const TOPICS: Topic[] = [
       '“Bill post karo” dabao. Stock apne aap kam ho gaya.',
     ],
     note: 'Udhaar chuna to wo grahak ke khate mein apne aap chadh jaata hai — alag se kuch likhne ki zaroorat nahi. “Is bill par munafa” laal dikhe to maal lagat se neeche ja raha hai; post karne se pehle rate dekh lo.',
-    go: { label: 'Maal Gaya', href: '/invoice/edit' },
+    go: { label: 'Bill Banao', href: '/invoice/edit' },
   },
   {
-    q: 'Naya maal aaya — stock kaise chadhayein?',
+    q: 'Stock Chadhao — naya maal aaya, kaise chadhayein?',
     icon: 'arrow-down-circle-outline',
     accent: 'green',
     steps: [
-      'Neeche laal “+” dabao, phir “Maal Aaya” chuno.',
+      'Neeche laal “+” dabao, phir “Stock Chadhao” chuno.',
       'Supplier chuno. Naya hai to naam likho aur “+ Add” dabao — wahin ban jaayega.',
       'Date dekh lo — aaj ki pehle se bhari hai.',
       'Maal scan karo ya naam likho. Ek saath kai cheezein daal sakte ho.',
@@ -70,78 +75,78 @@ const TOPICS: Topic[] = [
       'Bill ki photo laga do, note likh do, phir “Chadha do” dabao.',
     ],
     note: 'Rate zaroor daalo. Ye purchase hai, aur yahi rate us maal ki cost banta hai. Rate zero chhoda to wo maal jab bikega tab poora paisa munafa dikhega, aur hisaab jhootha ho jaayega.',
-    go: { label: 'Maal Aaya', href: '/stock/add' },
+    go: { label: 'Stock Chadhao', href: '/stock/add' },
   },
   {
     q: 'Naya item kaise banayein?',
     icon: 'add-circle-outline',
     accent: 'violet',
     steps: [
-      'Maal Aaya ya Maal Gaya mein naam likho. Na mile to “+ … naya item banao” wali line par tap karo.',
+      'Stock Chadhao ya Bill Banao mein naam likho. Na mile to “+ … naya item banao” wali line par tap karo.',
       'Ya “Aur” tab → “Saara maal” → wahan se banao.',
       'Photo kheencho — counter par dhoondhne mein sabse zyada yahi kaam aati hai.',
       'Category chuno, “Item ka naam” likho, “Qty” aur “Bechne ka rate” daalo.',
       'Gaadi, colour, “Kharid rate”, warranty — sab “Aur detail” ke andar hain. Zaroorat ho tabhi kholo.',
       '“Save item” dabao.',
     ],
-    note: 'Staff ke paas item banane ka haq nahi hota. Unke paas wahi button “Admin ko bhejo” likha aata hai, aur owner “Aur” tab ke Requests mein se approve karta hai.',
+    note: 'Staff ke paas item banane ka haq nahi hota. Unke paas wahi button “Admin ko bhejo” likha aata hai, aur owner “Aur” tab → “Staff ne kya bheja” mein se haan karta hai.',
     go: { label: 'Naya item', href: '/admin/item' },
   },
   {
-    q: 'Kharab maal kaise likhein?',
+    q: 'Kharab Likho — toota-phoota maal kaise nikalein?',
     icon: 'alert-circle-outline',
     accent: 'rose',
     steps: [
-      'Neeche laal “+” dabao, phir “Kharab Maal” chuno. (“Aur” tab → Godown mein bhi hai.)',
+      'Neeche laal “+” dabao, phir “Kharab Likho” chuno. (“Aur” tab → Godown mein bhi hai.)',
       '“Kya hua?” mein se ek chuno — Kharab, Reject, Nahi mila, Toot Gaya, Ginti ka farak ya Aur kuch.',
       'Maal scan karo ya naam likho.',
       '“Kitne kharab” bharo aur “Ek ka kharid rate” dekh lo.',
       'Photo aur note laga do, phir “Kharab likho” dabao.',
     ],
     note: 'Rate khali mat chhodo. Stock to waise bhi kam ho jaayega, par rate ke bina nuksan ₹0 likha jaayega — aur Hisab mein “Kharab / Loss” utna hi kam dikhega. Jiska rate pata nahi, wo line khud bata deti hai.',
-    go: { label: 'Kharab Maal', href: '/kharab-maal' },
+    go: { label: 'Kharab Likho', href: '/kharab-maal' },
   },
   {
-    q: 'Stock check kaise karein?',
+    q: 'Ginti Karo — godown ka maal app se kaise milayein?',
     icon: 'checkbox-outline',
     accent: 'teal',
     steps: [
-      'Neeche laal “+” dabao, phir “Stock Check” chuno. (“Aur” tab → Godown mein bhi hai.)',
+      'Neeche laal “+” dabao, phir “Ginti Karo” chuno. (“Aur” tab → Godown mein bhi hai.)',
       'Jitne item ginne hain, sab scan karo ya naam likh ke daal lo.',
       '“System Stock” app ka number hai. “Actual Stock” mein ginti karke apna number likho.',
       '“Difference” apne aap aa jaayega. Farak ho to neeche se wajah chuno.',
       '“… item theek karo” dabao, phir “Ek baar dekh lo” wali list par “Haan, stock theek kar do”.',
     ],
     note: 'Jis item ka “Actual Stock” khali chhoda, wo waise ka waisa rahega — app khud kuch nahi badalta. Poora godown ek din mein ginna zaroori nahi; ek rack karo, note mein likh do kis rack ka tha.',
-    go: { label: 'Stock Check', href: '/stock-check' },
+    go: { label: 'Ginti Karo', href: '/stock-check' },
   },
   {
-    q: 'Kharcha kaise likhein?',
+    q: 'Kharcha Likho — dukan ka paisa bahar gaya to?',
     icon: 'wallet-outline',
     accent: 'amber',
     steps: [
-      'Neeche laal “+” dabao, phir “Kharcha” chuno. (“Aur” tab → “Kharcha” bhi wahi kholta hai.)',
+      'Neeche laal “+” dabao, phir “Kharcha Likho” chuno. (“Aur” tab → “Kharcha Likho” bhi wahi kholta hai.)',
       '“Kitna kharcha hua?” mein paisa daalo.',
       '“KIS CHEEZ KA” mein se chuno — Transport, Petrol, Rent, Bijli, Loading, Packing, Repair, Chai/Pani. Aur kuch ho to “Other”.',
       '“PAISA KAISE DIYA” chuno — Cash, Online ya UPI. “Kisne diya” mein naam chuno.',
       '“₹… likh do” dabao. Chit hai to “Receipt ki photo aur note” kholke photo laga do.',
     ],
-    note: 'Maal kharidna kharcha nahi hai — wo “Maal Aaya” se jaata hai. Yahan sirf wo paisa likho jo dukaan chalane mein gaya.',
-    go: { label: 'Kharcha', href: '/expenses' },
+    note: 'Maal kharidna kharcha nahi hai — wo “Stock Chadhao” se jaata hai. Yahan sirf wo paisa likho jo dukaan chalane mein gaya.',
+    go: { label: 'Kharcha Likho', href: '/expenses' },
   },
   {
     q: 'Partner ka paisa kaise likhein?',
     icon: 'person-outline',
     accent: 'rose',
     steps: [
-      '“Aur” tab → “Partner Kharcha” kholo. Ye sirf owner ko dikhta hai.',
+      '“Aur” tab → “Partner ka paisa likho” kholo. Ye sirf owner ko dikhta hai.',
       '“Kaunsa partner” chuno — naam likh ke naya partner bhi bana sakte ho.',
       '“Kitna paisa” daalo.',
       '“YE PAISA KIS TARAH KA HAI” mein do mein se ek dabao — “Business Kharcha” ya “Personal Paisa Nikala”.',
       'Baaki kharche jaisa hi — kis cheez ka, paisa kaise diya, kisne diya, tareekh. Phir “₹… likh do”.',
     ],
     note: 'Yahi ek cheez hai jo galat hui to seedha paise ka nuksan hai. Partner ne dukaan ke liye kisi ko diya — wo “Business Kharcha”. Partner apne ghar ke liye le gaya — wo “Personal Paisa Nikala”, aur wo business ka kharcha NAHI hai. Ghar wala paisa Business Kharcha mein likh diya to har mahine munafa kam dikhega, aur us jhoothe number par rate, maal aur staff sab tay ho jaayenge. Ek chune bina kuch save nahi hoga — jaan-boojh kar.',
-    go: { label: 'Partner Kharcha', href: '/partner-kharcha' },
+    go: { label: 'Partner ka paisa likho', href: '/partner-kharcha' },
   },
   {
     q: 'Kiska kitna udhaar hai — khata kaise dekhein?',
@@ -162,7 +167,7 @@ const TOPICS: Topic[] = [
     icon: 'logo-whatsapp',
     accent: 'green',
     steps: [
-      '“Aur” tab → “Yaad dilao” kholo — “Kisse paise lene hain” wali list aa jaayegi.',
+      '“Aur” tab → “Yaad dilao” kholo — kisse paise lene hain, poori list aa jaayegi.',
       'Upar kul baaki paisa dikhta hai. “Sab”, “Aaj bill hua” aur “Overdue” se chhaant lo.',
       'Ek aadmi ko bhejne ke liye uske aage laal “Yaad dilao” dabao — ya sabko ek saath bhejne ke liye upar “Sabko bhejo”.',
       'WhatsApp khud khul jaayega, message pehle se likha hua. Aapko bas bhejna hai.',
@@ -176,13 +181,13 @@ const TOPICS: Topic[] = [
     icon: 'receipt-outline',
     accent: 'blue',
     steps: [
-      'Neeche “Parchi” tab kholo.',
+      'Neeche “Bill” tab kholo.',
       'Upar se din chuno — “Aaj”, “Kal”, “7 Din”, “Is Mahine”, ya “Tareekh” se koi bhi din.',
-      'Har kaam ek hi list mein hai, samay ke saath — bill, maal aaya, kharcha, payment, kharab.',
-      'Bill, purchase ya stock wali line par tap karo to wahi parchi khul jaayegi.',
+      'Har kaam ek hi list mein hai, samay ke saath — bill, naya stock, kharcha, payment, kharab.',
+      'Bill, supplier ke bill ya stock wali line par tap karo to wahi parchi khul jaayegi.',
     ],
     note: 'Subah ki entries yahan dikh rahi hain to app theek chal rahi hai. “App chal rahi hai ya nahi” ka sabse seedha jawab yahi hai.',
-    go: { label: 'Parchi kholo', href: '/parchi' },
+    go: { label: 'Bill kholo', href: '/parchi' },
   },
   {
     q: 'Kaunsa maal khatam ho raha hai?',
@@ -208,7 +213,7 @@ const TOPICS: Topic[] = [
       'Kisi item par tap karo to uska apna page khul jaayega.',
     ],
     note: '“Stock” tab par bhi “Maal kahan pada hai” likha aata hai, par wo sirf ginti batata hai. Andar kya-kya pada hai, wo yahan dikhta hai. Jis jagah kuch nahi hai wo bhi dikhegi — “kuch nahi hai” bhi ek jawab hai.',
-    go: { label: 'Warehouse', href: '/warehouse' },
+    go: { label: 'Maal kahan pada hai', href: '/warehouse' },
   },
   {
     q: 'Mahine ka hisaab kaise dekhein?',
@@ -216,7 +221,7 @@ const TOPICS: Topic[] = [
     accent: 'violet',
     steps: [
       'Neeche “Hisab” tab kholo.',
-      'Upar se din chuno — “Aaj”, “7 Din”, “Is Mahine”, ya “Custom” mein apni “Se” aur “Tak” tareekh.',
+      'Upar se din chuno — “Aaj”, “7 Din”, “Is Mahine”, ya “Tareekh” mein apni “Se” aur “Tak” bharo.',
       'Ek hi jagah par: Sale, Maal Ki Cost, Gross Profit, Business Kharcha, Kharab / Loss, aur sabse neeche Munafa.',
       'Kisi bhi figure par tap karo — us number ke peeche ki saari entries khul jaayengi.',
     ],
@@ -245,7 +250,7 @@ const TOPICS: Topic[] = [
       'Iska matlab hai maal becha gaya, par wo us jagah kabhi chadha hi nahi.',
       '“Stock” tab sabse upar “Gadbad — stock minus mein hai” mein bata deta hai ki kaunsa maal aur kahan.',
       'Us line par tap karo — us item ka poora aana-jaana khul jaayega.',
-      'Ya to maal aane ki entry reh gayi — “+” se “Maal Aaya” karke chadha do.',
+      'Ya to maal aane ki entry reh gayi — “+” se “Stock Chadhao” karke chadha do.',
       'Ya koi bill galat bana hai — wo bill kholke dekh lo.',
     ],
     note: 'Zero stock par bill banane ki chhoot jaan-boojh kar hai, kyunki offline phone ko taaza ginti nahi pata hoti. Isliye baad mein mila lena zaroori hai.',
@@ -290,8 +295,8 @@ export default function HelpScreen() {
 
       <Card>
         <Text>
-          Neeche paanch jagah hain: Ghar · Stock · Parchi · Hisab · Aur. Unke upar laal “+” har nayi
-          entry ka darwaza hai — Maal Aaya, Maal Gaya, Kharcha, Kharab Maal, Stock Check.
+          Neeche paanch jagah hain: Ghar · Stock · Bill · Hisab · Aur. Unke upar laal “+” har nayi
+          entry ka darwaza hai — Stock Chadhao, Bill Banao, Kharcha Likho, Kharab Likho, Ginti Karo.
         </Text>
         <Text variant="small" color="textMuted">
           Tab wo jagah hai jahan aap jaate ho. “+” wo kaam hai jo aap karte ho.

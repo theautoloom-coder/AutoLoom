@@ -1,5 +1,5 @@
 /**
- * KHARAB MAAL — maal toot gaya, kharab ho gaya, reject nikla ya kam mila.
+ * KHARAB LIKHO — maal toot gaya, kharab ho gaya, reject nikla ya kam mila.
  *
  * This is the "stock goes out and nobody paid for it" screen. It is a plain
  * stock adjustment underneath: one `stock_adjustments` draft, a negative line
@@ -59,7 +59,7 @@ const REASONS = [
 
 type Line = { variantId: string; label: string; sku: string; qty: number; cost: number };
 
-export default function KharabMaal() {
+export default function KharabLikho() {
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
@@ -186,7 +186,7 @@ export default function KharabMaal() {
       notify(`${totalQty} pcs kharab likh diya.`, 'ok');
       router.back();
     } catch (e) {
-      notify(`Nahi hua: ${String((e as Error).message ?? e)}`, 'danger');
+      notify(`Kharab nahi likha gaya: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setSaving(false);
     }
@@ -195,9 +195,9 @@ export default function KharabMaal() {
   if (!can('stock.adjust')) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Kharab Maal' }} />
+        <Stack.Screen options={{ title: 'Kharab Likho' }} />
         <Screen>
-          <Text variant="display">Kharab Maal</Text>
+          <Text variant="display">Kharab Likho</Text>
           <Empty title="Iski permission nahi hai" hint="Admin se stock badalne ka haq maango." />
         </Screen>
       </>
@@ -206,12 +206,12 @@ export default function KharabMaal() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Kharab Maal' }} />
+      <Stack.Screen options={{ title: 'Kharab Likho' }} />
       <Screen>
         <View>
-          <Text variant="display">Kharab Maal</Text>
+          <Text variant="display">Kharab Likho</Text>
           <Text variant="small" color="textMuted">
-            Maal toot gaya, kharab ho gaya ya kam nikla — yahan likhein.
+            Maal toot gaya, kharab nikla ya gum ho gaya? Yahan likho — stock bhi kam hoga aur nuksan hisab mein dikhega.
           </Text>
         </View>
 
@@ -254,7 +254,7 @@ export default function KharabMaal() {
                   <Row gap={space.sm}>
                     <Input
                       containerStyle={{ flex: 1 }}
-                      label="Kitne kharab"
+                      label="Kitne pcs"
                       value={String(l.qty)}
                       onChangeText={(v) => patch(l.variantId, { qty: Math.max(0, Math.floor(Number(v.replace(/[^0-9]/g, '')) || 0)) })}
                       keyboardType="number-pad"
@@ -285,7 +285,7 @@ export default function KharabMaal() {
         )}
 
         <Card style={{ gap: space.md }}>
-          <Text variant="label" color="textMuted">Photo</Text>
+          <Text variant="label" color="textMuted">Kharab maal ki photo</Text>
           <PhotoPicker localUri={photo?.uri} name="Kharab maal" onPickLocal={setPhoto} />
           <Input label="Note" value={note} onChangeText={setNote} placeholder="Kaise hua, kisne dekha — kuch bhi" />
         </Card>
@@ -306,7 +306,7 @@ export default function KharabMaal() {
         ) : null}
 
         <Button
-          title={totalQty > 0 ? `${totalQty} pcs kharab likho` : 'Kharab likho'}
+          title={totalQty > 0 ? `${totalQty} pcs kharab likh do` : 'Kharab likh do'}
           size="lg"
           full
           tone="danger"

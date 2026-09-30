@@ -1,5 +1,9 @@
 /**
- * Parchi — aaj din bhar kya-kya hua.
+ * Bill — aaj din bhar kya-kya hua.
+ *
+ * The file is still parchi.tsx because the route is /parchi and renaming a
+ * route breaks every deep link already sent over WhatsApp. On screen it is
+ * "Bill", which is the word the shop used for it long before we did.
  *
  * This screen used to be the `audit_logs` table with the column names
  * translated: "Bill badla", "Item ka rate banaya", one row per keystroke that
@@ -8,7 +12,7 @@
  * day — what happened in the shop today.
  *
  * So it is now the day itself, newest first, with the clock on every line.
- * Maal aaya, maal gaya, kharcha, payment, kharab maal — the five things that
+ * Bill, naya stock, kharcha, payment, kharab maal — the five things that
  * actually move, out of the five tables they live in, because the shop does
  * not think in tables. Tap a line and you land on the document it came from.
  *
@@ -210,9 +214,9 @@ export default function ParchiScreen() {
   return (
     <Screen>
       <View>
-        <Text variant="display">Parchi</Text>
+        <Text variant="display">Bill</Text>
         <Text variant="small" color="textMuted">
-          Aaj din bhar kya-kya hua.
+          Din bhar ke bill aur baaki har entry — kis waqt kya hua.
         </Text>
       </View>
 
@@ -281,7 +285,7 @@ export default function ParchiScreen() {
               ? 'Aaj abhi tak koi entry nahi hui.'
               : 'Is din koi entry nahi hui.'
           }
-          hint="Neeche “+” dabao — maal aaya, maal gaya, kharcha ya payment."
+          hint="Neeche “+” dabao — Bill Banao, Stock Chadhao ya Kharcha Likho."
         />
       ) : (
         groups.map((g) => (

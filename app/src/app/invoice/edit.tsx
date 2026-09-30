@@ -1,5 +1,6 @@
 /**
- * Bill editor (and return / credit note against a bill).
+ * BILL BANAO — grahak ko maal ja raha hai (and the return / credit note that
+ * comes back against a bill).
  *
  *   Choose customer → scan or search items → price (last price for this
  *   customer prefilled, else the admin price) → cash / online / udhaar → post.
@@ -87,7 +88,7 @@ export default function InvoiceEdit() {
         }
       }
       setId(newId);
-    })().catch((e) => notify(`Draft nahi bana: ${String((e as Error).message ?? e)}`, 'danger'));
+    })().catch((e) => notify(`Naya bill nahi khula: ${String((e as Error).message ?? e)}`, 'danger'));
   }, [id, creating, locationId, db, actor, against, original, originalLines, customerParam, profile?.id]);
 
   const interstate = gst && !!doc?.is_interstate;
@@ -178,14 +179,14 @@ export default function InvoiceEdit() {
       }
     }
 
-    if (!(await confirm(isCN ? 'Wapasi post karein?' : 'Bill post karein?', `${formatINR(totals.totals.grand_total)} · ${customer?.name} · ${MODES.find((m) => m.value === doc.payment_mode)?.label ?? doc.payment_mode}. Bill number abhi lag jaayega.`))) return;
+    if (!(await confirm(isCN ? 'Wapasi likh dein?' : 'Bill bana dein?', `${formatINR(totals.totals.grand_total)} · ${customer?.name} · ${MODES.find((m) => m.value === doc.payment_mode)?.label ?? doc.payment_mode}. Bill number abhi lag jaayega.`))) return;
     setPosting(true);
     try {
       let docNo = '';
       await db.writeTransaction(async (tx) => { docNo = await postInvoice(tx, id, actor, { creditOverrideBy }); });
       router.replace(`/invoice/${id}`);
-      notify(`${docNo} post ho gaya.`, 'ok');
-    } catch (e) { notify(`Post nahi hua: ${(e as Error).message}. Dobara koshish karo.`, 'danger'); } finally { setPosting(false); }
+      notify(isCN ? `Wapasi ${docNo} likh di.` : `Bill ${docNo} ban gaya.`, 'ok');
+    } catch (e) { notify(`Bill nahi bana: ${(e as Error).message}. Dobara koshish karo.`, 'danger'); } finally { setPosting(false); }
   }
 
   async function discard() {
@@ -212,13 +213,15 @@ export default function InvoiceEdit() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isCN ? 'Wapasi' : 'Maal Gaya' }} />
+      <Stack.Screen options={{ title: isCN ? 'Wapasi' : 'Bill Banao' }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }} align="flex-start">
           <View style={{ flex: 1 }}>
-            <Text variant="display">{isCN ? 'Wapasi' : 'Maal Gaya'}</Text>
+            <Text variant="display">{isCN ? 'Wapasi' : 'Bill Banao'}</Text>
             <Text variant="small" color="textMuted">
-              {isCN ? 'Jo maal wapas aaya, yahan likhein.' : 'Jab maal bike ya godown se bahar jaye, yahan entry karein.'}
+              {isCN
+                ? 'Grahak jo maal wapas laaya, wo yahan likho — paisa uske khaate mein wapas jud jayega.'
+                : 'Grahak ko maal de rahe ho? Yahan bill banao — stock kam hoga aur udhaar ho to khaate mein chadh jayega.'}
             </Text>
           </View>
           <Text variant="mono" color="textFaint">{statusLabel(doc.status)}</Text>
@@ -341,7 +344,7 @@ export default function InvoiceEdit() {
           <Button title="Chhod do" tone="secondary" onPress={discard} />
           {/* A bill with no grahak or no maal can never post; post() only
               said so after the press. Now the button says it before. */}
-          <Button title={isCN ? 'Wapasi post karo' : 'Bill post karo'} size="lg" onPress={post} loading={posting} disabled={!canPost} style={{ flex: 1.25 }} />
+          <Button title={isCN ? 'Wapasi likh do' : 'Bill bana do'} size="lg" onPress={post} loading={posting} disabled={!canPost} style={{ flex: 1.25 }} />
         </Row>
       </Screen>
     </>

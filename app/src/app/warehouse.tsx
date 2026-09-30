@@ -1,5 +1,9 @@
 /**
- * Warehouse — maal kahan pada hai.
+ * Maal kahan pada hai — the screen that answers exactly its own name.
+ *
+ * The file is warehouse.tsx and the route is /warehouse because that is what
+ * the link says; the heading is the question, because that is what the shop
+ * says.
  *
  * One question, asked out loud in every godown: where is it. Not a warehouse
  * management system — no bins to configure, no putaway rules, no pick paths.
@@ -64,12 +68,12 @@ export default function Warehouse() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Warehouse' }} />
+      <Stack.Screen options={{ title: 'Maal kahan pada hai' }} />
       <Screen>
         <View>
-          <Text variant="display">Warehouse</Text>
+          <Text variant="display">Maal kahan pada hai</Text>
           <Text variant="small" color="textMuted">
-            Maal kahan pada hai — jagah par tap karo.
+            Godown, dukan, workshop — jagah par tap karo, wahan ka saara maal khul jayega.
           </Text>
         </View>
 

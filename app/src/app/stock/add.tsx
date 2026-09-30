@@ -1,5 +1,5 @@
 /**
- * MAAL AAYA — godown mein naya maal aaye to yahan.
+ * STOCK CHADHAO — godown mein naya maal aaye to yahan.
  *
  * This used to post a "found" adjustment, which moved the stock and left the
  * cost alone: tg_update_avg_cost only fires for movement_type 'purchase'. A
@@ -13,7 +13,7 @@
  * job becomes a two-minute one.
  *
  * Counting something you did not know you had is a different job and belongs
- * to Stock Check.
+ * to Ginti Karo.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -36,7 +36,7 @@ import { space } from '@/ui/theme';
 type Line = { variantId: string; label: string; sku: string; qty: number; rate: number };
 type Supplier = { id: string; name: string };
 
-export default function MaalAaya() {
+export default function StockChadhao() {
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
@@ -102,7 +102,7 @@ export default function MaalAaya() {
   async function save() {
     const usable = lines.filter((l) => l.qty > 0);
     if (!supplierId) { notify('Supplier chuno — ya naam likh ke naya bana lo.', 'danger'); return; }
-    if (usable.length === 0) { notify('Kam se kam ek maal daalo.', 'danger'); return; }
+    if (usable.length === 0) { notify('Kam se kam ek item daalo.', 'danger'); return; }
     if (!locationId) { notify('Location nahi mili. Admin se location set karwao.', 'danger'); return; }
 
     setSaving(true);
@@ -114,7 +114,7 @@ export default function MaalAaya() {
         try {
           billPath = await uploadPhoto(billPhoto, 'bills');
         } catch {
-          notify('Bill ki photo nahi chadhi — entry phir bhi save ho rahi hai.', 'danger');
+          notify('Bill ki photo nahi chadhi — stock phir bhi chadh raha hai.', 'danger');
         }
       }
 
@@ -140,10 +140,10 @@ export default function MaalAaya() {
         await postPurchase(tx, id, actor);
       });
 
-      notify(`${totalQty} pcs chadh gaya.`, 'ok');
+      notify(`${totalQty} pcs stock mein chadh gaya.`, 'ok');
       router.back();
     } catch (e) {
-      notify(`Nahi chadha: ${String((e as Error).message ?? e)}`, 'danger');
+      notify(`Stock nahi chadha: ${String((e as Error).message ?? e)}`, 'danger');
     } finally {
       setSaving(false);
     }
@@ -152,10 +152,10 @@ export default function MaalAaya() {
   if (!can('purchase.create')) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Maal Aaya' }} />
+        <Stack.Screen options={{ title: 'Stock Chadhao' }} />
         <Screen>
-          <Text variant="display">Maal Aaya</Text>
-          <Empty title="Iski permission nahi hai" hint="Admin se maal chadhane ka haq maango." />
+          <Text variant="display">Stock Chadhao</Text>
+          <Empty title="Iski permission nahi hai" hint="Admin se stock chadhane ka haq maango." />
         </Screen>
       </>
     );
@@ -163,12 +163,12 @@ export default function MaalAaya() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Maal Aaya' }} />
+      <Stack.Screen options={{ title: 'Stock Chadhao' }} />
       <Screen>
         <View>
-          <Text variant="display">Maal Aaya</Text>
+          <Text variant="display">Stock Chadhao</Text>
           <Text variant="small" color="textMuted">
-            Godown mein naya maal aaye to yahan entry karein.
+            Supplier se naya maal aaya? Yahan daalo — stock bhi badhega aur supplier ka hisab bhi ban jayega.
           </Text>
         </View>
 
@@ -179,10 +179,10 @@ export default function MaalAaya() {
             options={(suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))}
             onChange={setSupplierId}
             onCreate={addSupplier}
-            placeholder="Kisse aaya?"
+            placeholder="Kis supplier se aaya?"
             hint="Naam likh ke naya supplier bhi bana sakte ho."
           />
-          <Input label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
+          <Input label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
         </Card>
 
         <VariantPicker
@@ -215,11 +215,11 @@ export default function MaalAaya() {
                     />
                     <Input
                       containerStyle={{ flex: 1 }}
-                      label="Kitne ka pada"
+                      label="Ek ka rate"
                       value={l.rate ? String(l.rate) : ''}
                       onChangeText={(v) => patch(l.variantId, { rate: Number(v.replace(/[^0-9.]/g, '')) || 0 })}
                       keyboardType="decimal-pad"
-                      hint="Ek piece ka"
+                      hint="Supplier ko jitne ka diya"
                     />
                   </Row>
                   <Text variant="small" color="textFaint">
@@ -251,7 +251,7 @@ export default function MaalAaya() {
         ) : null}
 
         <Button
-          title={totalQty > 0 ? `${totalQty} pcs chadha do` : 'Chadha do'}
+          title={totalQty > 0 ? `${totalQty} pcs chadha do` : 'Stock chadha do'}
           size="lg"
           full
           onPress={save}

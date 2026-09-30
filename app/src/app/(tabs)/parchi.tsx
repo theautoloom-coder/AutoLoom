@@ -285,7 +285,7 @@ export default function ParchiScreen() {
               ? 'Aaj abhi tak koi entry nahi hui.'
               : 'Is din koi entry nahi hui.'
           }
-          hint="Neeche “+” dabao — Bill Banao, Stock Chadhao ya Kharcha Likho."
+          hint="Neeche “Nayi entry” dabao — Bill Banao, Stock Chadhao ya Kharcha Likho."
         />
       ) : (
         groups.map((g) => (

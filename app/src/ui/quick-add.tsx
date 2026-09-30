@@ -10,6 +10,11 @@
  * a button and not a sixth tab — and why it sits where a thumb already rests
  * rather than at the top of a screen.
  *
+ * It says "Nayi entry", not just "+". A bare red circle is a convention among
+ * people who use a lot of apps; the owner of this shop opened it, looked for
+ * the way to add stock, and did not find one. A button that has to be guessed
+ * at is a button that does not exist.
+ *
  * Every label here is a verb, and it is the SAME wording as the heading of the
  * screen it opens. People were telling the owner they could not follow the
  * app, and a button called "Maal Gaya" opening a screen about making a bill
@@ -101,17 +106,20 @@ export function QuickAdd() {
             right: space.lg,
             // Clear of the tab bar, where the thumb already is.
             bottom: Platform.OS === 'web' ? 76 : 92,
-            width: 56,
-            height: 56,
-            borderRadius: radius.pill,
-            backgroundColor: t.accent,
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            transform: [{ scale: s.pressed ? 0.94 : 1 }],
+            gap: 6,
+            height: 52,
+            paddingHorizontal: space.lg,
+            borderRadius: radius.pill,
+            backgroundColor: t.accent,
+            transform: [{ scale: s.pressed ? 0.97 : 1 }],
           },
           shadow.lg,
         ]}>
-        <Text style={{ color: t.accentText, fontSize: 30, lineHeight: 34, marginTop: -2 }}>+</Text>
+        <Text style={{ color: t.accentText, fontSize: 26, lineHeight: 30, marginTop: -2 }}>+</Text>
+        <Text style={{ color: t.accentText, fontWeight: '700', fontSize: 15 }}>Nayi entry</Text>
       </Pressable>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Kya karna hai?">

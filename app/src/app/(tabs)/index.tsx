@@ -22,7 +22,7 @@ import { formatINR, formatINRShort, toDateString } from '@domain';
 
 import { DASHBOARD_TODAY, TODAY_FEED } from '@/lib/queries';
 import { useSession } from '@/lib/session';
-import { Card, Empty, Grid, IconBadge, ListRow, Row, Screen, SectionTitle, StatTile, Text } from '@/ui';
+import { Button, Card, Empty, Grid, IconBadge, ListRow, Row, Screen, SectionTitle, StatTile, Text } from '@/ui';
 import { clockOf, KIND } from '@/ui/kinds';
 import { useCountUp } from '@/ui/motion';
 import { SkeletonList, SkeletonTile } from '@/ui/skeleton';
@@ -75,6 +75,31 @@ export default function HomeScreen() {
         </Text>
       </View>
 
+      {/* The two jobs that happen twenty times a day, named and on the first
+          screen. Everything used to live behind an unlabelled red circle, and
+          the shop's own owner opened the app, looked for how to add stock, and
+          could not find it. A main action you have to discover is not a main
+          action. The other three are still one tap away under "Nayi entry". */}
+      <Row gap={space.sm}>
+        {can('sale.create') ? (
+          <Button
+            title="Bill Banao"
+            size="lg"
+            onPress={() => router.push('/invoice/edit')}
+            style={{ flex: 1 }}
+          />
+        ) : null}
+        {can('purchase.create') || can('stock.adjust') ? (
+          <Button
+            title="Stock Chadhao"
+            tone="secondary"
+            size="lg"
+            onPress={() => router.push('/stock/add')}
+            style={{ flex: 1 }}
+          />
+        ) : null}
+      </Row>
+
       {kpiLoading ? (
         <Grid min={150}>
           {Array.from({ length: tileCount }, (_, i) => (
@@ -121,7 +146,7 @@ export default function HomeScreen() {
         // and then collapse to two.
         <SkeletonList rows={3} size={38} />
       ) : (feed ?? []).length === 0 ? (
-        <Empty art="parchi" title="Aaj abhi tak kuch nahi hua" hint="Neeche “+” dabao — Bill Banao, Stock Chadhao ya Kharcha Likho." />
+        <Empty art="parchi" title="Aaj abhi tak kuch nahi hua" hint="Neeche “Nayi entry” dabao — Bill Banao, Stock Chadhao ya Kharcha Likho." />
       ) : (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(feed ?? []).map((f) => {

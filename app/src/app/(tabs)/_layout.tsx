@@ -264,10 +264,16 @@ export default function TabsLayout() {
     </View>
   );
 
+  // The "+" belongs on BOTH layouts. It used to be mounted only in the phone
+  // branch, so on a computer the five jobs this app exists for — stock in, a
+  // bill, a kharcha, a write-off, a count — had no way in at all. The owner
+  // opened it on a desktop, went looking for how to add stock, and was right
+  // that there was nothing there.
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: t.bg }}>
       <Sidebar />
       <View style={{ flex: 1 }}>{tabs}</View>
+      <QuickAdd />
     </View>
   );
 }

@@ -51,7 +51,7 @@ const TOPICS: Topic[] = [
     icon: 'arrow-up-circle-outline',
     accent: 'blue',
     steps: [
-      'Neeche laal “+” dabao, phir “Bill Banao” chuno.',
+      'Neeche laal “Nayi entry” dabao, phir “Bill Banao” chuno.',
       'Grahak chuno. Naya ho to naam likho aur “+ Add” dabao — grahak wala form khul jaayega.',
       'Maal “Scan karo ya SKU / naam likho” wale box se daalo. Phone par “Scan” se barcode bhi padh lo.',
       'Har line par Qty, Rate aur “Chhoot %” dekh lo.',
@@ -67,7 +67,7 @@ const TOPICS: Topic[] = [
     icon: 'arrow-down-circle-outline',
     accent: 'green',
     steps: [
-      'Neeche laal “+” dabao, phir “Stock Chadhao” chuno.',
+      'Neeche laal “Nayi entry” dabao, phir “Stock Chadhao” chuno.',
       'Supplier chuno. Naya hai to naam likho aur “+ Add” dabao — wahin ban jaayega.',
       'Date dekh lo — aaj ki pehle se bhari hai.',
       'Maal scan karo ya naam likho. Ek saath kai cheezein daal sakte ho.',
@@ -97,7 +97,7 @@ const TOPICS: Topic[] = [
     icon: 'alert-circle-outline',
     accent: 'rose',
     steps: [
-      'Neeche laal “+” dabao, phir “Kharab Likho” chuno. (“Aur” tab → Godown mein bhi hai.)',
+      'Neeche laal “Nayi entry” dabao, phir “Kharab Likho” chuno. (“Aur” tab → Godown mein bhi hai.)',
       '“Kya hua?” mein se ek chuno — Kharab, Reject, Nahi mila, Toot Gaya, Ginti ka farak ya Aur kuch.',
       'Maal scan karo ya naam likho.',
       '“Kitne kharab” bharo aur “Ek ka kharid rate” dekh lo.',
@@ -111,7 +111,7 @@ const TOPICS: Topic[] = [
     icon: 'checkbox-outline',
     accent: 'teal',
     steps: [
-      'Neeche laal “+” dabao, phir “Ginti Karo” chuno. (“Aur” tab → Godown mein bhi hai.)',
+      'Neeche laal “Nayi entry” dabao, phir “Ginti Karo” chuno. (“Aur” tab → Godown mein bhi hai.)',
       'Jitne item ginne hain, sab scan karo ya naam likh ke daal lo.',
       '“System Stock” app ka number hai. “Actual Stock” mein ginti karke apna number likho.',
       '“Difference” apne aap aa jaayega. Farak ho to neeche se wajah chuno.',
@@ -125,7 +125,7 @@ const TOPICS: Topic[] = [
     icon: 'wallet-outline',
     accent: 'amber',
     steps: [
-      'Neeche laal “+” dabao, phir “Kharcha Likho” chuno. (“Aur” tab → “Kharcha Likho” bhi wahi kholta hai.)',
+      'Neeche laal “Nayi entry” dabao, phir “Kharcha Likho” chuno. (“Aur” tab → “Kharcha Likho” bhi wahi kholta hai.)',
       '“Kitna kharcha hua?” mein paisa daalo.',
       '“KIS CHEEZ KA” mein se chuno — Transport, Petrol, Rent, Bijli, Loading, Packing, Repair, Chai/Pani. Aur kuch ho to “Other”.',
       '“PAISA KAISE DIYA” chuno — Cash, Online ya UPI. “Kisne diya” mein naam chuno.',

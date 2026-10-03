@@ -41,7 +41,7 @@ export default function PurchaseEdit() {
   const { data: company } = useQuery<{ state_code: string; round_to_rupee: number }>('SELECT state_code, round_to_rupee FROM company_settings LIMIT 1');
   const { data: original, isLoading: originalLoading } = useQuery<{ id: string; doc_no: string; supplier_id: string; location_id: string; is_interstate: number }>('SELECT id, doc_no, supplier_id, location_id, is_interstate FROM purchases WHERE id = ?', [against ?? '']);
   const { data: originalLines, isLoading: originalLinesLoading } = useQuery<Line & { returned: number }>(
-    `SELECT pl.*, COALESCE((SELECT SUM(x.qty) FROM purchase_lines x JOIN purchases px ON px.id = x.purchase_id WHERE x.against_line_id = pl.id AND px.status <> 'cancelled'), 0) AS returned
+    `SELECT pl.*, COALESCE((SELECT SUM(x.qty) FROM purchase_lines x JOIN purchases px ON px.id = x.purchase_id WHERE x.against_line_id = pl.id AND px.status = 'posted'), 0) AS returned
      FROM purchase_lines pl WHERE pl.purchase_id = ? ORDER BY pl.line_no`, [against ?? '']);
 
   const [posting, setPosting] = useState(false);

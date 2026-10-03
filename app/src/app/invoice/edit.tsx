@@ -64,9 +64,13 @@ export default function InvoiceEdit() {
   const customer = customers?.find((c) => c.id === doc?.customer_id) ?? null;
   const { data: locations } = useQuery<{ id: string; name: string }>("SELECT id, name FROM locations WHERE is_active = 1 AND type <> 'damaged' ORDER BY sort_order");
   const { data: original, isLoading: originalLoading } = useQuery<{ id: string; doc_no: string; customer_id: string; location_id: string; is_interstate: number; price_list_id: string | null }>('SELECT id, doc_no, customer_id, location_id, is_interstate, price_list_id FROM sales_invoices WHERE id = ?', [against ?? '']);
+  // `returned` counts POSTED returns only. It counted every return not
+  // cancelled — drafts included, this very draft among them — so posting a
+  // return was refused with "sirf 0 hi aur wapas ho sakte hain", and a draft
+  // left over from an earlier try made the next return open with no lines.
   const { data: originalLines, isLoading: originalLinesLoading } = useQuery<Line & { returned: number }>(
     `SELECT l.*, pv.sku, pv.avg_cost, pv.min_selling_price, pv.last_purchase_cost, pv.retail_price, pv.dealer_price, pv.wholesale_price, 0 AS here,
-            COALESCE((SELECT SUM(x.qty) FROM sales_invoice_lines x JOIN sales_invoices ix ON ix.id = x.invoice_id WHERE x.against_line_id = l.id AND ix.status <> 'cancelled'), 0) AS returned
+            COALESCE((SELECT SUM(x.qty) FROM sales_invoice_lines x JOIN sales_invoices ix ON ix.id = x.invoice_id WHERE x.against_line_id = l.id AND ix.status = 'posted'), 0) AS returned
      FROM sales_invoice_lines l JOIN product_variants pv ON pv.id = l.variant_id WHERE l.invoice_id = ? ORDER BY l.line_no`, [against ?? '']);
 
   const gst = shop.gstEnabled;

@@ -115,6 +115,32 @@ console.log('\n▸ Bill Banao');
 }
 
 // ---------------------------------------------------------------------------
+// The return used to open empty — no grahak, MAAL · 0 — because it waited for
+// the original bill's query to be `undefined`, and PowerSync answers `[]`.
+// Found on the shop's phone; no test had ever pressed "Maal wapas".
+console.log('\n▸ Maal wapas');
+{
+  const inv = sql("select id from sales_invoices where status='posted' and doc_type='invoice' order by posted_at desc limit 1");
+  const before = num("select count(*) from sales_invoices where doc_type='credit_note' and status='posted'");
+  await go(`/invoice/${inv}`, 5000);
+  await page.getByRole('button', { name: 'Maal wapas' }).click();
+  await page.waitForTimeout(7000);
+  const lines = num(`select count(*) from sales_invoice_lines l join sales_invoices i on i.id = l.invoice_id
+                      where i.against_invoice_id = '${inv}' and i.status = 'draft'`);
+  check('the return opens with the bill\'s maal', lines > 0, `${lines} line(s)`);
+  const post = page.getByRole('button', { name: /Wapasi likh do/i });
+  if (await post.isEnabled().catch(() => false)) {
+    await post.click();
+    await page.waitForTimeout(2000);
+    await page.getByRole('button', { name: /Aage badho|Haan/i }).first().click().catch(() => {});
+    await page.waitForTimeout(7000);
+  }
+  const after = num("select count(*) from sales_invoices where doc_type='credit_note' and status='posted'");
+  check('return posted', after === before + 1, `${before} → ${after}`);
+  check('stock came back', num("select count(*) from stock_movements where movement_type='sale_return' and date(created_at)=current_date") > 0);
+}
+
+// ---------------------------------------------------------------------------
 console.log('\n▸ Kharab Likho');
 {
   const before = num("select count(*) from stock_movements where movement_type='damage'");

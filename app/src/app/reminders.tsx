@@ -34,7 +34,7 @@ type Bill = { id: string; doc_no: string; doc_date: string; grand_total: number;
 const FILTERS = [
   { key: 'all', label: 'Sab' },
   { key: 'today', label: 'Aaj bill hua' },
-  { key: 'overdue', label: 'Overdue' },
+  { key: 'overdue', label: 'Der ho gayi' },
 ] as const;
 
 function daysOld(date: string | null): number | null {
@@ -84,6 +84,11 @@ export default function RemindersScreen() {
     filter === 'all' ? true : filter === 'today' ? p.bills_today > 0 : isOverdue(p));
   const total = visible.reduce((a, p) => a + p.balance, 0);
   const overdueCount = (pending ?? []).filter(isOverdue).length;
+  // Who the one-by-one walk has already reached — sent, or skipped for want
+  // of a mobile number — so it moves on instead of sticking on that grahak.
+  const [walked, setWalked] = useState<string[]>([]);
+  const nextToSend = visible.find((p) => !walked.includes(p.id));
+  const sentHere = visible.filter((p) => walked.includes(p.id)).length;
   const shown = useCountUp(total);
 
   async function remind(p: Pending) {
@@ -107,7 +112,7 @@ export default function RemindersScreen() {
     await shareImageDataUrl(url, { dialogTitle: `Payment QR · ${name}`, fileName: 'payment-qr.gif' });
   }
 
-  const sampleName = visible[0]?.name ?? 'Customer';
+  const sampleName = visible[0]?.name ?? 'Grahak';
   const sampleMessage = reminderMessage(shop.wa, { name: sampleName, pending: visible[0]?.balance ?? 0 });
 
   return (
@@ -129,16 +134,31 @@ export default function RemindersScreen() {
               <Text variant="label" color="textMuted">Kul baaki paisa</Text>
               <Text style={[typeScale.hero, { fontSize: 34, lineHeight: 38, color: t.warn }]}>{formatINR(Math.round(shown))}</Text>
               <Text variant="small" color="textFaint">
-                {visible.length} customer{overdueCount ? ` · ${overdueCount} overdue` : ''}
+                {visible.length} grahak{overdueCount ? ` · ${overdueCount} ki der ho gayi` : ''}
               </Text>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={async () => { for (const p of visible.slice(0, 1)) await remind(p); }}
-              android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
-              style={({ pressed }) => [styles.redPill, { backgroundColor: t.accent, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-              <Text style={{ color: t.accentText, fontWeight: '700' }}>Sabko bhejo</Text>
-            </Pressable>
+            {/* "Sabko bhejo" sent to the first grahak only — WhatsApp opens one
+                chat at a time, and the loop stopped after one. So it goes one
+                by one: each press opens the next grahak not yet sent to, and
+                the button says how far along the list it is. */}
+            {visible.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={!nextToSend}
+                onPress={async () => {
+                  if (!nextToSend) return;
+                  await remind(nextToSend);
+                  setWalked((w) => [...w, nextToSend.id]);
+                }}
+                android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+                style={({ pressed }) => [styles.redPill, { backgroundColor: t.accent, opacity: nextToSend ? 1 : 0.5, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+                <Text style={{ color: t.accentText, fontWeight: '700' }}>
+                  {sentHere === 0
+                    ? (visible.length > 1 ? `Sabko bhejo · ${visible.length}` : 'WhatsApp bhejo')
+                    : nextToSend ? `Agla bhejo · ${sentHere + 1}/${visible.length}` : 'Sabko bhej diya'}
+                </Text>
+              </Pressable>
+            ) : null}
           </Row>
         </Card>
       </Enter>

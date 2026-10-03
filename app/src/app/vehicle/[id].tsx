@@ -15,6 +15,11 @@
  * The year matters because a 2019 Creta and a 2024 Creta take different parts.
  * When Search passes one, the generation is resolved from it and the header
  * says which one, so nobody has to trust it silently.
+ *
+ * "Model aur bulb" answers the question asked most at this counter — "Nexon
+ * mein kaunsa bulb lagta hai?" The socket per model-year was seeded with the
+ * car list and synced to every phone, and no screen ever showed it. Tapping a
+ * model-year also narrows the maal below to that one.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,7 +29,7 @@ import { View } from 'react-native';
 import { formatINR, generationForYear } from '@domain';
 
 import { VEHICLE_GENERATIONS, VEHICLE_MODEL, VEHICLE_PRODUCTS } from '@/lib/queries';
-import { Card, Chip, Empty, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Badge, Card, Chip, Empty, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
@@ -52,8 +57,18 @@ export default function VehicleScreen() {
   const { data: models } = useQuery<Model>(VEHICLE_MODEL.sql, [id]);
   const { data: gens } = useQuery<Gen>(VEHICLE_GENERATIONS.sql, [id]);
 
+  const { data: sockets } = useQuery<{ generation_id: string; position_label: string | null; socket: string }>(
+    `SELECT m.generation_id, m.position_label, o.value AS socket
+       FROM vehicle_spec_map m
+       JOIN vehicle_generations g ON g.id = m.generation_id
+       JOIN spec_options o ON o.id = m.option_id
+      WHERE g.model_id = ?
+      ORDER BY m.position_label`, [id]);
+  const [picked, setPicked] = useState<string | null>(null);
+
   const year = yearParam ? Number(yearParam) : null;
-  const gen = useMemo(() => (year && gens ? generationForYear(gens, year) : null), [gens, year]);
+  const fromYear = useMemo(() => (year && gens ? generationForYear(gens, year) : null), [gens, year]);
+  const gen = picked ? (gens ?? []).find((g) => g.id === picked) ?? null : fromYear;
 
   const { data: fits } = useQuery<Hit>(VEHICLE_PRODUCTS.sql, [id, gen?.id ?? '', gen ? 0 : (year ?? 0)]);
 
@@ -76,6 +91,28 @@ export default function VehicleScreen() {
             Is gaadi mein jo maal lagta hai.
           </Text>
         </View>
+
+        {(gens ?? []).length > 0 ? (
+          <>
+            <SectionTitle>Model aur bulb</SectionTitle>
+            <Card style={{ gap: 0, paddingVertical: 4 }}>
+              {(gens ?? []).map((g) => {
+                const mine = (sockets ?? []).filter((x) => x.generation_id === g.id);
+                return (
+                  <ListRow
+                    key={g.id}
+                    title={g.name}
+                    subtitle={mine.length
+                      ? mine.map((x) => `${x.position_label ?? 'Bulb'} ${x.socket}`).join(' · ')
+                      : `${g.year_from} se ${g.year_to ?? 'ab tak'}`}
+                    onPress={() => setPicked(picked === g.id ? null : g.id)}
+                    right={gen?.id === g.id ? <Badge tone="accent">chuna</Badge> : undefined}
+                  />
+                );
+              })}
+            </Card>
+          </>
+        ) : null}
 
         {all.length > 0 ? (
           <Row gap={space.xs} wrap>

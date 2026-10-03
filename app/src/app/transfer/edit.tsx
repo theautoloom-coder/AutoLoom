@@ -62,7 +62,7 @@ export default function TransferEdit() {
     if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
     const short = (lines ?? []).filter((l) => l.qty > l.here);
     if (short.length && !(await confirm('Kuch line mein wahan ke stock se zyada qty hai', `${short.map((l) => l.description).join(', ')}. Phir bhi bhejein? Jahan se ja raha hai wahan stock minus mein chala jayega, jab tak theek na karo.`))) return;
-    if (!(await confirm('Transfer bhej dein?', 'Stock leaves the source location now and will be in transit until received.'))) return;
+    if (!(await confirm('Transfer bhej dein?', 'Maal abhi yahan se nikal ke wahan chadh jayega.'))) return;
     setBusy(true);
     try {
       await db.writeTransaction(async (tx) => dispatchTransfer(tx, id, actor));
@@ -84,14 +84,14 @@ export default function TransferEdit() {
     <>
       <Stack.Screen options={{ title: 'Maal doosri jagah bhejo' }} />
       <Screen>
-        <Row style={{ justifyContent: 'space-between' }}><Text variant="display">Transfer</Text><Badge>draft</Badge></Row>
+        <Row style={{ justifyContent: 'space-between' }}><Text variant="display">Transfer</Text><Badge>adhoora</Badge></Row>
         <FormSection title="Kahan se kahan">
           <Row gap={12}>
             <View style={{ flex: 1 }}><SelectField label="Se" value={doc.from_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ from_location_id: v })} /></View>
             <View style={{ flex: 1 }}><SelectField label="Tak" value={doc.to_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => v && patch({ to_location_id: v })} /></View>
           </Row>
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} />
+            <Input containerStyle={{ flex: 1 }} label="Tareekh" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} />
             <Input containerStyle={{ flex: 2 }} label="Note" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} placeholder="Gaadi, driver, wajah" />
           </Row>
         </FormSection>

@@ -3,9 +3,12 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { statusLabel } from '@domain';
+
 import { cancelTransfer, receiveTransfer } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
+import { dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Empty, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
@@ -34,11 +37,11 @@ export default function TransferDetail() {
     <>
       <Stack.Screen options={{ title: t.doc_no ?? 'Transfer' }} />
       <Screen>
-        <Badge tone={tone}>{t.status === 'dispatched' ? 'in transit' : t.status}</Badge>
+        <Badge tone={tone}>{t.status === 'dispatched' ? 'raste mein' : statusLabel(t.status)}</Badge>
         <Text variant="display">{t.from_name} → {t.to_name}</Text>
         <Card style={{ gap: 0 }}>
-          <KV k="Number" v={t.doc_no ?? '—'} mono />
-          <KV k="Date" v={t.doc_date} />
+          <KV k="Transfer no." v={t.doc_no ?? '—'} mono />
+          <KV k="Tareekh" v={dayLabel(t.doc_date)} />
           {t.dispatched_at ? <KV k="Bhej diya" v={new Date(t.dispatched_at).toLocaleString('en-IN')} /> : null}
           {t.received_at ? <KV k="Aa gaya" v={new Date(t.received_at).toLocaleString('en-IN')} /> : null}
           {t.notes ? <KV k="Note" v={t.notes} /> : null}
@@ -46,7 +49,7 @@ export default function TransferDetail() {
         {t.status === 'dispatched' && can('stock.transfer') ? (
           <Row gap={space.sm}>
             <Button title={`${t.to_name} mein le lo`} size="lg" style={{ flex: 1 }} loading={busy} onPress={async () => { if (await confirm('Transfer le lein?', 'Maal wahan pahunch jayega.')) run('Maal wahan pahunch gaya.', () => db.writeTransaction((tx) => receiveTransfer(tx, t.id, actor))); }} />
-            <Button title="Rehne do" tone="danger" onPress={async () => { if (await confirm('Transfer cancel karein?', 'Stock returns to the source.')) run('Cancel ho gaya.', () => db.writeTransaction((tx) => cancelTransfer(tx, t.id, actor))); }} />
+            <Button title="Rehne do" tone="danger" onPress={async () => { if (await confirm('Transfer cancel karein?', 'Maal wapas wahin chala jayega jahan se bheja tha.')) run('Cancel ho gaya.', () => db.writeTransaction((tx) => cancelTransfer(tx, t.id, actor))); }} />
           </Row>
         ) : null}
         <SectionTitle>Maal</SectionTitle>

@@ -8,17 +8,19 @@
  * GST is only applied when the owner turns it on in Settings.
  */
 import { useQuery } from '@powersync/react';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { checkCredit, checkPrice, formatINR, isDateString, isInterstate, resolvePrice, statusLabel, toDateString } from '@domain';
 
+import { takeBack } from '@/lib/hand-back';
 import { CUSTOMER_LAST_RATE, CUSTOMER_PRICE_CONTEXT } from '@/lib/queries';
 import { postInvoice, totalLines, type DraftLine } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { useShopSettings } from '@/lib/use-settings';
+import { customerTypeLabel } from '@/lib/words';
 import { deleteRow, insertRow, updateRow } from '@/lib/writes';
 import { Badge, Button, Card, Chip, Divider, Input, KV, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
@@ -113,6 +115,18 @@ export default function InvoiceEdit() {
 
   const patch = (p: Record<string, string | number | boolean | null>) => id && updateRow(db, 'sales_invoices', id, p);
 
+  // Back from "+ Naya banao" with a grahak made for this bill: choose them.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!id) return;
+      const made = takeBack('customer');
+      if (made) void chooseCustomer(made);
+      // chooseCustomer reads lines and customers; re-running is harmless,
+      // takeBack hands the id over only once.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, lines, customers]),
+  );
+
   /** Last price this customer paid → admin price. */
   async function priceFor(cid: string | null, v: { id: string; retail_price: number; dealer_price?: number | null; wholesale_price?: number | null; min_selling_price?: number | null; avg_cost?: number | null; last_purchase_cost?: number | null }) {
     if (cid) {
@@ -125,7 +139,10 @@ export default function InvoiceEdit() {
   }
 
   async function chooseCustomer(cid: string | null) {
-    const c = customers?.find((x) => x.id === cid);
+    // A customer made a moment ago from this bill may not be in the list yet.
+    const c = customers?.find((x) => x.id === cid)
+      ?? (cid ? await db.getOptional<Customer>('SELECT id, name, state_code, price_list_id, credit_days FROM customers WHERE id = ?', [cid]) : null)
+      ?? undefined;
     await patch({ customer_id: cid, customer_vehicle_id: null, price_list_id: c?.price_list_id ?? null, place_of_supply_state: c?.state_code ?? null, is_interstate: isInterstate(shop.company?.state_code, c?.state_code), credit_days: c?.credit_days ?? 0 });
     for (const l of lines ?? []) {
       const p = await priceFor(cid, l);
@@ -228,7 +245,7 @@ export default function InvoiceEdit() {
   // profit shown here is the profit Hisab will report later.
   const costOfGoods = (lines ?? []).reduce((a, l) => a + l.qty * (l.avg_cost || 0), 0);
   const billProfit = totals.totals.grand_total - costOfGoods;
-  const sourceLabel: Record<string, string> = { last: 'pichla rate', customer: 'special rate', price_list: 'list ka rate', dealer: 'dealer rate', wholesale: 'thok rate', retail: 'admin rate', manual: 'haath se' };
+  const sourceLabel: Record<string, string> = { last: 'pichla rate', customer: 'special rate', price_list: 'list ka rate', dealer: 'dealer rate', wholesale: 'thok rate', retail: 'dukaan ka rate', manual: 'haath se' };
 
   return (
     <>
@@ -248,7 +265,7 @@ export default function InvoiceEdit() {
         {isCN && original?.[0] ? <Text variant="small" color="textMuted">Bill {original[0].doc_no} ke against. Qty utni hi rakho jitna maal sach mein wapas aaya. Jo toota ya kharab hai use "Kharab / toota hua" mark karo — wo bechne wale stock mein wapas nahi jayega.</Text> : null}
 
         <FormSection title="Grahak">
-          <SelectField label="Kaun le raha hai" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${c.customer_type}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={() => router.push('/customer/edit')} />
+          <SelectField label="Kaun le raha hai" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${customerTypeLabel(c.customer_type)}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={(text) => router.push({ pathname: '/customer/edit', params: { name: text, forBill: '1' } })} />
           {customer ? <CreditBlock customer={customer} credit={credit} gst={gst} interstate={interstate} /> : null}
           <Row gap={12}>
             {/* Already today's date — the draft was created with it. The job

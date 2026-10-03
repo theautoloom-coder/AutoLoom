@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { formatINR } from '@domain';
 
 import { useSession } from '@/lib/session';
+import { dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Divider, Empty, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { space } from '@/ui/theme';
 
@@ -18,7 +19,7 @@ type Ledger = { id: string; entry_date: string; doc_type: string; doc_no: string
 type Purchase = { id: string; doc_no: string | null; doc_date: string; supplier_invoice_no: string | null; grand_total: number; paid_total: number; status: string; doc_type: string };
 type Top = { id: string; sku: string; variant_name: string; product_name: string; qty: number; last_rate: number; last_date: string };
 
-const DOC_LABEL: Record<string, string> = { opening: 'Opening balance', purchase: 'Purchase', debit_note: 'Debit note', payment_out: 'Payment made', adjustment: 'Adjustment', cancel_reversal: 'Cancellation' };
+const DOC_LABEL: Record<string, string> = { opening: 'Purana baaki', purchase: 'Maal aaya', debit_note: 'Maal wapas bheja', payment_out: 'Paisa diya', adjustment: 'Sudhar', cancel_reversal: 'Cancel' };
 
 export default function SupplierScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -66,7 +67,7 @@ export default function SupplierScreen() {
               </View>
               <View style={{ flex: 1, minWidth: 140 }}>
                 <Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Kitne din mein dena hai</Text>
-                <Text variant="number" color="navyText">{s.payment_terms_days} days</Text>
+                <Text variant="number" color="navyText">{s.payment_terms_days} din</Text>
               </View>
             </Row>
           </Card>
@@ -85,11 +86,11 @@ export default function SupplierScreen() {
 
         {showMoney ? (
           <>
-            <SectionTitle>Purchase</SectionTitle>
+            <SectionTitle>Kab kya aaya</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(purchases ?? []).map((p) => (
-                <ListRow key={p.id} title={p.doc_no ?? '(draft)'} subtitle={`${p.doc_date}${p.supplier_invoice_no ? ` · their bill ${p.supplier_invoice_no}` : ''}`}
-                  right={<View style={{ alignItems: 'flex-end' }}><Text mono>{formatINR(p.grand_total)}</Text><Badge tone={p.status === 'cancelled' ? 'danger' : p.doc_type === 'debit_note' ? 'info' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>{p.status === 'cancelled' ? 'cancelled' : p.doc_type === 'debit_note' ? 'debit note' : p.paid_total >= p.grand_total ? 'paid' : p.status}</Badge></View>} />
+                <ListRow key={p.id} title={p.doc_no ?? 'Adhoori entry'} subtitle={`${dayLabel(p.doc_date)}${p.supplier_invoice_no ? ` · unka bill ${p.supplier_invoice_no}` : ''}`}
+                  right={<View style={{ alignItems: 'flex-end' }}><Text mono>{formatINR(p.grand_total)}</Text><Badge tone={p.status === 'cancelled' ? 'danger' : p.doc_type === 'debit_note' ? 'info' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>{p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : p.doc_type === 'debit_note' ? 'wapas bheja' : p.paid_total >= p.grand_total ? 'chuka diya' : 'dena baaki'}</Badge></View>} />
               ))}
               {(purchases ?? []).length === 0 ? <Empty title="Abhi tak kuch nahi kharida" /> : null}
             </Card>
@@ -97,7 +98,7 @@ export default function SupplierScreen() {
             <SectionTitle>Inse aane wala maal</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(top ?? []).map((p) => (
-                <ListRow key={p.id} title={`${p.product_name} · ${p.variant_name}`} subtitle={`${p.sku} · last ${p.last_date}`} right={<View style={{ alignItems: 'flex-end' }}><Text mono>{p.qty} pcs</Text><Text variant="small" color="textMuted" mono>@ {formatINR(p.last_rate)}</Text></View>} />
+                <ListRow key={p.id} title={`${p.product_name} · ${p.variant_name}`} subtitle={`${p.sku} · aakhri baar ${dayLabel(p.last_date)}`} right={<View style={{ alignItems: 'flex-end' }}><Text mono>{p.qty} pcs</Text><Text variant="small" color="textMuted" mono>@ {formatINR(p.last_rate)}</Text></View>} />
               ))}
               {(top ?? []).length === 0 ? <Empty title="Abhi tak kuch nahi kharida" /> : null}
             </Card>
@@ -110,7 +111,7 @@ export default function SupplierScreen() {
                   <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">
                     <View style={{ flex: 1.6 }}>
                       <Text variant="small" style={{ fontWeight: '600' }}>{DOC_LABEL[e.doc_type] ?? e.doc_type}{e.doc_no ? ` ${e.doc_no}` : ''}</Text>
-                      <Text variant="small" color="textFaint">{e.entry_date}{e.narration ? ` · ${e.narration}` : ''}</Text>
+                      <Text variant="small" color="textFaint">{dayLabel(e.entry_date)}{e.narration ? ` · ${e.narration}` : ''}</Text>
                     </View>
                     <Text variant="small" mono style={{ width: 80, textAlign: 'right' }} color="ok">{e.debit ? formatINR(e.debit) : ''}</Text>
                     <Text variant="small" mono style={{ width: 80, textAlign: 'right' }}>{e.credit ? formatINR(e.credit) : ''}</Text>

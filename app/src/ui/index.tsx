@@ -123,6 +123,17 @@ export function Amount({ children, variant = 'mono', color, style }: { children:
 // -----------------------------------------------------------------------------
 // Layout
 // -----------------------------------------------------------------------------
+/**
+ * Scroll a field to the top of the screen.
+ *
+ * The keyboard-aware scroll lifts a focused field just clear of the keyboard,
+ * which is right for a form and wrong for a search: the field sat on the
+ * keyboard's edge and every result it found was drawn underneath it. On the
+ * bill a counter hand typed "ZZ", saw nothing, and had to close the keyboard to
+ * find out the item was there all along. A search box asks for this instead.
+ */
+export const ScreenScroll = React.createContext<{ bringToTop: (field: View | TextInput | null) => void } | null>(null);
+
 export function Screen({
   children,
   scroll = true,
@@ -136,6 +147,26 @@ export function Screen({
 }) {
   const t = useTheme();
   const wide = useIsWide();
+  const scrollRef = React.useRef<ScrollView>(null);
+  const offset = React.useRef(0);
+  const scrollApi = React.useMemo(() => ({
+    bringToTop(field: View | TextInput | null) {
+      // A browser has no on-screen keyboard to dodge, and jumping the page
+      // under a mouse click is worse than the problem.
+      if (Platform.OS === 'web' || !field) return;
+      // After the keyboard has opened and the aware scroll has had its turn.
+      setTimeout(() => {
+        const sv = scrollRef.current as unknown as View | null;
+        if (!sv) return;
+        field.measureInWindow((_x, fieldY) => {
+          sv.measureInWindow((_sx, top) => {
+            const delta = fieldY - top - space.sm;
+            if (delta > space.lg) scrollRef.current?.scrollTo({ y: offset.current + delta, animated: true });
+          });
+        });
+      }, 320);
+    },
+  }), []);
   // Under a stack header the header has already paid for the status bar.
   // Paying for it again here left a band of blank white between "‹ Peeche"
   // and the screen's own title on every pushed screen — about 60px on a
@@ -151,12 +182,17 @@ export function Screen({
         // Not a plain ScrollView: this is the base every form in the app sits
         // on, so it is what keeps the field you are typing in above the
         // keyboard. bottomOffset leaves a thumb's width of room under it.
-        <KeyboardAwareScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          bottomOffset={space.xl}>
-          {inner}
-        </KeyboardAwareScrollView>
+        <ScreenScroll.Provider value={scrollApi}>
+          <KeyboardAwareScrollView
+            ref={scrollRef as never}
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={32}
+            onScroll={(e) => { offset.current = e.nativeEvent.contentOffset.y; }}
+            bottomOffset={space.xl}>
+            {inner}
+          </KeyboardAwareScrollView>
+        </ScreenScroll.Provider>
       ) : (
         inner
       )}

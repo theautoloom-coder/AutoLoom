@@ -5,6 +5,7 @@ import { View, type TextInput } from 'react-native';
 
 import { isValidGstin, stateCodeFromGstin, normaliseRegistration } from '@domain';
 
+import { handBack } from '@/lib/hand-back';
 import { INDIAN_STATES } from '@/lib/states';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
@@ -32,7 +33,9 @@ const TYPES = [
 ];
 
 export default function CustomerEdit() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // name / forBill: opened from the bill's "+ Naya banao" — keep what was typed,
+  // and go back to the bill on save instead of on to this customer's page.
+  const { id, name: typedName, forBill } = useLocalSearchParams<{ id?: string; name?: string; forBill?: string }>();
   const isNew = !id;
   const router = useRouter();
   const { db } = useSystem();
@@ -50,7 +53,7 @@ export default function CustomerEdit() {
   );
   const { data: models } = useQuery<{ id: string; name: string; make_name: string }>('SELECT vm.id, vm.name, mk.name AS make_name FROM vehicle_models vm JOIN vehicle_makes mk ON mk.id = vm.make_id WHERE vm.is_active = 1 ORDER BY mk.sort_order, vm.name');
 
-  const [form, setForm] = useState<Partial<Customer>>({ customer_type: 'dealer', credit_limit: 0, credit_days: 0, opening_balance: 0, is_active: 1 });
+  const [form, setForm] = useState<Partial<Customer>>({ name: typedName ?? '', customer_type: 'dealer', credit_limit: 0, credit_days: 0, opening_balance: 0, is_active: 1 });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reg, setReg] = useState('');
@@ -178,7 +181,12 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
         }
       });
       setDirty(false);
-      router.replace(`/customer/${cid}`);
+      if (forBill && isNew) {
+        handBack('customer', cid);
+        router.back();
+      } else {
+        router.replace(`/customer/${cid}`);
+      }
     } catch (e) {
       notify(`Save nahi hua: ${(e as Error).message}. Dobara koshish karo.`);
     } finally {

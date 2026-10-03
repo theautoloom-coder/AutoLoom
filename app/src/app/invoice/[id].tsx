@@ -11,6 +11,7 @@ import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { useShopSettings } from '@/lib/use-settings';
 import { openWhatsApp, slipMessage } from '@/lib/whatsapp';
+import { dayLabel, payModeLabel } from '@/lib/words';
 import { Badge, Button, Card, Divider, Empty, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
@@ -56,8 +57,8 @@ export default function InvoiceDetail() {
 
   async function cancel() {
     if (!inv) return;
-    const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Reason for cancelling') : 'Cancelled';
-    if (!reason || !(await confirm('Ye bill cancel karein?', 'Stock comes back, the khata entry is reversed, and any cash receipt for this bill is reversed. The number stays used.'))) return;
+    const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Cancel kyun kar rahe ho?') : 'Cancel kiya';
+    if (!reason || !(await confirm('Ye bill cancel karein?', 'Maal stock mein wapas aa jayega, khate ki entry ulti ho jayegi, aur is bill ki cash receipt bhi. Bill number dobara nahi milega.'))) return;
     setBusy(true);
     try { await db.writeTransaction((tx) => cancelInvoice(tx, inv.id, reason, actor)); notify('Cancel ho gaya.'); } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
@@ -75,20 +76,20 @@ export default function InvoiceDetail() {
       <Screen>
         <View>
           <Row gap={6} wrap>
-            <Badge tone={inv.status === 'cancelled' ? 'danger' : inv.status === 'posted' ? (due > 0 && !isCN ? 'warn' : 'ok') : 'neutral'}>{inv.status === 'posted' ? (isCN ? 'return posted' : due > 0 ? 'pending' : 'paid') : inv.status}</Badge>
-            {isCN ? <Badge tone="info">against {inv.against_no}</Badge> : null}
-            {inv.credit_flag ? <Badge tone="warn">over credit limit</Badge> : null}
+            <Badge tone={inv.status === 'cancelled' ? 'danger' : inv.status === 'posted' ? (due > 0 && !isCN ? 'warn' : 'ok') : 'neutral'}>{inv.status === 'posted' ? (isCN ? 'wapasi ho gayi' : due > 0 ? 'baaki hai' : 'poora mila') : inv.status === 'cancelled' ? 'cancel' : 'adhoora'}</Badge>
+            {isCN ? <Badge tone="info">{inv.against_no} ki wapasi</Badge> : null}
+            {inv.credit_flag ? <Badge tone="warn">udhaar limit se upar</Badge> : null}
           </Row>
           <Text variant="display" style={{ marginTop: space.xs }}>{inv.customer_name}</Text>
-          <Text color="textMuted" onPress={() => router.push(`/customer/${inv.customer_id}`)}>{inv.doc_no ?? 'Draft'} · {inv.doc_date} · {inv.location_name}{inv.salesperson_name ? ` · ${inv.salesperson_name}` : ''}</Text>
+          <Text color="textMuted" onPress={() => router.push(`/customer/${inv.customer_id}`)}>{inv.doc_no ?? 'Adhoora bill'} · {dayLabel(inv.doc_date)} · {inv.location_name}{inv.salesperson_name ? ` · ${inv.salesperson_name}` : ''}</Text>
         </View>
-        {inv.status === 'cancelled' ? <Card tone="alt"><Text color="danger">Cancelled: {inv.cancel_reason}</Text></Card> : null}
+        {inv.status === 'cancelled' ? <Card tone="alt"><Text color="danger">Cancel hua: {inv.cancel_reason}</Text></Card> : null}
 
         <Card tone="navy">
           <Row gap={space.lg} wrap>
-            <View style={{ flex: 1, minWidth: 110 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>{isCN ? 'Credit' : 'Bill total'}</Text><Text variant="number" color="navyText">{formatINR(inv.grand_total)}</Text></View>
+            <View style={{ flex: 1, minWidth: 110 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>{isCN ? 'Wapas diye' : 'Bill total'}</Text><Text variant="number" color="navyText">{formatINR(inv.grand_total)}</Text></View>
             {!isCN ? <>
-              <View style={{ flex: 1, minWidth: 110 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Paid</Text><Text variant="number" color="navyText">{formatINR(inv.paid_total)}</Text></View>
+              <View style={{ flex: 1, minWidth: 110 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Mila</Text><Text variant="number" color="navyText">{formatINR(inv.paid_total)}</Text></View>
               <View style={{ flex: 1, minWidth: 110 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Is bill ka baaki</Text><Text variant="number" color="navyText">{formatINR(due)}</Text></View>
               <View style={{ flex: 1, minWidth: 110 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Khata baaki</Text><Text variant="number" color="navyText">{formatINR(inv.balance)}</Text></View>
             </> : null}
@@ -96,19 +97,22 @@ export default function InvoiceDetail() {
         </Card>
 
         <Row gap={space.sm} wrap>
+          {/* A bill the server refused, or one left half-made, opens here from
+              the khata. It needs a way back to finishing it, not a print button. */}
+          {inv.status === 'draft' ? <Button title="Bill poora karo" onPress={() => router.replace(`/invoice/edit?id=${inv.id}`)} /> : null}
           {inv.status === 'posted' && !isCN && can('payment.receive') && due > 0 ? <Button title="Jama laga do" onPress={() => router.push(`/payment/edit?direction=in&party=${inv.customer_id}&doc=${inv.id}&amount=${due}`)} /> : null}
           {inv.status === 'posted' ? <Button title="WhatsApp parchi" tone={due > 0 ? 'secondary' : 'primary'} onPress={whatsapp} /> : null}
-          <Button title="PDF / print" tone="secondary" onPress={share} />
-          {inv.status === 'posted' && !isCN && can('sale.return') ? <Button title="Return" tone="secondary" onPress={() => router.push(`/invoice/edit?against=${inv.id}`)} /> : null}
-          {inv.status === 'posted' && can('sale.cancel') ? <Button title="Cancel bill" tone="danger" onPress={cancel} loading={busy} /> : null}
+          {inv.status !== 'draft' ? <Button title="PDF / print" tone="secondary" onPress={share} /> : null}
+          {inv.status === 'posted' && !isCN && can('sale.return') ? <Button title="Maal wapas" tone="secondary" onPress={() => router.push(`/invoice/edit?against=${inv.id}`)} /> : null}
+          {inv.status === 'posted' && can('sale.cancel') ? <Button title="Bill cancel karo" tone="danger" onPress={cancel} loading={busy} /> : null}
         </Row>
 
         <SectionTitle>Maal</SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(lines ?? []).map((l) => (
-            <ListRow key={l.id} title={l.description} subtitle={`${l.qty} ${l.unit_code ?? ''} × ${formatINR(l.rate)}${l.discount_pct ? ` − ${l.discount_pct}%` : ''}${hasTax ? ` · GST ${l.tax_rate_pct}%` : ''}${l.return_condition ? ` · ${l.return_condition === 'damaged' ? 'faulty' : 'good'}` : ''}${l.return_note ? ` · ${l.return_note}` : ''}`}
+            <ListRow key={l.id} title={l.description} subtitle={`${l.qty} ${l.unit_code ?? ''} × ${formatINR(l.rate)}${l.discount_pct ? ` − ${l.discount_pct}%` : ''}${hasTax ? ` · GST ${l.tax_rate_pct}%` : ''}${l.return_condition ? ` · ${l.return_condition === 'damaged' ? 'kharab' : 'theek'}` : ''}${l.return_note ? ` · ${l.return_note}` : ''}`}
               onPress={() => router.push(`/product/${l.product_id}?variant=${l.variant_id}`)}
-              right={<View style={{ alignItems: 'flex-end' }}><Text mono>{formatINR(l.line_total)}</Text>{showCost ? <Text variant="small" color="textMuted" mono>cost {formatINR(l.unit_cost_at_sale)}</Text> : null}</View>} />
+              right={<View style={{ alignItems: 'flex-end' }}><Text mono>{formatINR(l.line_total)}</Text>{showCost ? <Text variant="small" color="textMuted" mono>lagat {formatINR(l.unit_cost_at_sale)}</Text> : null}</View>} />
           ))}
         </Card>
 
@@ -118,14 +122,14 @@ export default function InvoiceDetail() {
           {inv.other_charges ? <KV k="Aur kharcha" v={formatINR(inv.other_charges)} mono /> : null}
           {inv.round_off ? <KV k="Round off" v={formatINR(inv.round_off, { paise: true })} mono /> : null}
           <Divider />
-          <KV k={isCN ? 'Credit' : 'Total'} v={formatINR(inv.grand_total)} mono />
-          {showCost && !isCN ? <KV k="Margin" v={`${formatINR(margin)} · ${inv.taxable_total ? Math.round((margin / inv.taxable_total) * 1000) / 10 : 0}%`} mono /> : null}
-          <KV k="Payment" v={(inv.payment_mode ?? '').toUpperCase()} />
+          <KV k={isCN ? 'Wapas diye' : 'Total'} v={formatINR(inv.grand_total)} mono />
+          {showCost && !isCN ? <KV k="Munafa" v={`${formatINR(margin)} · ${inv.taxable_total ? Math.round((margin / inv.taxable_total) * 1000) / 10 : 0}%`} mono /> : null}
+          <KV k="Paisa kaise" v={payModeLabel(inv.payment_mode)} />
           {inv.notes ? <KV k="Note" v={inv.notes} /> : null}
         </Card>
 
-        {(payments ?? []).length ? (<><SectionTitle>Payment</SectionTitle><Card style={{ gap: 0, paddingVertical: 4 }}>{(payments ?? []).map((py) => <ListRow key={py.id} title={`${py.mode.toUpperCase()} · ${formatINR(py.amount)}`} subtitle={`${py.doc_no} · ${py.payment_date}${py.remarks ? ` · ${py.remarks}` : ''}${py.proof_path ? ' · 📎 proof' : ''}`} onPress={() => router.push('/payments')} />)}</Card></>) : null}
-        {(notes ?? []).length ? (<><SectionTitle>Is bill ki wapasi</SectionTitle><Card style={{ gap: 0, paddingVertical: 4 }}>{(notes ?? []).map((n) => <ListRow key={n.id} title={n.doc_no ?? 'Draft'} subtitle={n.doc_date} onPress={() => router.push(n.status === 'draft' ? `/invoice/edit?id=${n.id}` : `/invoice/${n.id}`)} right={<Text mono>{formatINR(n.grand_total)}</Text>} />)}</Card></>) : null}
+        {(payments ?? []).length ? (<><SectionTitle>Paisa mila</SectionTitle><Card style={{ gap: 0, paddingVertical: 4 }}>{(payments ?? []).map((py) => <ListRow key={py.id} title={`${payModeLabel(py.mode)} · ${formatINR(py.amount)}`} subtitle={`${py.doc_no} · ${dayLabel(py.payment_date)}${py.remarks ? ` · ${py.remarks}` : ''}${py.proof_path ? ' · 📎 photo' : ''}`} onPress={() => router.push('/payments')} />)}</Card></>) : null}
+        {(notes ?? []).length ? (<><SectionTitle>Is bill ki wapasi</SectionTitle><Card style={{ gap: 0, paddingVertical: 4 }}>{(notes ?? []).map((n) => <ListRow key={n.id} title={n.doc_no ?? 'Adhoori wapasi'} subtitle={dayLabel(n.doc_date)} onPress={() => router.push(n.status === 'draft' ? `/invoice/edit?id=${n.id}` : `/invoice/${n.id}`)} right={<Text mono>{formatINR(n.grand_total)}</Text>} />)}</Card></>) : null}
       </Screen>
     </>
   );

@@ -78,13 +78,13 @@ export function SelectField({
               <Text variant="title">{label ?? 'Chuno'}</Text>
               <Button title="Band karo" tone="ghost" size="sm" onPress={() => setOpen(false)} />
             </Row>
-            <Input value={q} onChangeText={setQ} placeholder="Type to filter" autoFocus autoCapitalize="none" autoCorrect={false} />
+            <Input value={q} onChangeText={setQ} placeholder="Naam likh ke dhoondo" autoFocus autoCapitalize="none" autoCorrect={false} />
             <FlatList
               data={filtered}
               keyExtractor={(o) => o.value}
               keyboardShouldPersistTaps="handled"
               ItemSeparatorComponent={Divider}
-              ListEmptyComponent={<Empty title="Kuch nahi mila" />}
+              ListEmptyComponent={<Empty title={q.trim() ? "Kuch nahi mila" : "Abhi list khaali hai"} hint={q.trim() || !onCreate ? undefined : "Naam likho — naya bhi yahin se ban jaayega."} />}
               ListHeaderComponent={
                 allowClear && value ? (
                   <Pressable
@@ -110,7 +110,7 @@ export function SelectField({
                       setOpen(false);
                     }}
                     style={styles.row}>
-                    <Text color="accent">+ Add “{q.trim()}”</Text>
+                    <Text color="accent">+ Naya banao: “{q.trim()}”</Text>
                   </Pressable>
                 ) : null
               }
@@ -190,7 +190,7 @@ export function MultiSelectField({
               <Text variant="title">{label ?? 'Chuno'}</Text>
               <Button title="Ho gaya" size="sm" onPress={() => setOpen(false)} />
             </Row>
-            <Input value={q} onChangeText={setQ} placeholder="Type to filter" autoCapitalize="none" autoCorrect={false} />
+            <Input value={q} onChangeText={setQ} placeholder="Naam likh ke dhoondo" autoCapitalize="none" autoCorrect={false} />
             <FlatList
               data={filtered}
               keyExtractor={(o) => o.value}
@@ -361,16 +361,15 @@ export function FormFooter({ children }: { children: React.ReactNode }) {
   return <View style={[styles.footer, { backgroundColor: t.surface, borderTopColor: t.border }]}>{children}</View>;
 }
 
-/** Ask before a destructive or irreversible action. */
+/**
+ * Ask before a destructive or irreversible action.
+ *
+ * The app's own sheet on every platform. Android's Alert put "CANCEL" and
+ * "CONTINUE" in capitals under "Bill bana dein?" — the one English question
+ * on the counter's busiest button.
+ */
 export function confirm(title: string, message: string): Promise<boolean> {
-  if (Platform.OS === 'web') return showConfirm(title, message);
-  const { Alert } = require('react-native') as typeof import('react-native');
-  return new Promise((resolve) =>
-    Alert.alert(title, message, [
-      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-      { text: 'Continue', style: 'destructive', onPress: () => resolve(true) },
-    ])
-  );
+  return showConfirm(title, message);
 }
 
 /**

@@ -4,14 +4,14 @@
  * barcode and presses Enter), a camera scanner on phones, and the result list.
  */
 import { useQuery } from '@powersync/react';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useContext, useMemo, useRef, useState } from 'react';
 import { Modal, Platform, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatINR } from '@domain';
 
 import { SEARCH_VARIANTS, tokenize } from '@/lib/queries';
-import { Badge, Button, Divider, Empty, IconButton, Input, ListRow, Row, Text, useTheme } from './index';
+import { Badge, Button, Divider, Empty, IconButton, Input, ListRow, Row, ScreenScroll, Text, useTheme } from './index';
 import { ItemPhoto } from './photo';
 import { radius, shadow, space } from './theme';
 
@@ -47,6 +47,7 @@ const PICK_SQL = (tokens: string[]) => {
 export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice, locationId, autoFocus = true }: { onPick: (v: PickedVariant) => void; onCreate?: (text: string) => void; canCreate?: boolean; showCost?: boolean; showPrice?: boolean; locationId?: string | null; autoFocus?: boolean }) {
   const [q, setQ] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const screen = useContext(ScreenScroll);
   const tokens = useMemo(() => tokenize(q), [q]);
   const pq = PICK_SQL(tokens.length ? tokens : [' ']);
   const { data: hits } = useQuery<PickedVariant>(pq.sql, pq.params);
@@ -76,6 +77,7 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
           autoCapitalize="none"
           autoCorrect={false}
           autoFocus={autoFocus}
+          onFocus={() => screen?.bringToTop(inputRef.current)}
           blurOnSubmit={false}
           onSubmitEditing={submit}
           returnKeyType="done"
@@ -98,8 +100,8 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
               onPress={() => { onPick(h); setQ(''); inputRef.current?.focus(); }}
               right={
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text mono color={h.qty <= 0 ? 'danger' : 'ok'}>{locationId ? `${locMap.get(h.id) ?? 0} here` : `${h.qty}`}</Text>
-                  {showCost ? <Text variant="small" color="textMuted" mono>cost {formatINR(h.avg_cost || h.last_purchase_cost)}</Text> : showPrice ? <Text variant="small" color="textMuted" mono>{formatINR(h.dealer_price ?? h.retail_price)}</Text> : null}
+                  <Text mono color={h.qty <= 0 ? 'danger' : 'ok'}>{locationId ? `yahan ${locMap.get(h.id) ?? 0}` : `${h.qty}`}</Text>
+                  {showCost ? <Text variant="small" color="textMuted" mono>lagat {formatINR(h.avg_cost || h.last_purchase_cost)}</Text> : showPrice ? <Text variant="small" color="textMuted" mono>{formatINR(h.dealer_price ?? h.retail_price)}</Text> : null}
                 </View>
               }
             />
@@ -120,7 +122,7 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
                 )}
               </View>
             ) : (
-              <Empty title="Koi SKU nahi mila" />
+              <Empty title={`"${q.trim()}" nahi mila`} hint="Naam ka chhota hissa likho — jaise “h4” ya “mat”." />
             )
           ) : null}
         </View>

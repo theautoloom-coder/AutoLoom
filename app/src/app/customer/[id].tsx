@@ -9,6 +9,7 @@ import { CUSTOMER, CUSTOMER_LEDGER, CUSTOMER_TOP_PRODUCTS } from '@/lib/queries'
 import { useSession } from '@/lib/session';
 import { useShopSettings } from '@/lib/use-settings';
 import { openWhatsApp, reminderMessage, statementMessage } from '@/lib/whatsapp';
+import { customerTypeLabel, dayLabel } from '@/lib/words';
 import { notify } from '@/ui/forms';
 import { Badge, Button, Card, Divider, Empty, KV, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
 import { space, type as typeScale } from '@/ui/theme';
@@ -24,12 +25,12 @@ type Warranty = { invoice_id: string; doc_no: string; doc_date: string; variant_
 type Vehicle = { id: string; registration_no: string; color: string | null; make_name: string | null; model_name: string | null; generation_name: string | null; model_id: string | null };
 
 const DOC_LABEL: Record<string, string> = {
-  opening: 'Opening balance',
-  sales_invoice: 'Invoice',
-  credit_note: 'Credit note',
-  payment_in: 'Payment aaya',
-  adjustment: 'Adjustment',
-  cancel_reversal: 'Cancellation',
+  opening: 'Purana baaki',
+  sales_invoice: 'Bill',
+  credit_note: 'Maal wapas',
+  payment_in: 'Paisa aaya',
+  adjustment: 'Sudhar',
+  cancel_reversal: 'Cancel',
 };
 
 export default function CustomerScreen() {
@@ -123,8 +124,8 @@ export default function CustomerScreen() {
       <Screen>
         <View>
           <Row gap={space.xs}>
-            <Badge tone={c.customer_type === 'retail' ? 'neutral' : 'info'}>{c.customer_type}</Badge>
-            {c.price_list_name ? <Badge tone="accent">{c.price_list_name} prices</Badge> : null}
+            <Badge tone={c.customer_type === 'retail' ? 'neutral' : 'info'}>{customerTypeLabel(c.customer_type)}</Badge>
+            {c.price_list_name ? <Badge tone="accent">{c.price_list_name} rate</Badge> : null}
             <Text variant="small" color="textFaint" mono>
               {c.code}
             </Text>
@@ -191,7 +192,7 @@ export default function CustomerScreen() {
                 <ListRow
                   key={v.id}
                   title={formatRegistration(v.registration_no)}
-                  subtitle={[v.make_name, v.model_name, v.generation_name, v.color].filter(Boolean).join(' · ') || 'Model not recorded'}
+                  subtitle={[v.make_name, v.model_name, v.generation_name, v.color].filter(Boolean).join(' · ') || 'Model nahi likha'}
                   right={<Text variant="small" color="textFaint">{v.color || ''}</Text>}
                 />
               ))}
@@ -209,7 +210,7 @@ export default function CustomerScreen() {
                   <ListRow
                     key={`${w.invoice_id}-${w.variant_id}`}
                     title={w.description}
-                    subtitle={`${w.doc_no} · ${w.doc_date} · ${w.warranty_months} mahine`}
+                    subtitle={`${w.doc_no} · ${dayLabel(w.doc_date)} · ${w.warranty_months} mahine`}
                     onPress={() => router.push(`/invoice/${w.invoice_id}`)}
                     right={
                       <Badge tone={live ? 'ok' : 'neutral'}>
@@ -237,7 +238,7 @@ export default function CustomerScreen() {
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text mono>{p.qty} pcs</Text>
                         <Text variant="small" color="textMuted" mono>
-                          last @ {formatINR(p.last_rate)}
+                          pichla @ {formatINR(p.last_rate)}
                         </Text>
                       </View>
                     }
@@ -275,7 +276,7 @@ export default function CustomerScreen() {
                         {e.doc_no ? ` ${e.doc_no}` : ''}
                       </Text>
                       <Text variant="small" color="textFaint">
-                        {e.entry_date}
+                        {dayLabel(e.entry_date)}
                         {e.narration ? ` · ${e.narration}` : ''}
                       </Text>
                     </View>

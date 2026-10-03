@@ -22,6 +22,7 @@ import {
   type LineTax,
 } from '@domain';
 
+import { payModeLabel } from './words';
 import { insertRow, updateRow, type Actor } from './writes';
 
 type DocType = 'sales_invoice' | 'credit_note' | 'purchase' | 'debit_note' | 'payment_in' | 'payment_out' | 'stock_adjustment' | 'stock_transfer' | 'stock_audit' | 'job_card';
@@ -198,7 +199,7 @@ export async function postPurchase(tx: Transaction, purchaseId: string, actor: A
   await insertRow(tx, 'ledger_entries', {
     party_type: 'supplier', party_id: p.supplier_id, entry_date: p.doc_date, doc_type: p.doc_type, doc_id: purchaseId, doc_no: docNo,
     debit: p.doc_type === 'debit_note' ? totals.grand_total : 0, credit: p.doc_type === 'purchase' ? totals.grand_total : 0,
-    narration: p.doc_type === 'purchase' ? `Purchase ${docNo}` : `Debit note ${docNo}`,
+    narration: p.doc_type === 'purchase' ? `Maal aaya ${docNo}` : `Maal wapas bheja ${docNo}`,
   }, actor);
 
   return docNo;
@@ -212,7 +213,7 @@ export async function cancelPurchase(tx: Transaction, purchaseId: string, reason
   await reverseMovements(tx, 'purchase', purchaseId, actor);
   await insertRow(tx, 'ledger_entries', {
     party_type: 'supplier', party_id: p.supplier_id, entry_date: toDateString(), doc_type: 'cancel_reversal', doc_id: purchaseId, doc_no: p.doc_no,
-    debit: p.doc_type === 'purchase' ? p.grand_total : 0, credit: p.doc_type === 'debit_note' ? p.grand_total : 0, narration: `Cancelled ${p.doc_no}: ${reason}`,
+    debit: p.doc_type === 'purchase' ? p.grand_total : 0, credit: p.doc_type === 'debit_note' ? p.grand_total : 0, narration: `Cancel ${p.doc_no}: ${reason}`,
   }, actor);
   await updateRow(tx, 'purchases', purchaseId, { status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: actor.userId, cancel_reason: reason });
 }
@@ -378,7 +379,7 @@ export async function postPayment(
 
   await insertRow(tx, 'ledger_entries', {
     party_type: partyType, party_id: input.party_id, entry_date: input.payment_date, doc_type: input.direction === 'in' ? 'payment_in' : 'payment_out', doc_id: paymentId, doc_no: docNo,
-    debit: input.direction === 'out' ? round(input.amount) : 0, credit: input.direction === 'in' ? round(input.amount) : 0, narration: `${input.mode}${input.reference_no ? ` ${input.reference_no}` : ''}`,
+    debit: input.direction === 'out' ? round(input.amount) : 0, credit: input.direction === 'in' ? round(input.amount) : 0, narration: `${payModeLabel(input.mode)}${input.reference_no ? ` ${input.reference_no}` : ''}`,
   }, actor);
 
   let allocations = input.allocations === 'auto' || !input.allocations ? null : input.allocations;
@@ -408,7 +409,7 @@ export async function cancelPayment(tx: Transaction, paymentId: string, reason: 
   }
   await insertRow(tx, 'ledger_entries', {
     party_type: p.party_type, party_id: p.party_id, entry_date: toDateString(), doc_type: 'cancel_reversal', doc_id: paymentId, doc_no: p.doc_no,
-    debit: p.direction === 'in' ? p.amount : 0, credit: p.direction === 'out' ? p.amount : 0, narration: `Reversed ${p.doc_no}: ${reason}`,
+    debit: p.direction === 'in' ? p.amount : 0, credit: p.direction === 'out' ? p.amount : 0, narration: `Ulta kiya ${p.doc_no}: ${reason}`,
   }, actor);
   await updateRow(tx, 'payments', paymentId, { status: reason.toLowerCase().includes('bounce') ? 'bounced' : 'cancelled', cancelled_at: new Date().toISOString(), cancel_reason: reason });
 }
@@ -478,7 +479,7 @@ export async function postInvoice(tx: Transaction, invoiceId: string, actor: Act
 
   await insertRow(tx, 'ledger_entries', {
     party_type: 'customer', party_id: inv.customer_id, entry_date: inv.doc_date, doc_type: isInvoice ? 'sales_invoice' : 'credit_note', doc_id: invoiceId, doc_no: docNo,
-    debit: isInvoice ? totals.grand_total : 0, credit: isInvoice ? 0 : totals.grand_total, narration: isInvoice ? `Invoice ${docNo}` : `Credit note ${docNo}`,
+    debit: isInvoice ? totals.grand_total : 0, credit: isInvoice ? 0 : totals.grand_total, narration: isInvoice ? `Bill ${docNo}` : `Maal wapas ${docNo}`,
   }, actor);
 
   // A cash / UPI / card / bank sale is paid on the spot: record the receipt against this invoice.
@@ -506,7 +507,7 @@ export async function cancelInvoice(tx: Transaction, invoiceId: string, reason: 
   await reverseMovements(tx, 'sales_invoice', invoiceId, actor);
   await insertRow(tx, 'ledger_entries', {
     party_type: 'customer', party_id: inv.customer_id, entry_date: toDateString(), doc_type: 'cancel_reversal', doc_id: invoiceId, doc_no: inv.doc_no,
-    debit: inv.doc_type === 'credit_note' ? inv.grand_total : 0, credit: inv.doc_type === 'invoice' ? inv.grand_total : 0, narration: `Cancelled ${inv.doc_no}: ${reason}`,
+    debit: inv.doc_type === 'credit_note' ? inv.grand_total : 0, credit: inv.doc_type === 'invoice' ? inv.grand_total : 0, narration: `Cancel ${inv.doc_no}: ${reason}`,
   }, actor);
   await updateRow(tx, 'sales_invoices', invoiceId, { status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: actor.userId, cancel_reason: reason });
 }

@@ -269,7 +269,8 @@ export default function CustomerScreen() {
                       </Text>
                       <Text variant="small" color="textFaint">
                         {dayLabel(e.entry_date)}
-                        {e.narration ? ` · ${e.narration}` : ''}
+                        {/* "Bill NOI/…" under "Bill NOI/…" says nothing twice. */}
+                        {e.narration && !(e.doc_no && e.narration.endsWith(e.doc_no)) ? ` · ${e.narration}` : ''}
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>

@@ -113,7 +113,7 @@ export default function SupplierScreen() {
                   <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">
                     <View style={{ flex: 1 }}>
                       <Text variant="small" style={{ fontWeight: '600' }}>{DOC_LABEL[e.doc_type] ?? e.doc_type}{e.doc_no ? ` ${e.doc_no}` : ''}</Text>
-                      <Text variant="small" color="textFaint">{dayLabel(e.entry_date)}{e.narration ? ` · ${e.narration}` : ''}</Text>
+                      <Text variant="small" color="textFaint">{dayLabel(e.entry_date)}{e.narration && !(e.doc_no && e.narration.endsWith(e.doc_no)) ? ` · ${e.narration}` : ''}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text variant="small" mono style={{ fontWeight: '600' }} color={e.credit ? 'warn' : 'ok'}>{e.credit ? `+ ${formatINR(e.credit)}` : `− ${formatINR(e.debit)}`}</Text>

@@ -94,7 +94,7 @@ export default function SettingsScreen() {
       <FormSection title="WhatsApp & UPI" hint="Bill aur yaad dilane wale message WhatsApp mein pehle se tayyar khulte hain — staff bas bhej deta hai. Message usi WhatsApp se jaata hai jo us phone par chalu hai (counter wale phone par aapka Business number).">
         <Input label="WhatsApp Business number" value={form.whatsapp_number ?? ''} onChangeText={(v) => set('whatsapp_number', v)} keyboardType="phone-pad" placeholder="98110 01100" editable={editable} hint="Bill par chhapega taaki grahak jawab de sake." />
         <Row gap={12}>
-          <Input containerStyle={{ flex: 1.3 }} label="UPI ID" value={form.upi_id ?? ''} onChangeText={(v) => set('upi_id', v)} autoCapitalize="none" placeholder="autoloom@upi" editable={editable} />
+          <Input containerStyle={{ flex: 1.3 }} label="UPI ID" value={form.upi_id ?? ''} onChangeText={(v) => set('upi_id', v)} autoCapitalize="none" placeholder="jaise dukaan@okhdfcbank" editable={editable} />
           <Input containerStyle={{ flex: 1 }} label="Paisa kiske naam aayega" value={form.upi_payee_name ?? ''} onChangeText={(v) => set('upi_payee_name', v)} placeholder="AutoLoom" editable={editable} />
         </Row>
         <Text variant="small" color="textFaint">Yaad dilane wale message mein UPI ID aur ek link jaata hai jisme baaki paisa pehle se bhara hota hai.</Text>

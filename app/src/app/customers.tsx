@@ -41,7 +41,7 @@ export default function CustomersScreen() {
         <Text variant="display">Grahak</Text>
         {can('party.edit') ? <Button title="Naya grahak" onPress={() => router.push('/customer/edit')} /> : null}
       </Row>
-      <Input value={q} onChangeText={setQ} placeholder="Naam, firm, mobile, GSTIN, shehar" autoCapitalize="none" />
+      <Input value={q} onChangeText={setQ} placeholder="Naam, firm, mobile ya shehar" autoCapitalize="none" />
       {/* The type chips are a fixed list, so they are real from the first
           frame — only the "All" count has to wait. Same for the box above:
           you can type a name before a single grahak has loaded. */}
@@ -87,7 +87,13 @@ export default function CustomersScreen() {
               }
             />
           ))}
-          {visible.length === 0 ? <Empty art="search" title="Koi grahak nahi mila" /> : null}
+          {/* "Nahi mila" is the answer to a search. On an empty list it read as if
+              something had gone missing, on the first screen a new shop opens. */}
+          {visible.length === 0 ? (
+            q.trim()
+              ? <Empty art="search" title={`“${q.trim()}” ka koi grahak nahi mila`} hint="Naam, mobile ya shehar ka thoda hissa likh ke dekho." />
+              : <Empty art="parchi" title="Abhi koi grahak nahi" hint="Upar “Naya grahak” dabao — naam aur mobile kaafi hai." />
+          ) : null}
         </Card>
       )}
     </Screen>

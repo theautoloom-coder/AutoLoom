@@ -48,10 +48,27 @@ function money(n: number): string {
   return formatINR(n, { symbol: false });
 }
 
+/**
+ * The seed shipped a made-up UPI ID so the screens had something to show, and
+ * production kept it. Every reminder then told real customers to pay
+ * autoloom@upi — an address that belongs to nobody, so the money either
+ * bounced or went somewhere the shop will never see. A UPI line that is wrong
+ * is far worse than no UPI line, so the placeholder counts as "not set".
+ */
+const PLACEHOLDER_UPI = new Set(['autoloom@upi']);
+
+/** A real-looking VPA: something@bank, no spaces. Anything else is not sent. */
+export function isUsableUpi(id: string | null | undefined): boolean {
+  if (!id) return false;
+  const v = id.trim().toLowerCase();
+  return !PLACEHOLDER_UPI.has(v) && /^[a-z0-9._-]{2,}@[a-z][a-z0-9.-]{1,}$/.test(v);
+}
+
 export function upiLine(s: WaSettings, amount?: number | null): string {
-  if (!s.upiId) return '';
-  const link = upiLink(s.upiId, s.upiPayeeName, amount);
-  return `UPI: ${s.upiId}${s.upiPayeeName ? ` (${s.upiPayeeName})` : ''}\nPay link: ${link}`;
+  const id = s.upiId;
+  if (!id || !isUsableUpi(id)) return '';
+  const link = upiLink(id, s.upiPayeeName, amount);
+  return `UPI: ${id}${s.upiPayeeName ? ` (${s.upiPayeeName})` : ''}\nPay link: ${link}`;
 }
 
 export function fill(template: string, vars: Record<string, string | number | null | undefined>): string {

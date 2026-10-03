@@ -22,6 +22,8 @@ import { useQuery } from '@powersync/react';
 import { Stack, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 
+import { ROLE_LABELS } from '@domain';
+
 import { useSession } from '@/lib/session';
 import { Badge, Button, Card, Empty, Grid, ListRow, Row, Screen, SectionTitle, StatTile, Text } from '@/ui';
 import { space } from '@/ui/theme';
@@ -73,7 +75,9 @@ export default function AdminHome() {
       <Screen>
         <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Text variant="display">Admin</Text>
-          {profile?.role ? <Badge tone="neutral">{String(profile.role).toUpperCase()}</Badge> : null}
+          {/* The role as the shop calls it — MAALIK, COUNTER, GODOWN — not the
+              database key. This badge used to read "SALES". */}
+          {profile?.role ? <Badge tone="neutral">{(ROLE_LABELS[profile.role as keyof typeof ROLE_LABELS] ?? String(profile.role)).toUpperCase()}</Badge> : null}
         </Row>
 
         {/* The one thing on this page that is time-sensitive. It appears only

@@ -22,7 +22,7 @@ import { formatINR, formatINRShort } from '@domain';
 
 import { STOCK_VALUE_BY_LOCATION } from '@/lib/queries';
 import { useSession } from '@/lib/session';
-import { Card, Empty, Row, Screen, SectionTitle, StatTile, Text, ListRow, type IconName } from '@/ui';
+import { Card, Empty, Grid, ListRow, Row, Screen, SectionTitle, StatTile, Text, type IconName } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
@@ -77,24 +77,26 @@ export default function Warehouse() {
           </Text>
         </View>
 
-        <Row gap={space.md} wrap align="stretch">
+        {/* Grid, not a wrapping Row of flex: 1 children — on Android that
+            pattern stacks the second row of tiles on top of whatever follows.
+            See stock.tsx for the whole story. */}
+        <Grid min={150}>
           {(locations ?? []).map((l) => {
             const look = LOOK[l.type] ?? { icon: 'cube-outline' as IconName, accent: 'teal' };
             return (
-              <View key={l.id} style={{ flex: 1, minWidth: 150 }}>
-                <StatTile
-                  label={l.name}
-                  value={String(Math.round(l.units))}
-                  sub={`pcs${showMoney ? ` · ${formatINRShort(l.value)}` : ''}`}
-                  icon={look.icon}
-                  accent={look.accent}
-                  tone={l.units < 0 ? 'danger' : openLoc === l.id ? 'accent' : undefined}
-                  onPress={() => setOpenLoc(openLoc === l.id ? null : l.id)}
-                />
-              </View>
+              <StatTile
+                key={l.id}
+                label={l.name}
+                value={String(Math.round(l.units))}
+                sub={`pcs${showMoney ? ` · ${formatINRShort(l.value)}` : ''}`}
+                icon={look.icon}
+                accent={look.accent}
+                tone={l.units < 0 ? 'danger' : openLoc === l.id ? 'accent' : undefined}
+                onPress={() => setOpenLoc(openLoc === l.id ? null : l.id)}
+              />
             );
           })}
-        </Row>
+        </Grid>
 
         {openLoc ? (
           <>

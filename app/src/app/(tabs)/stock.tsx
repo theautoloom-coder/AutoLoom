@@ -21,7 +21,7 @@ import { formatINR, formatINRShort } from '@domain';
 
 import { SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
-import { Badge, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, StatTile, Text, type IconName } from '@/ui';
+import { Badge, Card, Chip, Empty, Grid, Input, ListRow, Row, Screen, SectionTitle, StatTile, Text, type IconName } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { Skeleton, SkeletonList, SkeletonTile } from '@/ui/skeleton';
 import { radius, space } from '@/ui/theme';
@@ -140,32 +140,34 @@ export default function StockScreen() {
       ) : null}
 
       <SectionTitle>Maal kahan pada hai</SectionTitle>
+      {/* Grid, not a wrapping Row of flex: 1 children. That pattern looks right
+          in a browser and is broken on Android: flex: 1 means flexBasis 0, and
+          Yoga cannot work out the wrapped lines from a basis of nothing, so it
+          sized the container for ONE line of tiles. The first two came out
+          stretched to twice their height, and the second two were drawn on top
+          of the "Saara maal" heading and the first item below it. Every
+          screenshot taken in a browser showed it fine, which is how it reached
+          the owner's phone. Grid gives each cell a real basis. */}
       {locationsLoading ? (
         // Four, because the locations table is godown / counter / workshop /
-        // kharab and a shop rarely adds a fifth. Two rows of two at phone
-        // width — the same two rows the real tiles land in.
-        <Row gap={space.md} wrap align="stretch">
-          {[0, 1, 2, 3].map((i) => (
-            <View key={i} style={{ flex: 1, minWidth: 150 }}>
-              <SkeletonTile />
-            </View>
-          ))}
-        </Row>
+        // kharab and a shop rarely adds a fifth.
+        <Grid min={150}>
+          {[0, 1, 2, 3].map((i) => <SkeletonTile key={i} />)}
+        </Grid>
       ) : (
-        <Row gap={space.md} wrap align="stretch">
+        <Grid min={150}>
           {(locations ?? []).map((l) => (
-            <View key={l.id} style={{ flex: 1, minWidth: 150 }}>
-              <StatTile
-                label={l.name}
-                value={String(Math.round(l.units))}
-                sub={`pcs${showCost ? ` · ${formatINRShort(l.value)}` : ''}`}
-                icon={(LOCATION_LOOK[l.type] ?? { icon: 'cube-outline' as IconName }).icon}
-                accent={(LOCATION_LOOK[l.type] ?? { accent: 'teal' }).accent}
-                tone={l.units < 0 ? 'danger' : undefined}
-              />
-            </View>
+            <StatTile
+              key={l.id}
+              label={l.name}
+              value={String(Math.round(l.units))}
+              sub={`pcs${showCost ? ` · ${formatINRShort(l.value)}` : ''}`}
+              icon={(LOCATION_LOOK[l.type] ?? { icon: 'cube-outline' as IconName }).icon}
+              accent={(LOCATION_LOOK[l.type] ?? { accent: 'teal' }).accent}
+              tone={l.units < 0 ? 'danger' : undefined}
+            />
           ))}
-        </Row>
+        </Grid>
       )}
 
       <SectionTitle right={rowsLoading ? undefined : <Text variant="small" color="textFaint">{shown.length}</Text>}>

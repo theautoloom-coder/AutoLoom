@@ -84,7 +84,7 @@ export function QuickAdd() {
       icon: 'checkbox-outline',
       accent: 'violet',
       href: '/stock-check',
-      allowed: can('stock.adjust'),
+      allowed: can('stock.count') || can('stock.adjust'),
     },
   ].filter((a) => a.allowed);
 

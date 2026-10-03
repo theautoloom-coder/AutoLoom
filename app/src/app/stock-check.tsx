@@ -44,9 +44,9 @@ import { space } from '@/ui/theme';
  * free_issue · other.
  */
 const REASONS = [
-  { key: 'count', label: 'Count mistake', code: 'counting_error' },
+  { key: 'count', label: 'Ginti galat thi', code: 'counting_error' },
   { key: 'kharab', label: 'Kharab', code: 'damage' },
-  { key: 'missing', label: 'Missing', code: 'missing' },
+  { key: 'missing', label: 'Nahi mila', code: 'missing' },
   { key: 'other', label: 'Aur kuch', code: 'other' },
 ] as const;
 
@@ -149,7 +149,7 @@ export default function GintiKaro() {
             // The allowed code, never the Hinglish label: postAdjustment reads
             // this to decide whether the movement is a 'damage'.
             reason_code: c.reason.code,
-            note: `${c.reason.label} · counted ${c.actual}, system ${c.system}`,
+            note: `${c.reason.label} · gine ${c.actual}, app mein ${c.system}`,
           });
         }
         await postAdjustment(tx, id, actor);
@@ -164,7 +164,12 @@ export default function GintiKaro() {
     }
   }
 
-  if (!can('stock.adjust')) {
+  // stock.count is the godown and workshop roles' whole job; stock.adjust is
+  // the owner's. Checking only the second locked out exactly the people this
+  // screen is for. The server allows a count holder 'audit' adjustments and
+  // nothing else (migration 20261003100000), so this cannot be used to write
+  // anything off.
+  if (!can('stock.count') && !can('stock.adjust')) {
     return (
       <>
         <Stack.Screen options={{ title: 'Ginti Karo' }} />

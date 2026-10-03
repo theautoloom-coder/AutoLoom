@@ -30,7 +30,7 @@ export default function SuppliersScreen() {
         <Text variant="display">Supplier</Text>
         {can('party.edit') ? <Button title="Naya supplier" onPress={() => router.push('/supplier/edit')} /> : null}
       </Row>
-      <Input value={q} onChangeText={setQ} placeholder="Naam, firm, mobile, GSTIN, shehar" autoCapitalize="none" />
+      <Input value={q} onChangeText={setQ} placeholder="Naam, firm, mobile ya shehar" autoCapitalize="none" />
       {can('reports.view') || can('payment.pay_supplier') ? (
         isLoading ? (
           // What the shop owes is not a figure to guess at for half a second.
@@ -61,7 +61,13 @@ export default function SuppliersScreen() {
               }
             />
           ))}
-          {visible.length === 0 ? <Empty art="search" title="Koi supplier nahi mila" /> : null}
+          {/* "Nahi mila" is the answer to a search. On an empty list it read as if
+              something had gone missing, on the first screen a new shop opens. */}
+          {visible.length === 0 ? (
+            q.trim()
+              ? <Empty art="search" title={`“${q.trim()}” ka koi supplier nahi mila`} hint="Naam, mobile ya shehar ka thoda hissa likh ke dekho." />
+              : <Empty art="parchi" title="Abhi koi supplier nahi" hint="Upar “Naya supplier” dabao — naam aur mobile kaafi hai." />
+          ) : null}
         </Card>
       )}
     </Screen>

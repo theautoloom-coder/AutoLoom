@@ -75,12 +75,23 @@ export default function ReorderScreen() {
         <Button title="CSV" tone="secondary" size="sm" onPress={exportCsv} disabled={!visible.length} />
       </Row>
       <Text variant="small" color="textMuted">Jo tezi se bik raha hai aur khatam hone wala hai. Roz ki bikri dekh ke bataya hai ki kitna mangwana chahiye.</Text>
-      <Row gap={space.xs} wrap>
+      {/* Two questions, two blocks, each label above its own chips. They used
+          to share one wrapping row, and on a phone it broke into
+          "BIKRI DEKHEIN [30] [60] / [90] CHALANA HAI [15] / [30] [45]" — two
+          selected "30 din" on different lines and no way to tell which
+          question either one answered. */}
+      <View style={{ gap: space.xs }}>
         <Text variant="label" color="textMuted">Kitne din ki bikri dekhein</Text>
-        {[30, 60, 90].map((d) => <Chip key={d} label={`${d} din`} selected={days === d} onPress={() => setDays(d)} />)}
-        <Text variant="label" color="textMuted" style={{ marginLeft: 8 }}>Kitne din chalana hai</Text>
-        {[15, 30, 45].map((d) => <Chip key={d} label={`${d} din`} selected={cover === d} onPress={() => setCover(d)} />)}
-      </Row>
+        <Row gap={space.xs} wrap>
+          {[30, 60, 90].map((d) => <Chip key={d} label={`${d} din`} selected={days === d} onPress={() => setDays(d)} />)}
+        </Row>
+      </View>
+      <View style={{ gap: space.xs }}>
+        <Text variant="label" color="textMuted">Kitne din ka maal chahiye</Text>
+        <Row gap={space.xs} wrap>
+          {[15, 30, 45].map((d) => <Chip key={d} label={`${d} din`} selected={cover === d} onPress={() => setCover(d)} />)}
+        </Row>
+      </View>
       {families.length > 1 ? <Row gap={space.xs} wrap><Chip label="Sab" selected={!family} onPress={() => setFamily(null)} />{families.map((f) => <Chip key={f} label={f} selected={family === f} onPress={() => setFamily(family === f ? null : f)} />)}</Row> : null}
       <Card tone="alt">
         <Row gap={space.lg} wrap>

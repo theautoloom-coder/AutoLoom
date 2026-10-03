@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { HeaderShownContext } from 'expo-router/react-navigation';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -135,11 +136,17 @@ export function Screen({
 }) {
   const t = useTheme();
   const wide = useIsWide();
+  // Under a stack header the header has already paid for the status bar.
+  // Paying for it again here left a band of blank white between "‹ Peeche"
+  // and the screen's own title on every pushed screen — about 60px on a
+  // OnePlus, more on a phone with a deeper notch. Tab screens have no header,
+  // so they still need the top inset themselves.
+  const headerShown = React.useContext(HeaderShownContext);
   const inner = (
     <View style={[styles.content, wide && styles.contentWide, padded && styles.padded, style]}>{children}</View>
   );
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.screen, { backgroundColor: t.bg }]}>
+    <SafeAreaView edges={headerShown ? ['left', 'right'] : ['top', 'left', 'right']} style={[styles.screen, { backgroundColor: t.bg }]}>
       {scroll ? (
         // Not a plain ScrollView: this is the base every form in the app sits
         // on, so it is what keeps the field you are typing in above the

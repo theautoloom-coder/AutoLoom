@@ -21,7 +21,7 @@ export const KIND: Record<string, { label: string; icon: IconName; accent: strin
   sale: { label: 'Bill bana', icon: 'arrow-up-circle-outline', accent: 'blue', sign: '' },
   purchase: { label: 'Stock aaya', icon: 'arrow-down-circle-outline', accent: 'green', sign: '' },
   expense: { label: 'Kharcha', icon: 'wallet-outline', accent: 'amber', sign: '−' },
-  payment: { label: 'Payment', icon: 'cash-outline', accent: 'teal', sign: '' },
+  payment: { label: 'Paisa', icon: 'cash-outline', accent: 'teal', sign: '' },
   damage: { label: 'Kharab nikla', icon: 'alert-circle-outline', accent: 'rose', sign: '' },
   adjust: { label: 'Ginti sudhri', icon: 'swap-vertical-outline', accent: 'violet', sign: '' },
 };

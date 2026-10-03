@@ -159,9 +159,12 @@ export function Screen({
         const sv = scrollRef.current as unknown as View | null;
         if (!sv) return;
         field.measureInWindow((_x, fieldY) => {
-          sv.measureInWindow((_sx, top) => {
+          sv.measureInWindow((_sx, top, _w, height) => {
             const delta = fieldY - top - space.sm;
-            if (delta > space.lg) scrollRef.current?.scrollTo({ y: offset.current + delta, animated: true });
+            // Only when the field sits low enough that its results would land
+            // under the keyboard. Near the top already (Ginti Karo, Kharab
+            // Likho open on the search), scrolling only hid the screen's title.
+            if (delta > height * 0.3) scrollRef.current?.scrollTo({ y: offset.current + delta, animated: true });
           });
         });
       }, 320);

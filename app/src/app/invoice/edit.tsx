@@ -63,8 +63,8 @@ export default function InvoiceEdit() {
   const { data: customers } = useQuery<Customer>(`SELECT c.id, c.name, c.mobile, c.state_code, c.gstin, c.price_list_id, c.credit_limit, c.credit_days, c.customer_type, COALESCE(pb.balance,0) AS balance FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id WHERE c.is_active=1 ORDER BY c.name`);
   const customer = customers?.find((c) => c.id === doc?.customer_id) ?? null;
   const { data: locations } = useQuery<{ id: string; name: string }>("SELECT id, name FROM locations WHERE is_active = 1 AND type <> 'damaged' ORDER BY sort_order");
-  const { data: original } = useQuery<{ id: string; doc_no: string; customer_id: string; location_id: string; is_interstate: number; price_list_id: string | null }>('SELECT id, doc_no, customer_id, location_id, is_interstate, price_list_id FROM sales_invoices WHERE id = ?', [against ?? '']);
-  const { data: originalLines } = useQuery<Line & { returned: number }>(
+  const { data: original, isLoading: originalLoading } = useQuery<{ id: string; doc_no: string; customer_id: string; location_id: string; is_interstate: number; price_list_id: string | null }>('SELECT id, doc_no, customer_id, location_id, is_interstate, price_list_id FROM sales_invoices WHERE id = ?', [against ?? '']);
+  const { data: originalLines, isLoading: originalLinesLoading } = useQuery<Line & { returned: number }>(
     `SELECT l.*, pv.sku, pv.avg_cost, pv.min_selling_price, pv.last_purchase_cost, pv.retail_price, pv.dealer_price, pv.wholesale_price, 0 AS here,
             COALESCE((SELECT SUM(x.qty) FROM sales_invoice_lines x JOIN sales_invoices ix ON ix.id = x.invoice_id WHERE x.against_line_id = l.id AND ix.status <> 'cancelled'), 0) AS returned
      FROM sales_invoice_lines l JOIN product_variants pv ON pv.id = l.variant_id WHERE l.invoice_id = ? ORDER BY l.line_no`, [against ?? '']);
@@ -82,7 +82,13 @@ export default function InvoiceEdit() {
     // deliberately has no item picker, there was no way to add a line by hand
     // either. Every return was a dead end — MAAL · 0, total ₹0, button
     // disabled — and each visit left another empty draft behind.
-    if (against && (original === undefined || originalLines === undefined)) return;
+    //
+    // The first fix waited for `original === undefined`, which never happens:
+    // PowerSync answers `[]` while the first read is still running, so the
+    // wait passed at once and every return still opened empty — found on the
+    // shop's phone, "Maal wapas" on a real bill gave Chuno… and MAAL · 0.
+    // isLoading is the only honest signal, and the bill itself must be there.
+    if (against && (originalLoading || originalLinesLoading || !original?.[0])) return;
     setCreating(true);
     (async () => {
       const base = original?.[0];
@@ -108,7 +114,7 @@ export default function InvoiceEdit() {
       createdHere.current = newId;
       setId(newId);
     })().catch((e) => notify(`Naya bill nahi khula: ${String((e as Error).message ?? e)}`, 'danger'));
-  }, [id, creating, locationId, db, actor, against, original, originalLines, customerParam, profile?.id]);
+  }, [id, creating, locationId, db, actor, against, original, originalLines, originalLoading, originalLinesLoading, customerParam, profile?.id]);
 
   // Opening Bill Banao makes a draft at once, so the screen has something to
   // write lines into. Backing out without adding anything left that empty
@@ -116,14 +122,21 @@ export default function InvoiceEdit() {
   // visit. A draft this screen made, still empty when the screen goes, is
   // removed. One opened from the list (?id=) is never touched: its lines may
   // simply not have loaded yet.
+  //
+  // Asked of the database at the moment of leaving, not of `lines`: a query
+  // still on its first read answers [] too, and a draft whose lines simply had
+  // not loaded yet would have been thrown away with them.
   const createdHere = useRef<string | null>(null);
-  const leftEmpty = useRef(false);
-  leftEmpty.current = doc?.status === 'draft' && lines !== undefined && lines.length === 0;
   useEffect(() => () => {
     const draft = createdHere.current;
-    if (draft && leftEmpty.current) {
-      db.writeTransaction((tx) => deleteRow(tx, 'sales_invoices', draft)).catch(() => {});
-    }
+    if (!draft) return;
+    db.writeTransaction(async (tx) => {
+      const r = await tx.execute(
+        `SELECT (SELECT status FROM sales_invoices WHERE id = ?1) AS status,
+                (SELECT COUNT(*) FROM sales_invoice_lines WHERE invoice_id = ?1) AS n`, [draft]);
+      const row = r.rows?._array?.[0] as { status: string | null; n: number } | undefined;
+      if (row?.status === 'draft' && Number(row.n) === 0) await deleteRow(tx, 'sales_invoices', draft);
+    }).catch(() => {});
   }, [db]);
 
   const interstate = gst && !!doc?.is_interstate;
@@ -282,7 +295,7 @@ export default function InvoiceEdit() {
         {isCN && original?.[0] ? <Text variant="small" color="textMuted">Bill {original[0].doc_no} ke against. Qty utni hi rakho jitna maal sach mein wapas aaya. Jo toota ya kharab hai use "Kharab / toota hua" mark karo — wo bechne wale stock mein wapas nahi jayega.</Text> : null}
 
         <FormSection title="Grahak">
-          <SelectField label="Kaun le raha hai" value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${customerTypeLabel(c.customer_type)}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={(text) => router.push({ pathname: '/customer/edit', params: { name: text, forBill: '1' } })} />
+          <SelectField label={isCN ? 'Kaun lauta raha hai' : 'Kaun le raha hai'} value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${customerTypeLabel(c.customer_type)}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={(text) => router.push({ pathname: '/customer/edit', params: { name: text, forBill: '1' } })} />
           {customer ? <CreditBlock customer={customer} credit={credit} gst={gst} interstate={interstate} /> : null}
           <Row gap={12}>
             {/* Already today's date — the draft was created with it. The job
@@ -299,7 +312,7 @@ export default function InvoiceEdit() {
               autoCorrect={false}
               returnKeyType="done"
             />
-            <View style={{ flex: 1 }}><SelectField label="Maal kahan se" value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} /></View>
+            <View style={{ flex: 1 }}><SelectField label={isCN ? 'Maal kahan rakhna hai' : 'Maal kahan se'} value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} /></View>
           </Row>
         </FormSection>
 
@@ -387,7 +400,7 @@ export default function InvoiceEdit() {
 
           <View style={{ borderTopWidth: 1.5, borderTopColor: t.keyline, paddingTop: space.md, marginTop: space.xs }}>
             <Row style={{ justifyContent: 'space-between' }} align="center">
-              <Text variant="title">{isCN ? 'Credit' : 'Total'}</Text>
+              <Text variant="title">{isCN ? 'Wapas dene hain' : 'Total'}</Text>
               <Text variant="mono" style={{ fontSize: 27, lineHeight: 32, fontWeight: '600' }}>{formatINR(totals.totals.grand_total)}</Text>
             </Row>
           </View>

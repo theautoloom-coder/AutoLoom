@@ -34,7 +34,7 @@ import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { insertRow } from '@/lib/writes';
 import { Button, Card, Chip, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
-import { confirm, notify } from '@/ui/forms';
+import { notify } from '@/ui/forms';
 import { VariantPicker, type PickedVariant } from '@/ui/lines';
 import { space } from '@/ui/theme';
 
@@ -123,7 +123,9 @@ export default function GintiKaro() {
     // the screen said it saved. Catch it here, where it can be fixed.
     if (!isDateString(date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
     if (!locationId) { notify('Location nahi mili.', 'danger'); return; }
-    if (!(await confirm('Ginti theek kar dein?', `${changes.length} item ka stock abhi badal jaayega. Yeh wapas nahi hota.`))) return;
+    // No second "pakka?" here. The confirm step the person just came from IS
+    // the question — every change listed, and "Haan, ginti theek kar do" is
+    // their answer. Asking again in a popup taught people to tap through both.
 
     setSaving(true);
     try {
@@ -134,7 +136,7 @@ export default function GintiKaro() {
           // A physical count of the shelf. Each line carries its own reason;
           // this is only the fallback for a line that has none.
           reason: 'audit',
-          notes: ['Stock Check', note.trim() || null].filter(Boolean).join(' — '),
+          notes: ['Ginti', note.trim() || null].filter(Boolean).join(' — '),
           status: 'draft',
         }, actor);
 

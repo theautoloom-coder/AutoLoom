@@ -9,6 +9,7 @@ import { handBack } from '@/lib/hand-back';
 import { INDIAN_STATES } from '@/lib/states';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
+import { useShopSettings } from '@/lib/use-settings';
 import { insertRow, nextCode, updateRow } from '@/lib/writes';
 import { Button, Card, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, SwitchRow, confirm, notify } from '@/ui/forms';
@@ -40,6 +41,10 @@ export default function CustomerEdit() {
   const router = useRouter();
   const { db } = useSystem();
   const { can, actor } = useSession();
+  // GST is off for this shop. A GSTIN box on every new grahak — under a hint
+  // about CGST and IGST — asked the counter for a number nobody uses. It stays
+  // for a grahak who already has one on file.
+  const { gstEnabled } = useShopSettings();
 
   const { data: rows } = useQuery<Customer>('SELECT * FROM customers WHERE id = ?', [id ?? '']);
   const existing = rows?.[0];
@@ -303,7 +308,7 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
             autoComplete="email"
             textContentType="emailAddress"
             returnKeyType="next"
-            onSubmitEditing={() => gstinRef.current?.focus()}
+            onSubmitEditing={() => (gstinRef.current ?? addr1Ref.current)?.focus()}
             submitBehavior="submit"
           />
           {!isNew ? (
@@ -319,9 +324,10 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
           ) : null}
         </FormSection>
 
-        <FormSection title="GST aur pata" hint="State se tay hota hai ki bill par CGST+SGST lagega ya IGST.">
+        <FormSection title={gstEnabled ? 'GST aur pata' : 'Pata'} hint={gstEnabled ? 'State se tay hota hai ki bill par CGST+SGST lagega ya IGST.' : undefined}>
           {/* A GSTIN and a PAN are exactly the strings autocorrect likes to
               "fix". Wrong here means wrong on every bill afterwards. */}
+          {gstEnabled || form.gstin || form.pan ? (<>
           <Input
             ref={gstinRef}
             label="GSTIN"
@@ -346,6 +352,7 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
             onSubmitEditing={() => addr1Ref.current?.focus()}
             submitBehavior="submit"
           />
+          </>) : null}
           <Input
             ref={addr1Ref}
             label="Pata line 1"

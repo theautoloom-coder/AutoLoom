@@ -52,9 +52,9 @@ export default function StockLedger() {
         </Row>
         <Card style={{ gap: 0 }}>
           <Row gap={space.sm} style={{ paddingVertical: 6 }}>
-            <Text variant="label" color="textMuted" style={{ flex: 2 }}>Movement</Text>
+            <Text variant="label" color="textMuted" style={{ flex: 2 }}>Kya hua</Text>
             <Text variant="label" color="textMuted" style={{ width: 70, textAlign: 'right' }}>Qty</Text>
-            <Text variant="label" color="textMuted" style={{ width: 70, textAlign: 'right' }}>Balance</Text>
+            <Text variant="label" color="textMuted" style={{ width: 70, textAlign: 'right' }}>Bacha</Text>
           </Row>
           <Divider />
           {withBalance.length === 0 ? <Empty title="Koi aana-jaana nahi" /> : null}

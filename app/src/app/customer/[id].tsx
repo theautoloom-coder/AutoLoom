@@ -252,27 +252,17 @@ export default function CustomerScreen() {
             </Card>
 
             <SectionTitle>Khata</SectionTitle>
+            {/* Two columns, not four. Debit, credit and balance at fixed
+                widths left the entry about 50dp on a phone, where "Paisa
+                aaya" broke as "Pai / sa". One signed amount — + when the
+                grahak owes more, − when money came in — and the running
+                baaki under it carry the same facts in the room there is. */}
             <Card style={{ gap: 0 }}>
-              <Row gap={space.sm} style={{ paddingVertical: 6 }}>
-                <Text variant="label" color="textMuted" style={{ flex: 1.6 }}>
-                  Entry
-                </Text>
-                <Text variant="label" color="textMuted" style={{ width: 80, textAlign: 'right' }}>
-                  Debit
-                </Text>
-                <Text variant="label" color="textMuted" style={{ width: 80, textAlign: 'right' }}>
-                  Credit
-                </Text>
-                <Text variant="label" color="textMuted" style={{ width: 90, textAlign: 'right' }}>
-                  Balance
-                </Text>
-              </Row>
-              <Divider />
               {ledgerDesc.length === 0 ? <Empty title="Khata khaali hai" /> : null}
               {ledgerDesc.map((e) => (
                 <React.Fragment key={e.id}>
                   <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">
-                    <View style={{ flex: 1.6 }}>
+                    <View style={{ flex: 1 }}>
                       <Text variant="small" style={{ fontWeight: '600' }}>
                         {DOC_LABEL[e.doc_type] ?? e.doc_type}
                         {e.doc_no ? ` ${e.doc_no}` : ''}
@@ -282,15 +272,12 @@ export default function CustomerScreen() {
                         {e.narration ? ` · ${e.narration}` : ''}
                       </Text>
                     </View>
-                    <Text variant="small" mono style={{ width: 80, textAlign: 'right' }}>
-                      {e.debit ? formatINR(e.debit) : ''}
-                    </Text>
-                    <Text variant="small" mono style={{ width: 80, textAlign: 'right' }} color="ok">
-                      {e.credit ? formatINR(e.credit) : ''}
-                    </Text>
-                    <Text variant="small" mono style={{ width: 90, textAlign: 'right', fontWeight: '600' }}>
-                      {formatINR(e.running)}
-                    </Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text variant="small" mono style={{ fontWeight: '600' }} color={e.debit ? 'warn' : 'ok'}>
+                        {e.debit ? `+ ${formatINR(e.debit)}` : `− ${formatINR(e.credit)}`}
+                      </Text>
+                      <Text variant="small" mono color="textFaint">baaki {formatINR(e.running)}</Text>
+                    </View>
                   </Row>
                   <Divider />
                 </React.Fragment>

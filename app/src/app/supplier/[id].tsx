@@ -108,14 +108,17 @@ export default function SupplierScreen() {
               {desc.length === 0 ? <Empty title="Khata khaali hai" /> : null}
               {desc.map((e) => (
                 <React.Fragment key={e.id}>
+                  {/* Two columns, as on the customer page: + when the shop
+                      owes more, − when it paid; the running total under it. */}
                   <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">
-                    <View style={{ flex: 1.6 }}>
+                    <View style={{ flex: 1 }}>
                       <Text variant="small" style={{ fontWeight: '600' }}>{DOC_LABEL[e.doc_type] ?? e.doc_type}{e.doc_no ? ` ${e.doc_no}` : ''}</Text>
                       <Text variant="small" color="textFaint">{dayLabel(e.entry_date)}{e.narration ? ` · ${e.narration}` : ''}</Text>
                     </View>
-                    <Text variant="small" mono style={{ width: 80, textAlign: 'right' }} color="ok">{e.debit ? formatINR(e.debit) : ''}</Text>
-                    <Text variant="small" mono style={{ width: 80, textAlign: 'right' }}>{e.credit ? formatINR(e.credit) : ''}</Text>
-                    <Text variant="small" mono style={{ width: 90, textAlign: 'right', fontWeight: '600' }}>{formatINR(e.running)}</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text variant="small" mono style={{ fontWeight: '600' }} color={e.credit ? 'warn' : 'ok'}>{e.credit ? `+ ${formatINR(e.credit)}` : `− ${formatINR(e.debit)}`}</Text>
+                      <Text variant="small" mono color="textFaint">dena {formatINR(e.running)}</Text>
+                    </View>
                   </Row>
                   <Divider />
                 </React.Fragment>

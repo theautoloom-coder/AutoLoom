@@ -67,5 +67,9 @@ function why(code: string | null): string {
 
 export function describeRejection(r: Rejection): string {
   const what = WHAT[r.table] ?? r.table;
-  return `${what} save nahi hua — ${why(r.code)}. Dobara karke dekho; phir bhi na ho to owner ko batao.`;
+  // A refused bill is back to a draft with its maal; say where to find it.
+  const where = r.table === 'sales_invoices' || r.table === 'sales_invoice_lines'
+    ? ' Bill tab ke “Adhoore bill” mein pada hai.'
+    : '';
+  return `${what} save nahi hua — ${why(r.code)}.${where} Dobara karke dekho; phir bhi na ho to owner ko batao.`;
 }

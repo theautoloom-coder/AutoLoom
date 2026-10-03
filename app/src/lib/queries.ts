@@ -298,8 +298,12 @@ export const DASHBOARD_TODAY = {
       -- own unit_cost, which posting stamped with the moving average at the
       -- moment of sale — so it is the cost of THOSE pieces, not today's rate.
       -- Sale movements are negative, hence the sign flip.
-      (SELECT COALESCE(SUM(-qty * unit_cost),0) FROM stock_movements WHERE movement_type='sale' AND date(occurred_at) = ?1) AS cogs_today,
-      (SELECT COALESCE(SUM(-qty * unit_cost),0) FROM stock_movements WHERE movement_type='damage' AND date(occurred_at) = ?1) AS damage_today,
+      -- Only bills and write-offs that stand, by their own date — the same rule
+      -- as Hisab, so Home and Hisab cannot disagree about the same day.
+      (SELECT COALESCE(SUM(-m.qty * m.unit_cost),0) FROM stock_movements m JOIN sales_invoices i ON i.id = m.ref_id
+        WHERE m.movement_type='sale' AND i.status='posted' AND i.doc_date = ?1) AS cogs_today,
+      (SELECT COALESCE(SUM(-m.qty * m.unit_cost),0) FROM stock_movements m JOIN stock_adjustments a ON a.id = m.ref_id
+        WHERE m.movement_type='damage' AND a.status='posted' AND a.doc_date = ?1) AS damage_today,
       -- A partner taking money for themselves is money leaving the business
       -- but it is NOT a business expense. Hisab filters it out; without the
       -- same clause here, Home's kharcha and munafa would disagree with Hisab

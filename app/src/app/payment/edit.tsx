@@ -17,6 +17,7 @@ import { useSystem } from '@/lib/system';
 import { useShopSettings } from '@/lib/use-settings';
 import { openWhatsApp, paidMessage } from '@/lib/whatsapp';
 import { updateRow } from '@/lib/writes';
+import { dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Chip, Divider, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
@@ -79,12 +80,12 @@ export default function PaymentEdit() {
   }
 
   async function save() {
-    if (!partyId) { notify(`Choose the ${isIn ? 'customer' : 'supplier'}.`); return; }
+    if (!partyId) { notify(isIn ? 'Grahak chuno.' : 'Supplier chuno.'); return; }
     if (!amount || amount <= 0) { notify('Kitna paisa? Amount daalo.'); return; }
     if (useManual) {
       for (const [id, amt] of Object.entries(manual)) {
         const d = openDocs?.find((x) => x.id === id);
-        if (d && amt > d.outstanding + 0.005) { notify(`${d.doc_no}: more than its pending ${formatINR(d.outstanding)}.`); return; }
+        if (d && amt > d.outstanding + 0.005) { notify(`${d.doc_no}: iska baaki sirf ${formatINR(d.outstanding)} hai.`); return; }
       }
       if (manualTotal > amount + 0.005) { notify('Baant payment se zyada ho gaya.', 'danger'); return; }
     }
@@ -116,7 +117,7 @@ export default function PaymentEdit() {
         }
       }
       const pendingAfter = round((party?.balance ?? 0) - amount);
-      if (isIn && party?.mobile && (await confirm(`Recorded ${docNo}`, `Send "payment received" WhatsApp to ${party.name}?`))) {
+      if (isIn && party?.mobile && (await confirm(`${docNo} likh diya`, `${party.name} ko WhatsApp par “paisa mil gaya” bhej dein?`))) {
         await openWhatsApp(party.mobile, paidMessage(shop.wa, { name: party.name, amount, mode: MODES.find((m) => m.value === mode)?.label ?? mode, pending: Math.max(pendingAfter, 0) }));
       }
       router.replace(isIn ? `/customer/${partyId}` : `/supplier/${partyId}`);
@@ -130,37 +131,37 @@ export default function PaymentEdit() {
     <>
       <Stack.Screen options={{ title: isIn ? 'Paisa aaya' : 'Supplier ko paisa do' }} />
       <Screen>
-        <Text variant="display">{isIn ? 'Payment aaya' : 'Supplier ko paisa do'}</Text>
-        <FormSection title={isIn ? 'From' : 'To'}>
+        <Text variant="display">{isIn ? 'Paisa aaya' : 'Supplier ko paisa do'}</Text>
+        <FormSection title={isIn ? 'Kisne diya' : 'Kisko diya'}>
           <SelectField label={isIn ? 'Grahak' : 'Supplier'} value={partyId} options={(parties ?? []).map((p) => ({ value: p.id, label: p.name, sublabel: p.balance ? `${formatINR(p.balance)} ${isIn ? 'baaki' : 'dena hai'}` : 'chukta' }))} onChange={setPartyId} />
           {party ? <Row gap={8}><Badge tone={party.balance > 0 ? 'warn' : 'ok'}>{isIn ? 'Baaki' : 'Dena hai'} {formatINR(party.balance)}</Badge>{party.balance > 0 ? <Button title="Poora paisa" size="sm" tone="ghost" onPress={() => setAmount(round(party.balance))} /> : null}</Row> : null}
         </FormSection>
 
-        <FormSection title="Payment">
-          <NumberField label="Amount (₹)" value={amount} onChange={setAmount} />
-          <Text variant="label" color="textMuted">Mode</Text>
+        <FormSection title="Kitna aur kaise">
+          <NumberField label="Kitne rupaye (₹)" value={amount} onChange={setAmount} />
+          <Text variant="label" color="textMuted">Kaise aaya</Text>
           <Row gap={space.xs} wrap>{MODES.map((m) => <Chip key={m.value} label={m.label} selected={mode === m.value} onPress={() => setMode(m.value)} />)}</Row>
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
-            <Input containerStyle={{ flex: 1 }} label={mode === 'cheque' ? 'Cheque no.' : mode === 'upi' ? 'UPI ref / UTR' : 'Ref number'} value={ref} onChangeText={setRef} autoCapitalize="characters" />
+            <Input containerStyle={{ flex: 1 }} label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
+            <Input containerStyle={{ flex: 1 }} label={mode === 'cheque' ? 'Cheque number' : mode === 'upi' ? 'UPI ref / UTR' : 'Ref number (ho to)'} value={ref} onChangeText={setRef} autoCapitalize="characters" />
           </Row>
           <Input label="Remarks · kis account mein aaya / kisne liya" value={remarks} onChangeText={setRemarks} placeholder="Rakesh ji ke HDFC me · Ramesh ne cash liya" />
           {(accounts ?? []).length ? <Row gap={space.xs} wrap>{(accounts ?? []).map((a) => <Chip key={a.remarks} label={a.remarks} selected={remarks === a.remarks} onPress={() => setRemarks(a.remarks)} />)}</Row> : null}
           <Divider />
           <Row gap={12} align="center">
-            <Button title={proof ? 'Change screenshot' : 'Attach payment screenshot'} tone="secondary" onPress={attach} />
-            {proof ? <Image source={{ uri: proof.uri }} style={{ width: 56, height: 56, borderRadius: 6 }} /> : <Text variant="small" color="textFaint">Optional · UPI / bank screenshot as proof</Text>}
+            <Button title={proof ? 'Doosra screenshot' : 'Screenshot lagao'} tone="secondary" onPress={attach} />
+            {proof ? <Image source={{ uri: proof.uri }} style={{ width: 56, height: 56, borderRadius: 6 }} /> : <Text variant="small" color="textFaint">Zaroori nahi · UPI / bank ka saboot</Text>}
           </Row>
         </FormSection>
 
         {partyId ? (
           <>
-            <SectionTitle right={<Button title={useManual ? 'Auto (oldest first)' : 'Choose bills'} tone="ghost" size="sm" onPress={() => setUseManual((v) => !v)} />}>Kis bill se kaato · {(openDocs ?? []).length} khule hue</SectionTitle>
+            <SectionTitle right={<Button title={useManual ? 'Apne aap (purana pehle)' : 'Khud chuno'} tone="ghost" size="sm" onPress={() => setUseManual((v) => !v)} />}>Kis bill se kaato · {(openDocs ?? []).length} khule hue</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(openDocs ?? []).map((d) => {
                 const auto = autoAlloc.find((a) => a.doc_id === d.id)?.amount ?? 0;
                 return (
-                  <ListRow key={d.id} title={d.doc_no} subtitle={`${d.doc_date} · pending ${formatINR(d.outstanding)}`}
+                  <ListRow key={d.id} title={d.doc_no} subtitle={`${dayLabel(d.doc_date)} · baaki ${formatINR(d.outstanding)}`}
                     right={useManual ? <View style={{ width: 110 }}><NumberField value={manual[d.id] ?? null} onChange={(v) => setManual((m) => ({ ...m, [d.id]: v ?? 0 }))} placeholder="0" /></View> : <Text mono color={auto ? 'ok' : 'textFaint'}>{auto ? formatINR(auto) : '—'}</Text>} />
                 );
               })}
@@ -168,13 +169,13 @@ export default function PaymentEdit() {
               <Divider />
               <Row style={{ justifyContent: 'space-between', paddingTop: 8 }}>
                 <Text variant="small" color="textMuted">Laga diya {formatINR(allocated)}</Text>
-                <Text variant="small" color={unallocated > 0 ? 'warn' : 'textMuted'}>Advance {formatINR(Math.max(unallocated, 0))}</Text>
+                <Text variant="small" color={unallocated > 0 ? 'warn' : 'textMuted'}>Advance mein {formatINR(Math.max(unallocated, 0))}</Text>
               </Row>
             </Card>
           </>
         ) : null}
 
-        <Button title={isIn ? 'Mark as paid' : 'Record payment'} size="lg" onPress={save} loading={busy} />
+        <Button title={isIn ? 'Paisa likh do' : 'Payment likh do'} size="lg" onPress={save} loading={busy} />
       </Screen>
     </>
   );

@@ -144,7 +144,7 @@ try {
   await page.getByText('Online / UPI', { exact: true }).filter({ visible: true }).first().click();
   await page.getByPlaceholder(/Rakesh ji ke HDFC/).filter({ visible: true }).first().fill('Rakesh ji ke HDFC me');
   await shot('mark-paid');
-  await page.getByRole('button', { name: 'Mark as paid' }).filter({ visible: true }).first().click();
+  await page.getByRole('button', { name: 'Paisa likh do' }).filter({ visible: true }).first().click();
   await acceptConfirm(); // "Mark payment received?"
   await page.waitForTimeout(2000);
   await acceptConfirm(); // "Send payment received WhatsApp?"

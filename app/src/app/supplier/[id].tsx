@@ -46,17 +46,17 @@ export default function SupplierScreen() {
     <>
       <Stack.Screen options={{ title: s.name }} />
       <Screen>
-        <Row style={{ justifyContent: 'space-between' }} align="flex-start">
-          <View style={{ flex: 1 }}>
-            <Text variant="small" color="textFaint" mono>{s.code}</Text>
-            <Text variant="display">{s.name}</Text>
-            {s.company_name && s.company_name !== s.name ? <Text color="textMuted">{s.company_name}</Text> : null}
-          </View>
-          <Row gap={6}>
+        {/* Same as the customer page: the name gets the full width, the
+            actions wrap under it, so neither can squeeze the other off screen. */}
+        <View>
+          <Text variant="small" color="textFaint" mono>{s.code}</Text>
+          <Text variant="display">{s.name}</Text>
+          {s.company_name && s.company_name !== s.name ? <Text color="textMuted">{s.company_name}</Text> : null}
+          <Row gap={6} wrap style={{ marginTop: space.sm }}>
             {can('payment.pay_supplier') && s.balance > 0 ? <Button title="Paisa do" size="sm" onPress={() => router.push(`/payment/edit?direction=out&party=${s.id}`)} /> : null}
             {can('party.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/supplier/edit?id=${s.id}`)} /> : null}
           </Row>
-        </Row>
+        </View>
 
         {showMoney ? (
           <Card tone="navy">

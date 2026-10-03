@@ -122,6 +122,25 @@ const RANGE_FEED = `
   ORDER BY on_date DESC, at DESC
   LIMIT 400`;
 
+/**
+ * Bills started and never finished — and, more to the point, bills the server
+ * refused. A refused bill goes back to being a draft on the phone with its
+ * lines intact, and until this list there was nowhere to find it: the feed
+ * shows posted documents only, so the bill simply vanished from the shop's
+ * day. Only drafts with maal in them; an empty one is nothing to come back to.
+ */
+const DRAFTS = `
+  SELECT i.id, i.created_at AS at, COALESCE(c.name, 'Grahak nahi chuna') AS who,
+         (SELECT COUNT(*) FROM sales_invoice_lines il WHERE il.invoice_id = i.id) AS items,
+         (SELECT COALESCE(SUM(il.qty * il.rate), 0) FROM sales_invoice_lines il WHERE il.invoice_id = i.id) AS amount,
+         (SELECT il.description FROM sales_invoice_lines il WHERE il.invoice_id = i.id ORDER BY il.line_no LIMIT 1) AS item
+    FROM sales_invoices i LEFT JOIN customers c ON c.id = i.customer_id
+   WHERE i.status = 'draft' AND i.doc_type = 'invoice'
+     AND EXISTS (SELECT 1 FROM sales_invoice_lines il WHERE il.invoice_id = i.id)
+   ORDER BY i.created_at DESC
+   LIMIT 20`;
+type Draft = { id: string; at: string; who: string; items: number; amount: number; item: string | null };
+
 type RangeKey = 'aaj' | 'kal' | 'week' | 'mahina' | 'custom';
 
 /** Move an ISO date by whole days. Garbage in — the same garbage back, not a NaN date. */
@@ -185,6 +204,7 @@ export default function ParchiScreen() {
   // changing the chips afterwards keeps the previous range on screen instead
   // of blanking, which is right: the numbers stay readable while they update.
   const { data: rows, isLoading } = useQuery<Entry>(RANGE_FEED, [from, to]);
+  const { data: drafts } = useQuery<Draft>(DRAFTS);
 
   const list = rows ?? [];
   const multiDay = from !== to;
@@ -219,6 +239,31 @@ export default function ParchiScreen() {
           Din bhar ke bill aur baaki har entry — kis waqt kya hua.
         </Text>
       </View>
+
+      {(drafts ?? []).length > 0 ? (
+        <>
+          <SectionTitle right={<Text variant="small" color="textFaint">{(drafts ?? []).length}</Text>}>Adhoore bill</SectionTitle>
+          <Card style={{ gap: 0, paddingVertical: 4 }}>
+            {(drafts ?? []).map((d, i) => (
+              <React.Fragment key={d.id}>
+                {i > 0 ? <Divider /> : null}
+                <ListRow
+                  left={
+                    <Row gap={space.sm}>
+                      <Text variant="small" color="textFaint" mono style={{ width: 58 }}>{clockOf(d.at)}</Text>
+                      <IconBadge name="document-text-outline" accent="amber" size={34} />
+                    </Row>
+                  }
+                  title={d.who}
+                  subtitle={`${d.item ?? ''}${d.items > 1 ? ` +${d.items - 1} aur` : ''} · poora karna baaki`}
+                  onPress={() => router.push(`/invoice/edit?id=${d.id}`)}
+                  right={<Text mono>{formatINR(d.amount)}</Text>}
+                />
+              </React.Fragment>
+            ))}
+          </Card>
+        </>
+      ) : null}
 
       <Row gap={space.xs} wrap>
         <Chip label="Aaj" selected={range === 'aaj'} onPress={() => setRange('aaj')} />

@@ -130,17 +130,19 @@ export default function CustomerScreen() {
               {c.code}
             </Text>
           </Row>
-          <Row style={{ justifyContent: 'space-between' }} align="flex-start">
-            <Text variant="display" style={{ marginTop: space.xs, flex: 1 }}>
-              {c.name}
-            </Text>
-            <Row gap={6}>
-              {can('sale.create') ? <Button title="Naya bill" size="sm" onPress={() => router.push(`/invoice/edit?customer=${c.id}`)} /> : null}
-              <Button title="Hisaab bhejo" size="sm" tone="ghost" onPress={sendStatement} />
-              {c.balance > 0 ? <Button title="Yaad dilao" size="sm" tone="secondary" onPress={async () => { if (!c.mobile) { notify('Is grahak ka mobile number nahi hai.'); return; } await openWhatsApp(c.mobile, reminderMessage(shop.wa, { name: c.name, pending: c.balance })); }} /> : null}
-              {can('payment.receive') ? <Button title="Paisa aa gaya" size="sm" tone="secondary" onPress={() => router.push(`/payment/edit?direction=in&party=${c.id}${c.balance > 0 ? `&amount=${c.balance}` : ''}`)} /> : null}
-              {can('party.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/customer/edit?id=${c.id}`)} /> : null}
-            </Row>
+          {/* Name on its own line, actions wrapping underneath. They used to
+              share one row: on a phone the five buttons ran off the right edge
+              and squeezed the name to zero width, where Android drew it one
+              letter per line — a screen-high blank gap with no name in it. */}
+          <Text variant="display" style={{ marginTop: space.xs }}>
+            {c.name}
+          </Text>
+          <Row gap={6} wrap style={{ marginTop: space.sm }}>
+            {can('sale.create') ? <Button title="Naya bill" size="sm" onPress={() => router.push(`/invoice/edit?customer=${c.id}`)} /> : null}
+            {can('payment.receive') ? <Button title="Paisa aa gaya" size="sm" tone="secondary" onPress={() => router.push(`/payment/edit?direction=in&party=${c.id}${c.balance > 0 ? `&amount=${c.balance}` : ''}`)} /> : null}
+            {c.balance > 0 ? <Button title="Yaad dilao" size="sm" tone="secondary" onPress={async () => { if (!c.mobile) { notify('Is grahak ka mobile number nahi hai.'); return; } await openWhatsApp(c.mobile, reminderMessage(shop.wa, { name: c.name, pending: c.balance })); }} /> : null}
+            <Button title="Hisaab bhejo" size="sm" tone="ghost" onPress={sendStatement} />
+            {can('party.edit') ? <Button title="Badlo" tone="ghost" size="sm" onPress={() => router.push(`/customer/edit?id=${c.id}`)} /> : null}
           </Row>
           {c.business_name && c.business_name !== c.name ? (
             <Text variant="body" color="textMuted">

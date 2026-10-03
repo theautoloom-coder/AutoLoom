@@ -72,11 +72,19 @@ const SUMMARY = `
     -- at the moment of sale — so it is the cost of THOSE pieces, not today's
     -- rate. Sale movements are negative, hence the sign flip.
     --
+    -- Only movements of bills that stand: posted, dated in the range by the
+    -- BILL's date, the same rule Sale uses. This used to sum every 'sale'
+    -- movement by its clock, so a cancelled bill dropped out of Sale and kept
+    -- its cost, and a bill the server refused (stock gone up, bill not) added
+    -- ₹1,800 of cost against no sale at all — the shop's first staff udhaar
+    -- bill turned the day's munafa negative.
+    --
     -- This is also the only place maal becomes an expense. A purchase is NOT
     -- counted anywhere on this screen: buying stock swaps cash for maal, it
     -- does not lose you anything. It turns into cost here, when it is sold.
-    (SELECT COALESCE(SUM(-qty * unit_cost), 0) FROM stock_movements
-      WHERE movement_type = 'sale' AND date(occurred_at) BETWEEN ?1 AND ?2) AS cogs,
+    (SELECT COALESCE(SUM(-m.qty * m.unit_cost), 0) FROM stock_movements m
+       JOIN sales_invoices i ON i.id = m.ref_id
+      WHERE m.movement_type = 'sale' AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2) AS cogs,
 
     -- BUSINESS KHARCHA. Rent, bijli, diesel, chai — money that left and
     -- brought back nothing you can sell.
@@ -93,11 +101,14 @@ const SUMMARY = `
 
     -- KHARAB / LOSS. Maal that broke, leaked or went missing. Same stamped
     -- cost, same sign flip. It never reached a customer, so it is not in Maal
-    -- Ki Cost — it is its own loss.
-    (SELECT COALESCE(SUM(-qty * unit_cost), 0) FROM stock_movements
-      WHERE movement_type = 'damage' AND date(occurred_at) BETWEEN ?1 AND ?2) AS damage,
-    (SELECT COUNT(*) FROM stock_movements
-      WHERE movement_type = 'damage' AND date(occurred_at) BETWEEN ?1 AND ?2) AS damage_rows`;
+    -- Ki Cost — it is its own loss. Same rule as above: only write-offs that
+    -- were actually posted, by their own date.
+    (SELECT COALESCE(SUM(-m.qty * m.unit_cost), 0) FROM stock_movements m
+       JOIN stock_adjustments a ON a.id = m.ref_id
+      WHERE m.movement_type = 'damage' AND a.status = 'posted' AND a.doc_date BETWEEN ?1 AND ?2) AS damage,
+    (SELECT COUNT(*) FROM stock_movements m
+       JOIN stock_adjustments a ON a.id = m.ref_id
+      WHERE m.movement_type = 'damage' AND a.status = 'posted' AND a.doc_date BETWEEN ?1 AND ?2) AS damage_rows`;
 
 // -----------------------------------------------------------------------------
 // Drill-downs — "ye figure kahan se aaya"
@@ -149,9 +160,10 @@ const DETAIL: Record<ListKey, { title: string; hint: string; sub: (r: DetailRow)
              SUM(-m.qty * m.unit_cost) AS amount,
              SUM(-m.qty) AS a2, NULL AS a3
         FROM stock_movements m
+        JOIN sales_invoices i ON i.id = m.ref_id
         JOIN product_variants pv ON pv.id = m.variant_id
         JOIN products p ON p.id = pv.product_id
-       WHERE m.movement_type = 'sale' AND date(m.occurred_at) BETWEEN ?1 AND ?2
+       WHERE m.movement_type = 'sale' AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2
        GROUP BY pv.id, p.name, pv.variant_name
        ORDER BY amount DESC
        LIMIT 200`,
@@ -208,9 +220,10 @@ const DETAIL: Record<ListKey, { title: string; hint: string; sub: (r: DetailRow)
              -m.qty * m.unit_cost AS amount,
              -m.qty AS a2, NULL AS a3
         FROM stock_movements m
+        JOIN stock_adjustments a ON a.id = m.ref_id
         JOIN product_variants pv ON pv.id = m.variant_id
         JOIN products p ON p.id = pv.product_id
-       WHERE m.movement_type = 'damage' AND date(m.occurred_at) BETWEEN ?1 AND ?2
+       WHERE m.movement_type = 'damage' AND a.status = 'posted' AND a.doc_date BETWEEN ?1 AND ?2
        ORDER BY m.occurred_at DESC
        LIMIT 200`,
   },

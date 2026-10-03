@@ -7,6 +7,7 @@ import { formatINR } from '@domain';
 
 import { SEARCH_CUSTOMERS, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { customerTypeLabel } from '@/lib/words';
 import { Avatar, Badge, Button, Card, Chip, Empty, Input, ListRow, Row, Screen, Text } from '@/ui';
 import { Skeleton, SkeletonList } from '@/ui/skeleton';
 import { radius, space } from '@/ui/theme';
@@ -81,7 +82,7 @@ export default function CustomersScreen() {
               onPress={() => router.push(`/customer/${c.id}`)}
               right={
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Badge tone={c.customer_type === 'retail' ? 'neutral' : 'info'}>{c.customer_type}</Badge>
+                  <Badge tone={c.customer_type === 'retail' ? 'neutral' : 'info'}>{customerTypeLabel(c.customer_type)}</Badge>
                   {c.balance ? <Text variant="small" mono color={c.balance > 0 ? 'warn' : 'ok'}>{formatINR(c.balance)}</Text> : null}
                 </View>
               }

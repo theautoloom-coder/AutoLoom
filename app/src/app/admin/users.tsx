@@ -217,7 +217,7 @@ export default function UsersScreen() {
         ))}
       </Card>
 
-      <Button title={showMatrix ? 'Permission ki table chhupao' : 'Permission ki table dikhao'} tone="secondary" onPress={() => setShowMatrix((v) => !v)} />
+      <Button title={showMatrix ? 'Kaun kya kar sakta hai — chhupao' : 'Kaun kya kar sakta hai — dekho'} tone="secondary" onPress={() => setShowMatrix((v) => !v)} />
       {showMatrix ? (
         <Card style={{ gap: 0 }}>
           <Row gap={4} style={{ paddingVertical: 6 }}>
@@ -240,7 +240,7 @@ export default function UsersScreen() {
             </Row>
           ))}
           <Text variant="small" color="textFaint" style={{ marginTop: 8 }}>
-            Kisi khaane par tap karke on/off karo. Admin ki permission fixed hai. Badlav server par bhi lagta hai — security isi table ko padhti hai.
+            Kisi khaane par tap karke on/off karo. Admin ki permission fixed hai. Badlav server par bhi lagta hai — security isi list ko padhti hai.
           </Text>
         </Card>
       ) : null}

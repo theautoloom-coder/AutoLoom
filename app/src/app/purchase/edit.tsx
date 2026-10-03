@@ -163,11 +163,11 @@ export default function PurchaseEdit() {
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Humari date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" />
             <View style={{ flex: 1 }}>
-              <SelectField label={isReturn ? 'Return from' : 'Receive into'} value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} />
+              <SelectField label={isReturn ? 'Kahan se wapas' : 'Maal kahan rakha'} value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} />
             </View>
           </Row>
           <Row gap={8}>
-            <Badge tone={interstate ? 'info' : 'neutral'}>{interstate ? 'Inter-state · IGST' : 'Same state · CGST + SGST'}</Badge>
+            <Badge tone={interstate ? 'info' : 'neutral'}>{interstate ? 'Doosra state · IGST' : 'Apna state · CGST + SGST'}</Badge>
             <Button title="Toggle" tone="ghost" size="sm" onPress={() => patch({ is_interstate: !interstate })} />
           </Row>
         </FormSection>

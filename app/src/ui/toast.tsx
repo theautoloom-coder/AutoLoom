@@ -31,10 +31,13 @@ function pushToast(message: string, tone: ToastItem['tone'] = 'default') {
   const item = { id: nextId++, message, tone };
   toastItems = [...toastItems, item];
   toastListeners.forEach((l) => l(toastItems));
+  // A danger toast is longer, because it is read rather than glanced at: the
+  // sync refusing an entry means work was lost, and 3.2s is about the time it
+  // takes to notice a toast, not to read two lines of it.
   setTimeout(() => {
     toastItems = toastItems.filter((t) => t.id !== item.id);
     toastListeners.forEach((l) => l(toastItems));
-  }, 3200);
+  }, tone === 'danger' ? 7000 : 3200);
 }
 
 let confirmListener: ((s: ConfirmState) => void) | null = null;

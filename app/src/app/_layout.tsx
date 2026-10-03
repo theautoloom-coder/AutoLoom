@@ -7,9 +7,11 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { ensureDailyPendingReminder } from '@/lib/daily-reminder';
 import { setupPwa } from '@/lib/pwa';
+import { describeRejection, onSyncRejected } from '@/lib/sync-events';
 import { SessionProvider, useSession } from '@/lib/session';
 import { SystemProvider } from '@/lib/system';
 import { Loading, useTheme } from '@/ui';
+import { showToast } from '@/ui/toast';
 import { palette } from '@/ui/theme';
 import { useAppFonts } from '@/ui/fonts';
 import { AnimatedSplash } from '@/ui/splash';
@@ -60,6 +62,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!session && !onSignIn && !onReset) router.replace('/sign-in');
     if (session && onSignIn) router.replace('/');
   }, [loading, session, segments, router]);
+
+  // A refused entry is announced by the connector; this is where it becomes
+  // something the person can see. It stays up longer than an ordinary toast
+  // because it is the one message here that means work was lost.
+  useEffect(() => onSyncRejected((r) => showToast(describeRejection(r), 'danger')), []);
 
   // Once signed in, make sure the 6:30pm "check pending payments" reminder
   // is scheduled on this device. Idempotent, so this is cheap on every launch.

@@ -25,7 +25,7 @@ import { formatINR, isDateString, toDateString } from '@domain';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { postPurchase } from '@/lib/posting';
-import { insertRow, searchText } from '@/lib/writes';
+import { insertRow, nextPartyCode, searchText } from '@/lib/writes';
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
 import { Button, Card, Divider, Empty, Input, Row, Screen, Text } from '@/ui';
 import { notify, SelectField } from '@/ui/forms';
@@ -68,6 +68,7 @@ export default function StockChadhao() {
 
   async function addSupplier(name: string) {
     const id = await insertRow(db, 'suppliers', {
+      code: await nextPartyCode(db, 'suppliers'),
       name: name.trim(), is_active: true, search_text: searchText(name),
     }, actor);
     setSupplierId(id);

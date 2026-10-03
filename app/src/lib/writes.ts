@@ -93,6 +93,26 @@ export function searchText(...parts: Array<string | number | null | undefined>):
 }
 
 /** Next code in a series like C0001 -> C0002, from the current max. */
+/**
+ * The next free party code, read the same way everywhere.
+ *
+ * `code` is NOT NULL on both customers and suppliers, and the full edit forms
+ * always filled it. The quick path did not: naming a new supplier from inside
+ * Stock Chadhao inserted one with no code, the server refused it (23502), and
+ * the sync discarded it — no supplier, no error, and no way to receive stock
+ * on a shop that had none yet. Every path that creates a party now asks here.
+ */
+export async function nextPartyCode(
+  db: { getOptional<T>(sql: string, params?: unknown[]): Promise<T | null> },
+  table: 'customers' | 'suppliers'
+): Promise<string> {
+  const prefix = table === 'customers' ? 'C' : 'S';
+  const max = await db.getOptional<{ m: string | null }>(
+    `SELECT MAX(code) AS m FROM ${table} WHERE code LIKE '${prefix}%'`
+  );
+  return nextCode(prefix, max?.m);
+}
+
 export function nextCode(prefix: string, currentMax: string | null | undefined, width = 4): string {
   const n = currentMax && currentMax.startsWith(prefix) ? parseInt(currentMax.slice(prefix.length), 10) || 0 : 0;
   return `${prefix}${String(n + 1).padStart(width, '0')}`;

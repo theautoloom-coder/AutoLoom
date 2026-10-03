@@ -77,10 +77,36 @@ export async function allocateDocNo(tx: Transaction, docType: DocType, deviceId:
     seq = { id, series_code: last?.series_code ?? 'A', prefix, next_number: 1, pad_width: last?.pad_width ?? 4, owner_device_id: null, financial_year: fy, location_id: null };
   }
 
-  const docNo = formatDocNo(seq);
-  await updateRow(tx, 'document_sequences', seq.id, { next_number: seq.next_number + 1 });
+  // Never hand out a number this phone can already see on a document. The
+  // counter is one row that sync can overwrite with an older value; the
+  // documents are the truth. A counter left at 1 on the server handed the
+  // second bill of the day 0001 again, and the server threw the bill away.
+  const used = await one<{ m: number | null }>(
+    tx,
+    `SELECT MAX(CAST(SUBSTR(doc_no, ?) AS INTEGER)) AS m FROM ${DOC_TABLE[docType]}
+      WHERE SUBSTR(doc_no, 1, ?) = ? AND SUBSTR(doc_no, ?) GLOB '[0-9]*'`,
+    [seq.prefix.length + 1, seq.prefix.length, seq.prefix, seq.prefix.length + 1]
+  );
+  const number = Math.max(seq.next_number, (used?.m ?? 0) + 1);
+
+  const docNo = formatDocNo(seq, number);
+  await updateRow(tx, 'document_sequences', seq.id, { next_number: number + 1 });
   return docNo;
 }
+
+/** Where each kind of number ends up, so allocateDocNo can see what is taken. */
+const DOC_TABLE: Record<DocType, string> = {
+  sales_invoice: 'sales_invoices',
+  credit_note: 'sales_invoices',
+  purchase: 'purchases',
+  debit_note: 'purchases',
+  payment_in: 'payments',
+  payment_out: 'payments',
+  stock_adjustment: 'stock_adjustments',
+  stock_transfer: 'stock_transfers',
+  stock_audit: 'stock_audits',
+  job_card: 'job_cards',
+};
 
 // -----------------------------------------------------------------------------
 // Line totals

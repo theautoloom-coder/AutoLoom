@@ -76,6 +76,18 @@ describe('numbering', () => {
     expect(n).toMatch(/^PUR\/26-27\/0001$/); // a fresh unowned series was cloned for this device
     expect(many(db, "SELECT * FROM document_sequences WHERE doc_type = 'purchase'")).toHaveLength(2);
   });
+
+  // What the shop's phone did: the counter update was refused on the server,
+  // sync put 1 back, and the second bill of the day came out as 0001 again.
+  it('skips a number already printed on a bill when the counter has fallen behind', async () => {
+    const first = await draftInvoice(ID.cust, [{ variant: ID.h4, qty: 1, rate: 500 }]);
+    expect(await db.writeTransaction((tx) => postInvoice(tx as unknown as Transaction, first, actor))).toBe('NOI/A/26-27/0001');
+    db.raw.exec("UPDATE document_sequences SET next_number = 1 WHERE doc_type = 'sales_invoice'");
+
+    const second = await draftInvoice(ID.cust, [{ variant: ID.h4, qty: 1, rate: 500 }], 'credit');
+    expect(await db.writeTransaction((tx) => postInvoice(tx as unknown as Transaction, second, actor))).toBe('NOI/A/26-27/0002');
+    expect(one<{ next_number: number }>(db, "SELECT next_number FROM document_sequences WHERE doc_type = 'sales_invoice'").next_number).toBe(3);
+  });
 });
 
 describe('purchases', () => {

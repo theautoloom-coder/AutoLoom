@@ -189,6 +189,10 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
       if (forBill && isNew) {
         handBack('customer', cid);
         router.back();
+      } else if (!isNew && router.canGoBack()) {
+        // An edit goes back to the customer page it came from; replacing
+        // stacked a second copy of it and the next "Peeche" looked dead.
+        router.back();
       } else {
         router.replace(`/customer/${cid}`);
       }

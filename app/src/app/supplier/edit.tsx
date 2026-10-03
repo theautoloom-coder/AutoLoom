@@ -99,7 +99,10 @@ Phir bhi naya supplier banayein?`))) return;
         } else await updateRow(tx, 'suppliers', sid, payload);
       });
       setDirty(false);
-      router.replace(`/supplier/${sid}`);
+      // An edit goes back to the page it came from; replacing would stack a
+      // second copy of that page and make the next "Peeche" look dead.
+      if (!isNew && router.canGoBack()) router.back();
+      else router.replace(`/supplier/${sid}`);
     } catch (e) { notify(`Save nahi hua: ${(e as Error).message}. Dobara koshish karo.`); } finally { setSaving(false); }
   }
 

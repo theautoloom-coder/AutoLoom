@@ -120,7 +120,12 @@ export default function PaymentEdit() {
       if (isIn && party?.mobile && (await confirm(`${docNo} likh diya`, `${party.name} ko WhatsApp par “paisa mil gaya” bhej dein?`))) {
         await openWhatsApp(party.mobile, paidMessage(shop.wa, { name: party.name, amount, mode: MODES.find((m) => m.value === mode)?.label ?? mode, pending: Math.max(pendingAfter, 0) }));
       }
-      router.replace(isIn ? `/customer/${partyId}` : `/supplier/${partyId}`);
+      // Back to wherever the payment was started — the bill, the khata, the
+      // supplier page. Replacing with the party page put a second copy of it
+      // on the stack, so the next "Peeche" seemed to do nothing; and from a
+      // bill's "Jama laga do" it left the bill behind altogether.
+      if (router.canGoBack()) router.back();
+      else router.replace(isIn ? `/customer/${partyId}` : `/supplier/${partyId}`);
     } catch (e) { notify((e as Error).message); } finally { setBusy(false); }
   }
 

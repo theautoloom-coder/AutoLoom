@@ -363,6 +363,24 @@ update public.spec_definitions
    set name = 'CarPlay'
  where code = 'carplay' and name is distinct from 'CarPlay';
 
+--    Yes becomes Wireless — renamed, so an item already tagged "Yes" keeps
+--    its tag. When Wireless is already there (a second run, after 02 has put
+--    a fresh "Yes" back) the stray Yes is simply dropped. "No" stays: an
+--    earlier version deleted it here and left no honest answer for a unit
+--    with no CarPlay at all.
+update public.spec_options so
+   set value = 'Wireless', code = 'wireless'
+  from public.spec_definitions sd
+ where sd.id = so.spec_definition_id and sd.code = 'carplay'
+   and so.value = 'Yes'
+   and not exists (select 1 from public.spec_options x
+                    where x.spec_definition_id = so.spec_definition_id and x.value = 'Wireless');
+
+delete from public.spec_options so
+ using public.spec_definitions sd
+ where sd.id = so.spec_definition_id and sd.code = 'carplay'
+   and so.value = 'Yes';
+
 insert into public.spec_options (spec_definition_id, value, code, sort_order)
 select sd.id, v.value, v.code, v.sort_order
   from public.spec_definitions sd
@@ -371,15 +389,11 @@ select sd.id, v.value, v.code, v.sort_order
 on conflict do nothing;
 
 update public.spec_options so
-   set value = 'Wireless', code = 'wireless', sort_order = 1
+   set sort_order = case so.value when 'Wireless' then 1 when 'Wired' then 2 else 3 end
   from public.spec_definitions sd
  where sd.id = so.spec_definition_id and sd.code = 'carplay'
-   and so.value = 'Yes';
-
-delete from public.spec_options so
- using public.spec_definitions sd
- where sd.id = so.spec_definition_id and sd.code = 'carplay'
-   and so.value = 'No' and so.code is distinct from 'no';
+   and so.value in ('Wireless', 'Wired', 'No')
+   and so.sort_order is distinct from (case so.value when 'Wireless' then 1 when 'Wired' then 2 else 3 end);
 
 -- 3. Sort order. New options were appended, so "4 Seater" sat below "7 Seater"
 --    and the socket list ran H1, H10, H11, H13, H15, H16, H21W, H27, H3, H4 —

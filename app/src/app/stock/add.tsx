@@ -190,9 +190,12 @@ export default function StockChadhao() {
           <Input label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
         </Card>
 
+        {/* No autofocus: the first question here is the supplier, and a
+            keyboard already open over it hid the very field to fill first. */}
         <VariantPicker
           onPick={add}
           locationId={locationId}
+          autoFocus={false}
           canCreate={can('catalog.edit')}
           onCreate={(text) => router.push(`/admin/item?name=${encodeURIComponent(text)}&back=/stock/add` as never)}
         />

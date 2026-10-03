@@ -9,7 +9,7 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { checkCredit, checkPrice, formatINR, isDateString, isInterstate, resolvePrice, statusLabel, toDateString } from '@domain';
@@ -105,9 +105,26 @@ export default function InvoiceEdit() {
           await insertRow(db, 'sales_invoice_lines', { invoice_id: newId, line_no: ol.line_no, variant_id: ol.variant_id, description: ol.description, hsn_code: ol.hsn_code, qty: remaining, unit_code: ol.unit_code, mrp: ol.mrp, list_price: ol.list_price, rate: ol.rate, discount_pct: ol.discount_pct, discount_amt: 0, tax_rate_pct: ol.tax_rate_pct, price_source: ol.price_source, return_condition: 'sellable', against_line_id: ol.id });
         }
       }
+      createdHere.current = newId;
       setId(newId);
     })().catch((e) => notify(`Naya bill nahi khula: ${String((e as Error).message ?? e)}`, 'danger'));
   }, [id, creating, locationId, db, actor, against, original, originalLines, customerParam, profile?.id]);
+
+  // Opening Bill Banao makes a draft at once, so the screen has something to
+  // write lines into. Backing out without adding anything left that empty
+  // draft behind — on the phone and, once synced, on the server — one per
+  // visit. A draft this screen made, still empty when the screen goes, is
+  // removed. One opened from the list (?id=) is never touched: its lines may
+  // simply not have loaded yet.
+  const createdHere = useRef<string | null>(null);
+  const leftEmpty = useRef(false);
+  leftEmpty.current = doc?.status === 'draft' && lines !== undefined && lines.length === 0;
+  useEffect(() => () => {
+    const draft = createdHere.current;
+    if (draft && leftEmpty.current) {
+      db.writeTransaction((tx) => deleteRow(tx, 'sales_invoices', draft)).catch(() => {});
+    }
+  }, [db]);
 
   const interstate = gst && !!doc?.is_interstate;
   const totals = useMemo(() => totalLines(lines ?? [], interstate, doc?.other_charges ?? 0, shop.company?.round_to_rupee !== 0), [lines, interstate, doc?.other_charges, shop.company]);

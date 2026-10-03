@@ -234,8 +234,9 @@ create policy supplier_products_purchase_upd on public.supplier_products
 -- 4. Put back stock that left on a document the server refused
 --
 -- The half-applied uploads in (2) left movements behind whose document is
--- still a draft: stock off the shelf on the server with no bill, purchase or
--- adjustment to show for it. Each gets a reversing movement — stock_movements
+-- still a draft — or has since been discarded from the phone, which deletes
+-- it: stock off the shelf on the server with no bill, purchase or adjustment
+-- to show for it. Each gets a reversing movement — stock_movements
 -- is append-only, so the record of what happened stays and is cancelled out.
 -- Idempotent: a movement that already has its reversal is skipped.
 --
@@ -250,9 +251,9 @@ select m.variant_id, m.location_id, -m.qty, 'cancel_reversal', m.ref_type, m.ref
   from public.stock_movements m
  where m.movement_type <> 'cancel_reversal'
    and (
-        (m.ref_type = 'sales_invoice'    and exists (select 1 from public.sales_invoices    d where d.id = m.ref_id and d.status = 'draft'))
-     or (m.ref_type = 'purchase'         and exists (select 1 from public.purchases         d where d.id = m.ref_id and d.status = 'draft'))
-     or (m.ref_type = 'stock_adjustment' and exists (select 1 from public.stock_adjustments d where d.id = m.ref_id and d.status = 'draft'))
+        (m.ref_type = 'sales_invoice'    and not exists (select 1 from public.sales_invoices    d where d.id = m.ref_id and d.status <> 'draft'))
+     or (m.ref_type = 'purchase'         and not exists (select 1 from public.purchases         d where d.id = m.ref_id and d.status <> 'draft'))
+     or (m.ref_type = 'stock_adjustment' and not exists (select 1 from public.stock_adjustments d where d.id = m.ref_id and d.status <> 'draft'))
    )
    and not exists (select 1 from public.stock_movements r where r.reversal_of_id = m.id);
 

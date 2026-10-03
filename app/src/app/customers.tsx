@@ -44,16 +44,16 @@ export default function CustomersScreen() {
       </Row>
       <Input value={q} onChangeText={setQ} placeholder="Naam, firm, mobile ya shehar" autoCapitalize="none" />
       {/* The type chips are a fixed list, so they are real from the first
-          frame — only the "All" count has to wait. Same for the box above:
+          frame — only the "Sab" count has to wait. Same for the box above:
           you can type a name before a single grahak has loaded. */}
       <Row gap={space.xs} wrap>
         {loading ? (
           <Skeleton width={64} height={34} radius={radius.pill} />
         ) : (
-          <Chip label={`All · ${rows.length}`} selected={!type} onPress={() => setType(null)} />
+          <Chip label={`Sab · ${rows.length}`} selected={!type} onPress={() => setType(null)} />
         )}
         {TYPES.map((tp) => (
-          <Chip key={tp} label={tp} selected={type === tp} onPress={() => setType(type === tp ? null : tp)} />
+          <Chip key={tp} label={customerTypeLabel(tp)} selected={type === tp} onPress={() => setType(type === tp ? null : tp)} />
         ))}
       </Row>
       {can('reports.view') || can('payment.receive') ? (

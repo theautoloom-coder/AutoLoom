@@ -9,6 +9,7 @@ import { postAdjustment } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { deleteRow, insertRow, updateRow } from '@/lib/writes';
+import { useDropEmptyDraft } from '@/lib/drafts';
 import { Badge, Button, Card, Input, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
 import { LineCard, VariantPicker, type PickedVariant } from '@/ui/lines';
@@ -47,11 +48,14 @@ export default function AdjustmentEdit() {
      WHERE l.adjustment_id = ? ORDER BY l.created_at`, [id ?? '']);
   const { data: locations } = useQuery<{ id: string; name: string }>("SELECT id, name FROM locations WHERE is_active = 1 ORDER BY sort_order");
 
+  const markCreated = useDropEmptyDraft(db, 'stock_adjustments');
   useEffect(() => {
     if (id || creating || !locationId) return;
     setCreating(true);
-    insertRow(db, 'stock_adjustments', { doc_date: toDateString(), location_id: locationId, reason: 'damage', status: 'draft' }, actor).then(setId).catch((e) => notify(String(e)));
-  }, [id, creating, locationId, db, actor]);
+    insertRow(db, 'stock_adjustments', { doc_date: toDateString(), location_id: locationId, reason: 'damage', status: 'draft' }, actor)
+      .then((newId) => { markCreated(newId); setId(newId); })
+      .catch((e) => notify(String(e)));
+  }, [id, creating, locationId, db, actor, markCreated]);
 
   const patch = (p: Record<string, string | number | null>) => id && updateRow(db, 'stock_adjustments', id, p);
   const sign = doc?.reason === 'found' || doc?.reason === 'opening' ? 1 : doc?.reason === 'wrong_entry' || doc?.reason === 'counting_error' || doc?.reason === 'other' ? 0 : -1;

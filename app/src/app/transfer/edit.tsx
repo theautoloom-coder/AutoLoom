@@ -9,6 +9,7 @@ import { dispatchTransfer } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { deleteRow, insertRow, updateRow } from '@/lib/writes';
+import { useDropEmptyDraft } from '@/lib/drafts';
 import { Badge, Button, Card, Input, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
 import { LineCard, VariantPicker, type PickedVariant } from '@/ui/lines';
@@ -36,12 +37,15 @@ export default function TransferEdit() {
      WHERE l.transfer_id = ? ORDER BY l.created_at`, [id ?? '']);
   const { data: locations } = useQuery<{ id: string; name: string }>("SELECT id, name FROM locations WHERE is_active = 1 AND type NOT IN ('damaged','transit') ORDER BY sort_order");
 
+  const markCreated = useDropEmptyDraft(db, 'stock_transfers');
   useEffect(() => {
     if (id || creating || !locationId || !locations?.length) return;
     setCreating(true);
     const to = locations.find((l) => l.id !== locationId)?.id ?? locationId;
-    insertRow(db, 'stock_transfers', { doc_date: toDateString(), from_location_id: locationId, to_location_id: to, status: 'draft' }, actor).then(setId).catch((e) => notify(String(e)));
-  }, [id, creating, locationId, locations, db, actor]);
+    insertRow(db, 'stock_transfers', { doc_date: toDateString(), from_location_id: locationId, to_location_id: to, status: 'draft' }, actor)
+      .then((newId) => { markCreated(newId); setId(newId); })
+      .catch((e) => notify(String(e)));
+  }, [id, creating, locationId, locations, db, actor, markCreated]);
 
   const patch = (p: Record<string, string | number | null>) => id && updateRow(db, 'stock_transfers', id, p);
 

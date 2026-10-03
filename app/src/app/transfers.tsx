@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { statusLabel } from '@domain';
 
 import { useSession } from '@/lib/session';
+import { dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Empty, ListRow, Row, Screen, Text } from '@/ui';
 
 type T = { id: string; doc_no: string | null; doc_date: string; status: string; from_name: string; to_name: string; lines: number; units: number };
@@ -30,7 +31,7 @@ export default function TransfersScreen() {
       <Text variant="small" color="textMuted">Bhejte hi maal wahan se nikal jaata hai aur pahunchne par doosri jagah chadh jaata hai — beech mein gaadi ka maal "raste mein" dikhta hai.</Text>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {(rows ?? []).map((t) => (
-          <ListRow key={t.id} title={`${t.from_name} → ${t.to_name}`} subtitle={`${t.doc_no ?? 'Draft'} · ${t.doc_date} · ${t.lines} lines · ${Math.round(t.units)} units`}
+          <ListRow key={t.id} title={`${t.from_name} → ${t.to_name}`} subtitle={`${t.doc_no ?? 'Adhoora'} · ${dayLabel(t.doc_date)} · ${t.lines} item · ${Math.round(t.units)} pcs`}
             onPress={() => router.push(t.status === 'draft' ? `/transfer/edit?id=${t.id}` : `/transfer/${t.id}`)}
             right={<View style={{ alignItems: 'flex-end' }}><Badge tone={tone(t.status)}>{t.status === 'dispatched' ? 'raste mein' : statusLabel(t.status)}</Badge></View>} />
         ))}

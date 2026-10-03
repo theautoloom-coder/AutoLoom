@@ -16,6 +16,7 @@ import { postPurchase, totalLines, type DraftLine } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { deleteRow, insertRow, updateRow } from '@/lib/writes';
+import { useDropEmptyDraft } from '@/lib/drafts';
 import { Badge, Button, Card, Divider, Input, KV, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
 import { LineCard, VariantPicker, type PickedVariant } from '@/ui/lines';
@@ -38,8 +39,8 @@ export default function PurchaseEdit() {
   const { data: suppliers } = useQuery<{ id: string; name: string; state_code: string | null; gstin: string | null; company_name: string | null }>('SELECT id, name, state_code, gstin, company_name FROM suppliers WHERE is_active = 1 ORDER BY name');
   const { data: locations } = useQuery<{ id: string; name: string; type: string }>("SELECT id, name, type FROM locations WHERE is_active = 1 AND type <> 'damaged' ORDER BY sort_order");
   const { data: company } = useQuery<{ state_code: string; round_to_rupee: number }>('SELECT state_code, round_to_rupee FROM company_settings LIMIT 1');
-  const { data: original } = useQuery<{ id: string; doc_no: string; supplier_id: string; location_id: string; is_interstate: number }>('SELECT id, doc_no, supplier_id, location_id, is_interstate FROM purchases WHERE id = ?', [against ?? '']);
-  const { data: originalLines } = useQuery<Line & { returned: number }>(
+  const { data: original, isLoading: originalLoading } = useQuery<{ id: string; doc_no: string; supplier_id: string; location_id: string; is_interstate: number }>('SELECT id, doc_no, supplier_id, location_id, is_interstate FROM purchases WHERE id = ?', [against ?? '']);
+  const { data: originalLines, isLoading: originalLinesLoading } = useQuery<Line & { returned: number }>(
     `SELECT pl.*, COALESCE((SELECT SUM(x.qty) FROM purchase_lines x JOIN purchases px ON px.id = x.purchase_id WHERE x.against_line_id = pl.id AND px.status <> 'cancelled'), 0) AS returned
      FROM purchase_lines pl WHERE pl.purchase_id = ? ORDER BY pl.line_no`, [against ?? '']);
 
@@ -48,8 +49,14 @@ export default function PurchaseEdit() {
   const supplier = suppliers?.find((s) => s.id === doc?.supplier_id) ?? null;
 
   // Create the draft row on first open.
+  const markCreated = useDropEmptyDraft(db, 'purchases');
   useEffect(() => {
     if (id || creating || !locationId) return;
+    // A return to the supplier copies the original's lines, so it has to wait
+    // for them — on isLoading, because PowerSync answers [] while it is still
+    // reading, and a wait on undefined let every return open empty (the same
+    // bug the bill's "Maal wapas" had).
+    if (against && (originalLoading || originalLinesLoading || !original?.[0])) return;
     setCreating(true);
     (async () => {
       const base = original?.[0];
@@ -64,9 +71,10 @@ export default function PurchaseEdit() {
           await insertRow(db, 'purchase_lines', { purchase_id: newId, line_no: ol.line_no, variant_id: ol.variant_id, description: ol.description, hsn_code: ol.hsn_code, qty: remaining, unit_code: ol.unit_code, rate: ol.rate, discount_pct: ol.discount_pct, discount_amt: 0, tax_rate_pct: ol.tax_rate_pct, against_line_id: ol.id });
         }
       }
+      markCreated(newId);
       setId(newId);
     })().catch((e) => notify(String(e)));
-  }, [id, creating, locationId, db, actor, against, original, originalLines]);
+  }, [id, creating, locationId, db, actor, against, original, originalLines, originalLoading, originalLinesLoading, markCreated]);
 
   const interstate = !!doc?.is_interstate;
   const totals = useMemo(() => totalLines(lines ?? [], interstate, doc?.other_charges ?? 0, company?.[0]?.round_to_rupee !== 0), [lines, interstate, doc?.other_charges, company]);

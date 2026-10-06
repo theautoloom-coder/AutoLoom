@@ -249,6 +249,12 @@ export default function ItemForm() {
             variant_name: variantName, retail_price: price, dealer_price: price,
             pack_size: packSize ?? 1, pack_label: packLabel.trim() || null, warranty_months: warrantyMonths ?? 0,
             search_text: searchText(text, existing.sku, variantName),
+            // The Kharid rate box showed the cost and never saved it, so the
+            // owner had no way to price maal the godown had put in without a
+            // rate. Now it is the cost every later sale is booked at.
+            ...(can('catalog.view_cost') && cost != null && cost > 0 && cost !== existing.avg_cost
+              ? { avg_cost: cost, last_purchase_cost: cost }
+              : {}),
           });
           await tx.execute('DELETE FROM product_fitments WHERE product_id = ?', [existing.id]);
           if (modelId) await insertRow(tx, 'product_fitments', { product_id: existing.id, variant_id: null, model_id: modelId }, actor);
@@ -404,7 +410,9 @@ export default function ItemForm() {
             onSubmitEditing={() => packLabelRef.current?.focus()}
             submitBehavior="submit"
           />
-          <NumberField label="Kharid rate" value={cost} onChange={setCost} placeholder="1200" hint="Margin report ke liye." />
+          {can('catalog.view_cost') ? (
+            <NumberField label="Kharid rate" value={cost} onChange={setCost} placeholder="1200" hint="Isi se bikri ki cost aur munafa ginte hain." />
+          ) : null}
           <Row gap={12}>
             <View style={{ flex: 1 }}>
               <NumberField label="Ek set mein pieces" value={packSize} onChange={setPackSize} decimals={0} placeholder="7" />

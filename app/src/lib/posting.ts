@@ -167,7 +167,11 @@ export async function postPurchase(tx: Transaction, purchaseId: string, actor: A
       ref_type: 'purchase', ref_id: purchaseId, ref_line_id: l.id, unit_cost: landed[i], batch_no: l.batch_no ?? null, occurred_at: now,
     }, actor);
 
-    if (p.doc_type === 'purchase') {
+    // Maal put in without a rate (staff do not price; the owner does later)
+    // must not touch the cost: the server trigger ignores a zero-cost receipt,
+    // and the device used to blend it in anyway — dragging avg_cost down and
+    // setting the last buy rate to ₹0 whenever the owner did the same.
+    if (p.doc_type === 'purchase' && landed[i] > 0) {
       // Mirror the server's moving-average trigger so the device shows the new cost immediately.
       const avg = newAverageCost({ currentQty: before?.qty ?? 0, currentAvg: before?.avg_cost ?? 0, receivedQty: l.qty, receivedCost: landed[i] });
       await updateRow(tx, 'product_variants', l.variant_id, { avg_cost: avg, last_purchase_cost: landed[i] });

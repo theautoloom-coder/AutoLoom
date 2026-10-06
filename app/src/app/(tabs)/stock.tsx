@@ -49,7 +49,7 @@ type Row = {
 };
 type LocRow = { id: string; code: string; name: string; type: string; value: number; units: number };
 
-type Filter = 'sab' | 'low' | 'khatam';
+type Filter = 'sab' | 'low' | 'khatam' | 'rate';
 
 export default function StockScreen() {
   const router = useRouter();
@@ -83,10 +83,14 @@ export default function StockScreen() {
     sab: all.length,
     low: all.filter((r) => r.qty > 0 && r.qty <= Math.max(r.min_stock, r.reorder_level)).length,
     khatam: all.filter((r) => r.qty <= 0).length,
+    // Maal in the shop with no buy rate yet — put in by staff, who do not
+    // price. Until the owner fills it in, each sale of it reads as all profit.
+    rate: all.filter((r) => r.qty > 0 && !r.avg_cost && !r.last_purchase_cost).length,
   };
   const shown = all.filter((r) =>
     filter === 'low' ? r.qty > 0 && r.qty <= Math.max(r.min_stock, r.reorder_level)
     : filter === 'khatam' ? r.qty <= 0
+    : filter === 'rate' ? r.qty > 0 && !r.avg_cost && !r.last_purchase_cost
     : true
   );
 
@@ -116,6 +120,9 @@ export default function StockScreen() {
           <Chip label={`Sab ${counts.sab}`} selected={filter === 'sab'} onPress={() => setFilter('sab')} />
           <Chip label={`Kam hai ${counts.low}`} selected={filter === 'low'} onPress={() => setFilter('low')} />
           <Chip label={`Khatam ${counts.khatam}`} selected={filter === 'khatam'} onPress={() => setFilter('khatam')} />
+          {showCost && counts.rate > 0 ? (
+            <Chip label={`Rate baaki ${counts.rate}`} selected={filter === 'rate'} onPress={() => setFilter('rate')} />
+          ) : null}
         </Row>
       )}
 
@@ -171,7 +178,7 @@ export default function StockScreen() {
       )}
 
       <SectionTitle right={rowsLoading ? undefined : <Text variant="small" color="textFaint">{shown.length}</Text>}>
-        {filter === 'low' ? 'Kam hai' : filter === 'khatam' ? 'Khatam ho gaya' : 'Saara maal'}
+        {filter === 'low' ? 'Kam hai' : filter === 'khatam' ? 'Khatam ho gaya' : filter === 'rate' ? 'Kharid rate bharna baaki' : 'Saara maal'}
       </SectionTitle>
 
       {rowsLoading ? (

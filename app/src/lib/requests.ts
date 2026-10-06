@@ -83,11 +83,11 @@ export function validateProposal(p: ItemProposal): string | null {
   // have read as ₹12,800 of munafa. Stock Chadhao has warned about this in its
   // help text from the start; this screen let it through.
   //
-  // The rate is only demanded when there is stock to cost. An item created
-  // with no opening qty can wait for its first purchase to set the cost.
-  if ((p.qty ?? 0) > 0 && (p.cost == null || p.cost <= 0)) {
-    return 'Opening stock daala hai to kharid rate bhi daalo — warna ye maal bikte waqt poora munafa dikhayega.';
-  }
+  //
+  // No longer demanded (owner's call, 6 Oct 2026): staff do not see or set
+  // buy rates, and the owner prices maal afterwards. The risk above is now
+  // handled where the owner works — Stock → "Rate baaki" lists every item
+  // still at cost 0, so it is priced before it sells as pure profit.
   return null;
 }
 

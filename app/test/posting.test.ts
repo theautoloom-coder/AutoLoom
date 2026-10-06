@@ -120,6 +120,17 @@ describe('purchases', () => {
     expect(balance('supplier', ID.sup)).toBe(47600);
   });
 
+  // Staff put maal in without a rate; the owner prices it later. Until then
+  // the item's cost must stay where it was, not be dragged towards zero.
+  it('stock put in without a rate leaves the cost alone', async () => {
+    const pid = await draftPurchase([{ variant: ID.h4, qty: 10, rate: 0 }]);
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, pid, actor));
+    expect(stock(ID.h4, ID.main)).toBe(30);
+    const h4 = one<{ avg_cost: number; last_purchase_cost: number }>(db, 'SELECT avg_cost, last_purchase_cost FROM product_variants WHERE id = ?', ID.h4);
+    expect(h4.avg_cost).toBe(1450);
+    expect(h4.last_purchase_cost).toBe(1450);
+  });
+
   it('refuses to post twice and refuses an empty draft', async () => {
     const pid = await draftPurchase([{ variant: ID.h4, qty: 1, rate: 100 }]);
     await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, pid, actor));

@@ -163,17 +163,17 @@ console.log('\n▸ godown: stock-in with a new supplier typed in, ginti, transfe
     await page.waitForTimeout(2500);
     await page.getByText(/X-tremeVision/i).first().click();
     await page.waitForTimeout(2000);
-    // The godown types the rate off the supplier's bill; it is not filled in.
-    await page.getByLabel('Ek ka rate').first().fill('300');
-    await page.waitForTimeout(600);
+    // No rate: staff record the maal, the owner prices it later.
+    check('godown is not shown a buy-rate box', !(await page.getByLabel(/Ek ka rate/).first().isVisible().catch(() => false)));
     await page.getByRole('button', { name: /chadha do/i }).click();
     await page.waitForTimeout(9000);
     const after = num("select count(*) from purchases where status='posted'");
     check('purchase by the godown posted', after === before + 1, `${before} → ${after}`);
     check('the new supplier reached the server with a code',
       sql(`select coalesce(code,'') from suppliers where name='${tag}'`).startsWith('S'), sql(`select coalesce(code,'-') from suppliers where name='${tag}'`));
-    check("the supplier's rate was remembered",
-      num(`select count(*) from supplier_products sp join suppliers s on s.id=sp.supplier_id where s.name='${tag}'`) > 0);
+    // No rate was given, so no "last rate" of ₹0 is remembered for this supplier.
+    check('no ₹0 supplier rate remembered for an unpriced stock-in',
+      num(`select count(*) from supplier_products sp join suppliers s on s.id=sp.supplier_id where s.name='${tag}'`) === 0);
   });
 
   await step('ginti as the godown', async () => {
@@ -248,6 +248,29 @@ console.log('\n▸ purchase: return to the supplier');
     await go(page, `/vehicle/${creta}`, 5000);
     check('"Model aur bulb" shown', await page.getByText('Model aur bulb').isVisible().catch(() => false));
     check('Creta low beam socket shown', await page.getByText(/Low Beam H7/).first().isVisible().catch(() => false));
+  });
+
+  // Staff put maal in without a rate; the owner prices it afterwards.
+  await step('owner sees unpriced maal and prices it', async () => {
+    const pid = sql(`select p.id from products p join product_variants pv on pv.product_id = p.id
+                      where exists (select 1 from stock_movements m where m.variant_id = pv.id)
+                      group by p.id having count(*) = 1 limit 1`);
+    const vid = sql(`select id from product_variants where product_id = '${pid}'`);
+    sql(`update product_variants set avg_cost = 0, last_purchase_cost = 0 where id = '${vid}'`);
+    await page.waitForTimeout(8000);
+    await go(page, '/stock', 5000);
+    const chip = page.getByText(/Rate baaki \d+/).first();
+    check('"Rate baaki" shown to the owner', await chip.isVisible().catch(() => false));
+    await go(page, `/admin/item?id=${pid}`, 6000);
+    await page.getByLabel('Kharid rate').first().fill('432');
+    await page.waitForTimeout(600);
+    await page.getByRole('button', { name: 'Badlav kar do' }).click();
+    let cost = 0;
+    for (let i = 0; i < 10 && cost !== 432; i++) {
+      await page.waitForTimeout(2000);
+      cost = num(`select avg_cost from product_variants where id = '${vid}'`);
+    }
+    check('the kharid rate the owner typed is saved as the cost', cost === 432, `avg_cost ${cost}`);
   });
 
   await step('Hisab takes returns off the sale', async () => {

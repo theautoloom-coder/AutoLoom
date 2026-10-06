@@ -40,6 +40,7 @@ export default function StockChadhao() {
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
+  const showCost = can('catalog.view_cost');
   const { variant: variantParam } = useLocalSearchParams<{ variant?: string }>();
 
   const [supplierId, setSupplierId] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export default function StockChadhao() {
         qty: 1,
         // Only for those allowed to see buy rates; everyone else types the
         // rate off the supplier's bill in their hand.
-        rate: can('catalog.view_cost') ? v.last_purchase_cost || v.avg_cost || 0 : 0,
+        rate: showCost ? v.last_purchase_cost || v.avg_cost || 0 : 0,
       }];
     });
   }
@@ -107,11 +108,10 @@ export default function StockChadhao() {
     if (!supplierId) { notify('Supplier chuno — ya naam likh ke naya bana lo.', 'danger'); return; }
     if (usable.length === 0) { notify('Kam se kam ek item daalo.', 'danger'); return; }
     if (!locationId) { notify('Location nahi mili. Admin se location set karwao.', 'danger'); return; }
-    // Staff no longer get last time's rate filled in (buy rates are the
-    // owner's), so a forgotten rate would post the supplier's bill at ₹0 —
-    // their khata would say the shop owes nothing for maal it received.
-    const noRate = usable.find((l) => !(l.rate > 0));
-    if (noRate) { notify(`${noRate.label}: ek ka rate likho — supplier ke bill se.`, 'danger'); return; }
+    // No rate is demanded. The shop does not keep supplier bills in this app
+    // — it tracks the maal — and the owner fills in buy rates later (owner's
+    // call, 6 Oct 2026). Items still waiting for a rate are listed for the
+    // owner under Stock → "Rate baaki".
     // A NOT NULL date column will not take "", and PowerSync discards the
     // whole transaction server-side when it tries — silently, long after
     // the screen said it saved. Catch it here, where the person can fix it.
@@ -180,7 +180,7 @@ export default function StockChadhao() {
         <View>
           <Text variant="display">Stock Chadhao</Text>
           <Text variant="small" color="textMuted">
-            Supplier se naya maal aaya? Yahan daalo — stock bhi badhega aur supplier ka hisab bhi ban jayega.
+            Supplier se naya maal aaya? Yahan daalo — kitna aaya, kahan rakha. Stock turant badh jayega.
           </Text>
         </View>
 
@@ -228,17 +228,21 @@ export default function StockChadhao() {
                       onChangeText={(v) => patch(l.variantId, { qty: Math.max(0, Math.floor(Number(v.replace(/[^0-9]/g, '')) || 0)) })}
                       keyboardType="number-pad"
                     />
-                    <Input
-                      containerStyle={{ flex: 1 }}
-                      label="Ek ka rate"
-                      value={l.rate ? String(l.rate) : ''}
-                      onChangeText={(v) => patch(l.variantId, { rate: Number(v.replace(/[^0-9.]/g, '')) || 0 })}
-                      keyboardType="decimal-pad"
-                      hint="Supplier ko jitne ka diya"
-                    />
+                    {/* Only the owner sees or sets a buy rate here, and even
+                        then it is optional: staff just count what came in. */}
+                    {showCost ? (
+                      <Input
+                        containerStyle={{ flex: 1 }}
+                        label="Ek ka rate (zaroori nahi)"
+                        value={l.rate ? String(l.rate) : ''}
+                        onChangeText={(v) => patch(l.variantId, { rate: Number(v.replace(/[^0-9.]/g, '')) || 0 })}
+                        keyboardType="decimal-pad"
+                        hint="Baad mein item par bhi bhar sakte ho"
+                      />
+                    ) : null}
                   </Row>
                   <Text variant="small" color="textFaint">
-                    {l.sku} · abhi {here} → {here + l.qty} · {formatINR(l.qty * l.rate)}
+                    {l.sku} · abhi {here} → {here + l.qty}{showCost && l.rate ? ` · ${formatINR(l.qty * l.rate)}` : ''}
                   </Text>
                 </View>
               );
@@ -260,7 +264,7 @@ export default function StockChadhao() {
           <Card>
             <Row style={{ justifyContent: 'space-between' }}>
               <Text color="textMuted">{totalQty} pcs</Text>
-              <Text variant="number">{formatINR(totalValue)}</Text>
+              {showCost && totalValue > 0 ? <Text variant="number">{formatINR(totalValue)}</Text> : null}
             </Row>
           </Card>
         ) : null}

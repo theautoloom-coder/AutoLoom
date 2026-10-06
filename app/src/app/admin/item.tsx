@@ -227,7 +227,10 @@ export default function ItemForm() {
           await submitRequest(db, proposal, { actor, locationId, note });
           notify('Admin ko bhej diya. Approve hote hi item ban jayega.', 'ok');
         }
-        router.replace('/requests');
+        // Sent from Stock Chadhao or a bill (?back=): go back to it, the
+        // half-made entry is still there. Otherwise show the request list.
+        if (back && router.canGoBack()) router.back();
+        else router.replace('/requests');
         return;
       }
 

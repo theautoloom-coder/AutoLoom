@@ -116,9 +116,18 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
                     onPress={() => onCreate(q.trim())}
                   />
                 ) : (
-                  <Text variant="small" color="textMuted">
-                    Ye item catalogue mein nahi hai. Admin ko bhejo — approve hote hi bill mein laga sakoge.
-                  </Text>
+                  // Staff cannot make an item, but they can send one for
+                  // approval; this was only a sentence with nothing to press.
+                  <View style={{ gap: 6 }}>
+                    <Button
+                      title={`“${q.trim()}” admin ko bhejo`}
+                      tone="secondary"
+                      onPress={() => onCreate(q.trim())}
+                    />
+                    <Text variant="small" color="textMuted">
+                      Admin approve karega, phir ye item yahan mil jayega.
+                    </Text>
+                  </View>
                 )}
               </View>
             ) : (
@@ -192,7 +201,7 @@ export function LineCard({ title, subtitle, children, onRemove, right }: { title
           {subtitle ? <Text variant="small" color="textMuted" mono>{subtitle}</Text> : null}
         </View>
         {right}
-        {onRemove ? <IconButton icon={<Text color="danger">×</Text>} tone="danger" size={32} onPress={onRemove} accessibilityLabel="Remove line" /> : null}
+        {onRemove ? <IconButton icon={<Text color="danger">×</Text>} tone="danger" size={32} onPress={onRemove} accessibilityLabel="Line hatao" /> : null}
       </Row>
       {children ? <><Divider />{children}</> : null}
     </View>

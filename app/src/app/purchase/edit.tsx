@@ -154,22 +154,22 @@ export default function PurchaseEdit() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isReturn ? 'Purchase wapasi' : 'Purchase bill' }} />
+      <Stack.Screen options={{ title: isReturn ? 'Supplier ko wapsi' : 'Maal aaya' }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Text variant="display">{isReturn ? 'Purchase wapasi' : 'Purchase bill'}</Text>
-          <Badge>draft</Badge>
+          <Text variant="display">{isReturn ? 'Supplier ko wapsi' : 'Maal aaya'}</Text>
+          <Badge>adhoora</Badge>
         </Row>
-        {isReturn && original?.[0] ? <Text variant="small" color="textMuted">Against {original[0].doc_no}. Quantities are pre-filled with what has not been returned yet; reduce them as needed.</Text> : null}
+        {isReturn && original?.[0] ? <Text variant="small" color="textMuted">{original[0].doc_no} ka maal supplier ko wapas. Jitna abhi wapas nahi gaya, utni qty pehle se bhari hai — sirf utna rakho jitna sach mein ja raha hai.</Text> : null}
 
         <FormSection title="Supplier aur bill">
           <SelectField label="Supplier" value={doc.supplier_id} options={(suppliers ?? []).map((s) => ({ value: s.id, label: s.name, sublabel: s.gstin ?? undefined }))} onChange={chooseSupplier} />
           <Row gap={12}>
             <Input containerStyle={{ flex: 1 }} label="Supplier bill no." value={doc.supplier_invoice_no ?? ''} onChangeText={(v) => patch({ supplier_invoice_no: v })} autoCapitalize="characters" />
-            <Input containerStyle={{ flex: 1 }} label="Bill ki date" value={doc.supplier_invoice_date ?? ''} onChangeText={(v) => patch({ supplier_invoice_date: v })} placeholder="YYYY-MM-DD" />
+            <Input containerStyle={{ flex: 1 }} label="Unke bill ki tareekh" value={doc.supplier_invoice_date ?? ''} onChangeText={(v) => patch({ supplier_invoice_date: v })} placeholder="YYYY-MM-DD" />
           </Row>
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Humari date" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" />
+            <Input containerStyle={{ flex: 1 }} label="Hamari tareekh" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" />
             <View style={{ flex: 1 }}>
               <SelectField label={isReturn ? 'Kahan se wapas' : 'Maal kahan rakha'} value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} />
             </View>
@@ -236,7 +236,7 @@ export default function PurchaseEdit() {
         </FormSection>
 
         <Row gap={space.sm}>
-          <Button title={isReturn ? 'Post debit note' : 'Post purchase'} size="lg" onPress={post} loading={posting} style={{ flex: 1 }} />
+          <Button title={isReturn ? 'Wapsi likh do' : 'Maal chadha do'} size="lg" onPress={post} loading={posting} style={{ flex: 1 }} />
           <Button title="Chhod do" tone="danger" onPress={discard} />
         </Row>
         <Text variant="small" color="textFaint">Adhoore bill likhte hi is phone par save hote rehte hain, aur baaki sab ki tarah sync ho jaate hain.</Text>

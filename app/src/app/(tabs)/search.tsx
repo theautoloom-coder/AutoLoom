@@ -21,6 +21,7 @@ import { formatINR, normaliseRegistration, parseVehicleSearch } from '@domain';
 
 import { SEARCH_CUSTOMERS, SEARCH_INVOICES, SEARCH_REGISTRATIONS, SEARCH_VARIANTS, SEARCH_VEHICLES, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { BODY_TYPE as BODY } from '@/lib/words';
 import { Badge, Card, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
@@ -106,7 +107,7 @@ export default function SearchScreen() {
               <ListRow
                 key={v.id}
                 title={`${v.make_name} ${v.name}`}
-                subtitle={`${v.fitment_count} item is gaadi ke liye${v.body_type ? ` · ${v.body_type}` : ''}`}
+                subtitle={`${v.fitment_count} item is gaadi ke liye${v.body_type ? ` · ${BODY[v.body_type] ?? v.body_type}` : ''}`}
                 onPress={() => router.push(`/vehicle/${v.id}${parsed.year ? `?year=${parsed.year}` : ''}`)}
                 right={<Text variant="small" color="accent">Kya lagta hai</Text>}
               />

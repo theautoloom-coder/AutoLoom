@@ -97,6 +97,13 @@ export default function RequestsScreen() {
           </>
         ) : null}
 
+        {/* The hint below used to say "Naya item se bhej do" on a screen with
+            no such button, and nowhere else offered one to staff either — a
+            counter hand with new maal in front of them had no way in. */}
+        {!isReviewer ? (
+          <Button title="+ Naya item bhejo" onPress={() => router.push('/admin/item')} />
+        ) : null}
+
         <SectionTitle>
           {isReviewer ? `Approve karne hain ${pending.length || ''}` : `Bheji hui ${pending.length || ''}`}
         </SectionTitle>
@@ -106,7 +113,7 @@ export default function RequestsScreen() {
             hint={
               isReviewer
                 ? 'Staff koi naya item bhejega to yahan aayega.'
-                : 'Naya maal mile to "Naya item" se bhej do — admin approve karega.'
+                : 'Naya maal mile to upar “Naya item bhejo” dabao — admin approve karega.'
             }
           />
         ) : (

@@ -215,7 +215,7 @@ export default function RemindersScreen() {
                     accessibilityRole="button"
                     onPress={() => router.push(`/payment/edit?direction=in&party=${p.id}&amount=${p.balance}`)}
                     style={({ pressed }) => [styles.outline, { borderColor: t.borderStrong, opacity: pressed ? 0.6 : 1 }]}>
-                    <Text variant="small" style={{ fontWeight: '600' }}>Paid</Text>
+                    <Text variant="small" style={{ fontWeight: '600' }}>Mila</Text>
                   </Pressable>
                 ) : null}
 

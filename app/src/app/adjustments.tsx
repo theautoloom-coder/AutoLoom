@@ -5,6 +5,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { useSession } from '@/lib/session';
+import { ADJUST_REASON as REASON, dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Empty, ListRow, Row, Screen, Text } from '@/ui';
 
 type A = { id: string; doc_no: string | null; doc_date: string; reason: string; status: string; location_name: string; lines: number; delta: number; notes: string | null };
@@ -21,17 +22,17 @@ export default function AdjustmentsScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Adjustment</Text>
-        {can('stock.count') || can('stock.adjust') ? <Button title="Naya adjustment" onPress={() => router.push('/adjustment/edit')} /> : null}
+        <Text variant="display">Stock sudhar</Text>
+        {can('stock.count') || can('stock.adjust') ? <Button title="Naya sudhar" onPress={() => router.push('/adjustment/edit')} /> : null}
       </Row>
-      <Text variant="small" color="textMuted">Damage, kam nikla, extra mila, galat entry. Ginti karne wala koi bhi draft bana sakta hai; post karne ke liye permission chahiye aur record rehta hai.</Text>
+      <Text variant="small" color="textMuted">Kharab, kam nikla, zyada mila, galat entry. Ginti karne wala koi bhi adhoora sudhar bana sakta hai; pakka karne ke liye permission chahiye, aur sab likha rehta hai.</Text>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {(rows ?? []).map((a) => (
-          <ListRow key={a.id} title={`${a.reason.replace('_', ' ')} · ${a.location_name}`} subtitle={`${a.doc_no ?? 'Draft'} · ${a.doc_date} · ${a.lines} lines${a.notes ? ` · ${a.notes}` : ''}`}
+          <ListRow key={a.id} title={`${REASON[a.reason] ?? a.reason.replace('_', ' ')} · ${a.location_name}`} subtitle={`${a.doc_no ?? 'Adhoora'} · ${dayLabel(a.doc_date)} · ${a.lines} item${a.notes ? ` · ${a.notes}` : ''}`}
             onPress={() => router.push(a.status === 'draft' ? `/adjustment/edit?id=${a.id}` : `/adjustment/${a.id}`)}
             right={<View style={{ alignItems: 'flex-end' }}><Text mono color={a.delta < 0 ? 'danger' : 'ok'}>{a.delta > 0 ? '+' : ''}{a.delta}</Text><Badge tone={a.status === 'posted' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'neutral'}>{statusLabel(a.status)}</Badge></View>} />
         ))}
-        {(rows ?? []).length === 0 ? <Empty title="Koi adjustment nahi" /> : null}
+        {(rows ?? []).length === 0 ? <Empty title="Koi sudhar nahi" /> : null}
       </Card>
     </Screen>
   );

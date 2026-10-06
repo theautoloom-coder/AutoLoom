@@ -182,7 +182,7 @@ export default function ProductScreen() {
         </View>
 
         {/* Variants */}
-        <SectionTitle>Type · {variants?.length ?? 0}</SectionTitle>
+        <SectionTitle>Kism · {variants?.length ?? 0}</SectionTitle>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.xs }}>
           {(variants ?? []).map((v) => (
             <Chip key={v.id} label={`${v.variant_name} · ${v.qty}`} selected={v.id === variant?.id} onPress={() => setSelectedId(v.id)} />
@@ -201,18 +201,18 @@ export default function ProductScreen() {
               </View>
               {(() => {
                 const s = stockStatus(totalQty, variant.min_stock, variant.reorder_level);
-                return <Badge tone={s === 'out' ? 'danger' : s === 'low' ? 'warn' : 'ok'}>{s === 'out' ? 'Out of stock' : s === 'low' ? 'Reorder' : 'In stock'}</Badge>;
+                return <Badge tone={s === 'out' ? 'danger' : s === 'low' ? 'warn' : 'ok'}>{s === 'out' ? 'Khatam' : s === 'low' ? 'Kam hai — mangwao' : 'Stock mein hai'}</Badge>;
               })()}
             </Row>
 
             <Divider />
             <Text variant="label" color="textMuted">
-              Stock by location
+              Kahan kitna pada hai
             </Text>
             {(locStock ?? []).map((l) => (
               <KV key={l.location_id} k={l.name} v={`${l.qty} ${product.unit_code ?? ''}`.trim()} mono />
             ))}
-            <KV k="Total" v={`${totalQty} ${product.unit_code ?? ''}`.trim()} mono />
+            <KV k="Kul" v={`${totalQty} ${product.unit_code ?? ''}`.trim()} mono />
             <Row gap={space.sm}>
               {/* Standing on the item's own page is the moment you know its
                   stock is wrong. Before this the fix was four screens away. */}
@@ -231,11 +231,11 @@ export default function ProductScreen() {
               <>
                 <Divider />
                 <Text variant="label" color="textMuted">
-                  Prices
+                  Rate
                 </Text>
                 {variant.mrp ? <KV k="MRP" v={formatINR(variant.mrp)} mono /> : null}
-                <KV k="Retail rate" v={formatINR(variant.retail_price)} mono />
-                {variant.dealer_price ? <KV k="Dealer rate" v={formatINR(variant.dealer_price)} mono /> : null}
+                <KV k="Dukaan ka rate" v={formatINR(variant.retail_price)} mono />
+                {variant.dealer_price ? <KV k="Dealer ka rate" v={formatINR(variant.dealer_price)} mono /> : null}
                 {variant.wholesale_price ? <KV k="Thok rate" v={formatINR(variant.wholesale_price)} mono /> : null}
                 {variant.min_selling_price ? <KV k="Isse kam nahi bechna" v={formatINR(variant.min_selling_price)} mono /> : null}
               </>

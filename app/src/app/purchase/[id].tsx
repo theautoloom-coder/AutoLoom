@@ -8,6 +8,7 @@ import { formatINR, statusLabel } from '@domain';
 import { cancelPurchase } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
+import { dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Divider, Empty, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
@@ -54,27 +55,27 @@ export default function PurchaseDetail() {
           <View style={{ flex: 1 }}>
             <Row gap={6}>
               <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'posted' ? 'ok' : 'neutral'}>{statusLabel(p.status)}</Badge>
-              {isReturn ? <Badge tone="info">debit note{p.against_no ? ` · against ${p.against_no}` : ''}</Badge> : null}
+              {isReturn ? <Badge tone="info">{p.against_no ? `${p.against_no} ki wapsi` : 'supplier ko wapsi'}</Badge> : null}
             </Row>
-            <Text variant="display" style={{ marginTop: space.xs }}>{p.doc_no ?? 'Draft'}</Text>
-            <Text color="textMuted">{p.sname} · {p.doc_date} · {p.location_name}</Text>
+            <Text variant="display" style={{ marginTop: space.xs }}>{p.doc_no ?? 'Adhoori entry'}</Text>
+            <Text color="textMuted">{p.sname} · {dayLabel(p.doc_date)} · {p.location_name}</Text>
           </View>
         </Row>
-        {p.status === 'cancelled' ? <Card tone="alt"><Text color="danger">Cancelled: {p.cancel_reason}</Text></Card> : null}
+        {p.status === 'cancelled' ? <Card tone="alt"><Text color="danger">Cancel hua: {p.cancel_reason}</Text></Card> : null}
 
         <Card tone="navy">
           <Row gap={space.lg} wrap>
-            <View style={{ flex: 1, minWidth: 120 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Grand total</Text><Text variant="number" color="navyText">{formatINR(p.grand_total)}</Text></View>
-            <View style={{ flex: 1, minWidth: 120 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Paid</Text><Text variant="number" color="navyText">{formatINR(p.paid_total)}</Text></View>
-            <View style={{ flex: 1, minWidth: 120 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Due</Text><Text variant="number" color="navyText">{formatINR(due)}</Text></View>
+            <View style={{ flex: 1, minWidth: 120 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Kul bill</Text><Text variant="number" color="navyText">{formatINR(p.grand_total)}</Text></View>
+            <View style={{ flex: 1, minWidth: 120 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Diya</Text><Text variant="number" color="navyText">{formatINR(p.paid_total)}</Text></View>
+            <View style={{ flex: 1, minWidth: 120 }}><Text variant="label" color="navyText" style={{ opacity: 0.7 }}>Dena baaki</Text><Text variant="number" color="navyText">{formatINR(due)}</Text></View>
           </Row>
         </Card>
 
         {p.status === 'posted' ? (
           <Row gap={space.sm} wrap>
             {!isReturn && can('payment.pay_supplier') && due > 0 ? <Button title="Supplier ko paisa do" onPress={() => router.push(`/payment/edit?direction=out&party=${p.supplier_id}&doc=${p.id}`)} /> : null}
-            {!isReturn && can('purchase.create') ? <Button title="Purchase wapasi" tone="secondary" onPress={() => router.push(`/purchase/edit?against=${p.id}`)} /> : null}
-            {can('purchase.cancel') ? <Button title="Cancel document" tone="danger" onPress={cancel} loading={busy} /> : null}
+            {!isReturn && can('purchase.create') ? <Button title="Supplier ko maal wapas" tone="secondary" onPress={() => router.push(`/purchase/edit?against=${p.id}`)} /> : null}
+            {can('purchase.cancel') ? <Button title="Entry cancel karo" tone="danger" onPress={cancel} loading={busy} /> : null}
           </Row>
         ) : null}
 
@@ -112,7 +113,7 @@ export default function PurchaseDetail() {
           <>
             <SectionTitle>Is bill ki wapasi</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
-              {(returns ?? []).map((r) => <ListRow key={r.id} title={r.doc_no ?? 'Draft'} subtitle={r.doc_date} onPress={() => router.push(r.status === 'draft' ? `/purchase/edit?id=${r.id}` : `/purchase/${r.id}`)} right={<Text mono>{formatINR(r.grand_total)}</Text>} />)}
+              {(returns ?? []).map((r) => <ListRow key={r.id} title={r.doc_no ?? 'Adhoori wapsi'} subtitle={dayLabel(r.doc_date)} onPress={() => router.push(r.status === 'draft' ? `/purchase/edit?id=${r.id}` : `/purchase/${r.id}`)} right={<Text mono>{formatINR(r.grand_total)}</Text>} />)}
             </Card>
           </>
         ) : null}

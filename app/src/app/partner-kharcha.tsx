@@ -288,7 +288,7 @@ export default function PartnerKharchaScreen() {
               selected={isPersonal === false}
               tone="ok"
               title="Business Kharcha"
-              line="Profit/loss mein jayega."
+              line="Dukaan ke munafe mein se ghatega."
               onPress={() => setIsPersonal(false)}
             />
             <Choice
@@ -371,7 +371,7 @@ export default function PartnerKharchaScreen() {
             value={date}
             onChangeText={setDate}
             placeholder="YYYY-MM-DD"
-            hint="Aaj ki date pehle se bhari hai."
+            hint="Aaj ki tareekh pehle se bhari hai."
             keyboardType="numbers-and-punctuation"
             autoCapitalize="none"
             autoCorrect={false}

@@ -62,8 +62,13 @@ const SUMMARY = `
     -- SALE. Posted invoices only. A draft is not money and a cancelled bill
     -- never happened. Credit notes (doc_type='credit_note') are their own
     -- document and are excluded here exactly as Home excludes them.
-    (SELECT COALESCE(SUM(grand_total), 0) FROM sales_invoices
-      WHERE doc_type = 'invoice' AND status = 'posted' AND doc_date BETWEEN ?1 AND ?2) AS sale,
+    --
+    -- Returns come off. A bill whose maal came back stayed in Sale at full
+    -- value and its cost stayed in Maal Ki Cost, so munafa kept the margin on
+    -- something the shop no longer sold. A posted return (credit note) is now
+    -- subtracted here, and its stock coming back is subtracted from the cost.
+    (SELECT COALESCE(SUM(CASE WHEN doc_type = 'credit_note' THEN -grand_total ELSE grand_total END), 0) FROM sales_invoices
+      WHERE doc_type IN ('invoice', 'credit_note') AND status = 'posted' AND doc_date BETWEEN ?1 AND ?2) AS sale,
     (SELECT COUNT(*) FROM sales_invoices
       WHERE doc_type = 'invoice' AND status = 'posted' AND doc_date BETWEEN ?1 AND ?2) AS bills,
 
@@ -84,7 +89,7 @@ const SUMMARY = `
     -- does not lose you anything. It turns into cost here, when it is sold.
     (SELECT COALESCE(SUM(-m.qty * m.unit_cost), 0) FROM stock_movements m
        JOIN sales_invoices i ON i.id = m.ref_id
-      WHERE m.movement_type = 'sale' AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2) AS cogs,
+      WHERE m.movement_type IN ('sale', 'sale_return') AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2) AS cogs,
 
     -- BUSINESS KHARCHA. Rent, bijli, diesel, chai — money that left and
     -- brought back nothing you can sell.
@@ -136,15 +141,15 @@ const NO_ROWS = `SELECT '' AS id, '' AS title, NULL AS sub, 0 AS amount, NULL AS
 const DETAIL: Record<ListKey, { title: string; hint: string; sub: (r: DetailRow) => string; sql: string }> = {
   sale: {
     title: 'Sale',
-    hint: 'Jo bill bane — har ek ka total.',
+    hint: 'Jo bill bane — har ek ka total. Maal wapas aaya to minus mein.',
     sub: (r) => r.sub ?? '',
     sql: `
       SELECT i.id, i.doc_no AS title,
-             i.doc_date || ' · ' || COALESCE(c.name, '—') AS sub,
-             i.grand_total AS amount, NULL AS a2, NULL AS a3
+             i.doc_date || ' · ' || COALESCE(c.name, '—') || CASE WHEN i.doc_type = 'credit_note' THEN ' · wapasi' ELSE '' END AS sub,
+             CASE WHEN i.doc_type = 'credit_note' THEN -i.grand_total ELSE i.grand_total END AS amount, NULL AS a2, NULL AS a3
         FROM sales_invoices i
         LEFT JOIN customers c ON c.id = i.customer_id
-       WHERE i.doc_type = 'invoice' AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2
+       WHERE i.doc_type IN ('invoice', 'credit_note') AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2
        ORDER BY i.doc_date DESC, i.doc_no DESC
        LIMIT 200`,
   },
@@ -163,14 +168,14 @@ const DETAIL: Record<ListKey, { title: string; hint: string; sub: (r: DetailRow)
         JOIN sales_invoices i ON i.id = m.ref_id
         JOIN product_variants pv ON pv.id = m.variant_id
         JOIN products p ON p.id = pv.product_id
-       WHERE m.movement_type = 'sale' AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2
+       WHERE m.movement_type IN ('sale', 'sale_return') AND i.status = 'posted' AND i.doc_date BETWEEN ?1 AND ?2
        GROUP BY pv.id, p.name, pv.variant_name
        ORDER BY amount DESC
        LIMIT 200`,
   },
 
   gross: {
-    title: 'Gross Profit',
+    title: 'Maal par munafa',
     hint: 'Har bill par kitna bacha — bikri minus us maal ki cost.',
     sub: (r) => `${r.sub ?? ''} — bikri ${formatINR(r.a2 ?? 0)}, cost ${formatINR(r.a3 ?? 0)}`,
     // The per-bill cost here is matched by the movement's ref_id, not by date,
@@ -424,7 +429,7 @@ export default function HisabScreen() {
         <Line label="Maal Ki Cost" hint="Jo maal bika, uski cost" value={cogs} minus loading={isLoading} onPress={() => setOpen('cogs')} />
 
         <Divider style={{ marginVertical: 4 }} />
-        <Line label="Gross Profit" hint="Sale minus maal ki cost" value={gross} tone="rule" loading={isLoading} onPress={() => setOpen('gross')} />
+        <Line label="Maal par munafa" hint="Sale minus maal ki cost" value={gross} tone="rule" loading={isLoading} onPress={() => setOpen('gross')} />
         <Divider style={{ marginVertical: 4 }} />
 
         <Line label="Business Kharcha" hint="Rent, bijli, diesel, chai" value={kharcha} minus loading={isLoading} onPress={() => setOpen('kharcha')} />
@@ -488,7 +493,7 @@ export default function HisabScreen() {
               <KVLine k="Sale" v={sale} />
               <KVLine k="− Maal Ki Cost" v={cogs} />
               <Divider />
-              <KVLine k="= Gross Profit" v={gross} />
+              <KVLine k="= Maal par munafa" v={gross} />
               <KVLine k="− Business Kharcha" v={kharcha} />
               <KVLine k="− Kharab / Loss" v={damage} />
               <Divider />

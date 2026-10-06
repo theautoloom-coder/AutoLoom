@@ -39,7 +39,7 @@ export default function AdjustmentDetail() {
 
   return (
     <>
-      <Stack.Screen options={{ title: a.doc_no ?? 'Adjustment' }} />
+      <Stack.Screen options={{ title: a.doc_no ?? 'Stock sudhar' }} />
       <Screen>
         <Badge tone={a.status === 'posted' ? 'ok' : a.status === 'cancelled' ? 'danger' : 'neutral'}>{statusLabel(a.status)}</Badge>
         <Text variant="display">{a.reason.replace('_', ' ')} · {a.location_name}</Text>

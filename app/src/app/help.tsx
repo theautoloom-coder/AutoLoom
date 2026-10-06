@@ -69,7 +69,7 @@ const TOPICS: Topic[] = [
     steps: [
       'Neeche laal “Nayi entry” dabao, phir “Stock Chadhao” chuno.',
       'Supplier chuno. Naya hai to naam likho aur “+ Add” dabao — wahin ban jaayega.',
-      'Date dekh lo — aaj ki pehle se bhari hai.',
+      'Tareekh dekh lo — aaj ki pehle se bhari hai.',
       'Maal scan karo ya naam likho. Ek saath kai cheezein daal sakte ho.',
       'Har line par “Kitne aaye” aur “Kitne ka pada” bharo — rate ek piece ka.',
       'Bill ki photo laga do, note likh do, phir “Chadha do” dabao.',

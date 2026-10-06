@@ -69,6 +69,7 @@ async function bill(mode) {
   await page.waitForTimeout(2500);
   await page.getByText(mode, { exact: true }).first().click();
   await page.waitForTimeout(600);
+  if (mode === 'Udhaar') await page.getByText(/din mein paisa dena hai/).first().waitFor({ timeout: 8000 });
   await page.getByRole('button', { name: /Bill bana do/i }).click();
   await page.waitForTimeout(2000);
   await page.getByRole('button', { name: /Aage badho|Haan/i }).first().click().catch(() => {});

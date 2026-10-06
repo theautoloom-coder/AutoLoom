@@ -232,7 +232,7 @@ export default function KharabLikho() {
             value={date}
             onChangeText={setDate}
             placeholder="YYYY-MM-DD"
-            hint="Aaj ki date pehle se bhari hai."
+            hint="Aaj ki tareekh pehle se bhari hai."
             keyboardType="numbers-and-punctuation"
             autoCapitalize="none"
             autoCorrect={false}

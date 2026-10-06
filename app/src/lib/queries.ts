@@ -282,7 +282,8 @@ export const CUSTOMER_PRICE_CONTEXT = {
 export const DASHBOARD_TODAY = {
   sql: `
     SELECT
-      (SELECT COALESCE(SUM(grand_total),0) FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND doc_date = ?1) AS sales_today,
+      -- Net of posted returns, the same rule as Hisab.
+      (SELECT COALESCE(SUM(CASE WHEN doc_type='credit_note' THEN -grand_total ELSE grand_total END),0) FROM sales_invoices WHERE doc_type IN ('invoice','credit_note') AND status='posted' AND doc_date = ?1) AS sales_today,
       (SELECT COUNT(*) FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND doc_date = ?1) AS invoices_today,
       (SELECT COALESCE(SUM(grand_total),0) FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND doc_date = ?1 AND payment_mode <> 'credit') AS cash_sales_today,
       (SELECT COALESCE(SUM(grand_total),0) FROM purchases WHERE doc_type='purchase' AND status='posted' AND doc_date = ?1) AS purchases_today,
@@ -301,7 +302,7 @@ export const DASHBOARD_TODAY = {
       -- Only bills and write-offs that stand, by their own date — the same rule
       -- as Hisab, so Home and Hisab cannot disagree about the same day.
       (SELECT COALESCE(SUM(-m.qty * m.unit_cost),0) FROM stock_movements m JOIN sales_invoices i ON i.id = m.ref_id
-        WHERE m.movement_type='sale' AND i.status='posted' AND i.doc_date = ?1) AS cogs_today,
+        WHERE m.movement_type IN ('sale','sale_return') AND i.status='posted' AND i.doc_date = ?1) AS cogs_today,
       (SELECT COALESCE(SUM(-m.qty * m.unit_cost),0) FROM stock_movements m JOIN stock_adjustments a ON a.id = m.ref_id
         WHERE m.movement_type='damage' AND a.status='posted' AND a.doc_date = ?1) AS damage_today,
       -- A partner taking money for themselves is money leaving the business

@@ -29,6 +29,17 @@ export function customerTypeLabel(type: string | null | undefined): string {
   return CUSTOMER_TYPE[type ?? ''] ?? type ?? '';
 }
 
+/** Why stock was corrected — the stock_adjustments reason check values. */
+export const ADJUST_REASON: Record<string, string> = {
+  opening: 'Shuru ka stock', damage: 'Kharab', missing: 'Kam nikla', found: 'Zyada nikla',
+  wrong_entry: 'Galat entry', counting_error: 'Ginti galat thi', audit: 'Ginti', free_issue: 'Muft diya', other: 'Aur kuch',
+};
+
+/** Car body types as the counter says them. */
+export const BODY_TYPE: Record<string, string> = {
+  hatchback: 'Hatchback', sedan: 'Sedan', suv: 'SUV', muv: 'MUV / Van', pickup: 'Pickup', 'three-wheeler': 'E-rickshaw / 3-pahiya',
+};
+
 /** 'Aaj', 'Kal', '3 Oct', or '3 Oct 2025' when it is not this year. */
 export function dayLabel(iso: string | null | undefined, today = new Date()): string {
   if (!iso) return '';

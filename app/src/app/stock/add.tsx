@@ -187,7 +187,7 @@ export default function StockChadhao() {
             placeholder="Kis supplier se aaya?"
             hint="Naam likh ke naya supplier bhi bana sakte ho."
           />
-          <Input label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki date pehle se bhari hai." />
+          <Input label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" hint="Aaj ki tareekh pehle se bhari hai." />
         </Card>
 
         {/* No autofocus: the first question here is the supplier, and a

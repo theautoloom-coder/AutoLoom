@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { formatINR } from '@domain';
 
 import { useSession } from '@/lib/session';
+import { dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Chip, Empty, ListRow, Row, Screen, Text } from '@/ui';
 import { space } from '@/ui/theme';
 
@@ -27,11 +28,11 @@ export default function PurchasesScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Purchase</Text>
-        {can('purchase.create') ? <Button title="Purchase bill" onPress={() => router.push('/purchase/edit')} /> : null}
+        <Text variant="display">Supplier ke bill</Text>
+        {can('purchase.create') ? <Button title="Maal aaya" onPress={() => router.push('/stock/add')} /> : null}
       </Row>
       <Row gap={space.xs} wrap>
-        {(['all', 'draft', 'unpaid', 'returns'] as const).map((f) => <Chip key={f} label={f} selected={filter === f} onPress={() => setFilter(f)} />)}
+        {(['all', 'draft', 'unpaid', 'returns'] as const).map((f) => <Chip key={f} label={({ all: 'Sab', draft: 'Adhoore', unpaid: 'Dena baaki', returns: 'Wapsi' } as const)[f]} selected={filter === f} onPress={() => setFilter(f)} />)}
       </Row>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {visible.map((p) => (
@@ -39,23 +40,23 @@ export default function PurchasesScreen() {
             key={p.id}
             title={
               <Row gap={6}>
-                <Text variant="heading">{p.doc_no ?? 'Draft'}</Text>
-                {p.doc_type === 'debit_note' ? <Badge tone="info">return</Badge> : null}
+                <Text variant="heading">{p.doc_no ?? 'Adhoori entry'}</Text>
+                {p.doc_type === 'debit_note' ? <Badge tone="info">wapsi</Badge> : null}
               </Row>
             }
-            subtitle={`${p.supplier_name} · ${p.doc_date}${p.supplier_invoice_no ? ` · bill ${p.supplier_invoice_no}` : ''} · ${p.lines} line${p.lines === 1 ? '' : 's'} · ${p.location_name}`}
+            subtitle={`${p.supplier_name} · ${dayLabel(p.doc_date)}${p.supplier_invoice_no ? ` · unka bill ${p.supplier_invoice_no}` : ''} · ${p.lines} item · ${p.location_name}`}
             onPress={() => router.push(p.status === 'draft' ? `/purchase/edit?id=${p.id}` : `/purchase/${p.id}`)}
             right={
               <View style={{ alignItems: 'flex-end' }}>
                 <Text mono>{formatINR(p.grand_total)}</Text>
                 <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'draft' ? 'neutral' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>
-                  {p.status === 'cancelled' ? 'cancelled' : p.status === 'draft' ? 'draft' : p.paid_total >= p.grand_total ? 'paid' : 'due'}
+                  {p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : p.paid_total >= p.grand_total ? 'chuka diya' : 'dena baaki'}
                 </Badge>
               </View>
             }
           />
         ))}
-        {visible.length === 0 ? <Empty title="Koi purchase nahi" hint="Purchase bill banao → supplier chuno → maal scan ya search karo → post kar do." /> : null}
+        {visible.length === 0 ? <Empty title="Abhi koi bill nahi" hint="“Maal aaya” dabao → supplier chuno → maal scan ya naam likho → chadha do." /> : null}
       </Card>
     </Screen>
   );

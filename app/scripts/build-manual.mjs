@@ -66,7 +66,7 @@ const body = sections
             <div class="num">${n}</div>
             <h3>${esc(p.title)}</h3>
             <p class="what">${esc(p.what)}</p>
-            <ol>${p.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+            ${p.steps?.length ? `<ol>${p.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}
             ${p.note ? `<div class="note"><span>Dhyaan rakho</span>${esc(p.note)}</div>` : ''}
           </div>
         </article>`;

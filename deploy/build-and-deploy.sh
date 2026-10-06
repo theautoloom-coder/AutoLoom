@@ -38,11 +38,19 @@ rm -rf dist
 # this the export happily reuses a cached transform carrying whatever backend
 # was set last time. That is how a local `.env` build ended up baked into what
 # looked like a production bundle — same content hash and everything.
+#
+# PowerSync's web workers and wasm are not in the JS bundle: the app loads them
+# as files from /@powersync/. They live in app/public/@powersync, which is
+# gitignored, so a clean checkout — the server's auto-deploy — had none, every
+# request for a worker fell through to index.html, and the web app sat on
+# "Khul raha hai…" with "Error in database or sync worker". Copy them fresh
+# from the installed package on every build.
+npx powersync-web copy-assets -o public
 npx expo export --platform web --clear
 
 # A build without these is a blank white app on the phone, so fail loudly here
 # rather than after it is live.
-for f in index.html manifest.json sw.js apple-touch-icon.png; do
+for f in index.html manifest.json sw.js apple-touch-icon.png @powersync/worker.js; do
   [ -f "dist/$f" ] || { echo "✗ dist/$f missing — aborting"; exit 1; }
 done
 

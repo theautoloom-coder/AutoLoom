@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Transaction } from '@powersync/react-native';
 
 import {
-  allocateDocNo, cancelInvoice, cancelPayment, cancelPurchase, closeAudit, closeJobCard, dispatchTransfer, postAdjustment, postInvoice, postPayment, postPurchase, receiveTransfer, snapshotAudit,
+  allocateDocNo, cancelInvoice, cancelPayment, cancelPurchase, closeAudit, closeJobCard, dispatchTransfer, postAdjustment, postInvoice, postPayment, postPurchase, receiveTransfer, returnStillOpen, snapshotAudit,
 } from '../src/lib/posting';
 import { insertRow, type Actor } from '../src/lib/writes';
 import { createDb, many, one, row, type FakeDb } from './harness';
@@ -164,6 +164,51 @@ describe('purchases', () => {
     expect(no).toBe('DN/26-27/0001');
     expect(stock(ID.h4, ID.main)).toBe(27);
     expect(balance('supplier', ID.sup)).toBe(11800 - 3540);
+  });
+});
+
+describe('kharab maal back to the supplier', () => {
+  // Owner, 6 Oct 2026: broken maal goes back and the supplier settles it with
+  // replacement, a money adjustment against other maal, or both.
+  async function returnFromKharab(qty: number) {
+    row(db, 'stock_movements', { id: 'mv-kharab', variant_id: ID.h4, location_id: ID.dmg, qty, movement_type: 'transfer_in', unit_cost: 1450, occurred_at: '2026-09-10T00:00:00Z', created_at: '2026-09-10T00:00:00Z' });
+    const dn = await insertRow(asTx(db), 'purchases', { doc_type: 'debit_note', doc_date: '2026-09-16', supplier_id: ID.sup, location_id: ID.dmg, is_interstate: 0, other_charges: 0, status: 'draft' }, actor);
+    await insertRow(asTx(db), 'purchase_lines', { purchase_id: dn, line_no: 1, variant_id: ID.h4, description: 'x', qty, rate: 1450, discount_pct: 0, discount_amt: 0, tax_rate_pct: 0 });
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, dn, actor));
+    return dn;
+  }
+  async function replacement(dn: string, qty: number) {
+    const r = await insertRow(asTx(db), 'purchases', { doc_type: 'purchase', doc_date: '2026-09-20', supplier_id: ID.sup, location_id: ID.main, is_interstate: 0, other_charges: 0, status: 'draft', against_purchase_id: dn }, actor);
+    await insertRow(asTx(db), 'purchase_lines', { purchase_id: r, line_no: 1, variant_id: ID.h4, description: 'x', qty, rate: 1450, discount_pct: 0, discount_amt: 0, tax_rate_pct: 0 });
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, r, actor));
+    return r;
+  }
+  const settledAt = (id: string) => one<{ s: string | null }>(db, 'SELECT settled_at AS s FROM purchases WHERE id = ?', id).s;
+
+  it('a return takes the maal out of the kharab corner and the amount off the supplier', async () => {
+    const dn = await returnFromKharab(4);
+    expect(stock(ID.h4, ID.dmg)).toBe(0);
+    expect(balance('supplier', ID.sup)).toBe(-5800);
+    expect(await returnStillOpen(asTx(db), dn)).toEqual({ qty: 4, value: 5800 });
+    expect(settledAt(dn)).toBeNull();
+  });
+
+  it('part replacement leaves it open; the rest of it settles it by itself', async () => {
+    const dn = await returnFromKharab(4);
+    await replacement(dn, 3);
+    expect(stock(ID.h4, ID.main)).toBe(23);
+    expect(balance('supplier', ID.sup)).toBe(-1450);
+    expect(await returnStillOpen(asTx(db), dn)).toEqual({ qty: 1, value: 1450 });
+    expect(settledAt(dn)).toBeNull();
+    await replacement(dn, 1);
+    expect(balance('supplier', ID.sup)).toBe(0);
+    expect(settledAt(dn)).not.toBeNull();
+  });
+
+  it('the approver is recorded on the posted entry', async () => {
+    const pid = await draftPurchase([{ variant: ID.h4, qty: 2, rate: 1500 }]);
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, pid, { userId: 'owner-1', deviceId: 'd' }));
+    expect(one<{ a: string }>(db, 'SELECT approved_by AS a FROM purchases WHERE id = ?', pid).a).toBe('owner-1');
   });
 });
 

@@ -40,7 +40,84 @@ export type ItemProposal = {
   pack_size?: number | null;
   pack_label?: string;
   warranty_months?: number | null;
+  /** The family's specs as filled in — socket, watt, colour, mat type… */
+  specs?: ProposalSpec[];
+  /** Which cars it goes on, each with its years. Replaces model_id/year_text. */
+  fits?: ProposalFit[];
+  /** Goes on every car (sold by spec, not by car). */
+  universal?: boolean;
 };
+
+/**
+ * One filled-in spec. It carries what the writer needs from its definition
+ * (axis, in-name, order) so writing it never has to look the definition up —
+ * a proposal is approved on another phone, maybe days later.
+ */
+export type ProposalSpec = {
+  def_id: string;
+  name: string;
+  axis: boolean;
+  in_name: boolean;
+  sort: number;
+  display: string;
+  option_id?: string | null;
+  /** Multiselect: comma-separated option ids, as spec_values.option_ids holds them. */
+  option_ids?: string | null;
+  text?: string | null;
+  number?: number | null;
+  bool?: boolean | null;
+};
+
+export type ProposalFit = { model_id: string; year_from?: number | null; year_to?: number | null; label?: string };
+
+/** "H4 · 60/55 W" from the specs that name a variant, else the typed type/colour. */
+export function variantNameOf(p: Pick<ItemProposal, 'specs' | 'type' | 'colour'>): string {
+  const named = (p.specs ?? []).filter((s) => (s.axis || s.in_name) && s.display.trim())
+    .sort((a, b) => a.sort - b.sort).map((s) => s.display.trim());
+  const typed = [p.type?.trim(), p.colour?.trim()].filter(Boolean) as string[];
+  return [...named, ...typed].join(' · ') || 'Standard';
+}
+
+/** The proposal's cars, folding in the old single-car fields. */
+export function fitsOf(p: ItemProposal): ProposalFit[] {
+  if (p.fits?.length) return p.fits;
+  if (!p.model_id) return [];
+  const years = (p.year_text ?? '').match(/(\d{4})\D*(\d{4})?/);
+  return [{ model_id: p.model_id, year_from: years ? Number(years[1]) : null, year_to: years?.[2] ? Number(years[2]) : null, label: p.car_text ?? undefined }];
+}
+
+/**
+ * Write an item's specs and cars. Replaces whatever was there, so the same
+ * call serves a new item and an edit. Spec rows on a variant axis (a bulb's
+ * socket) sit on the variant; the rest describe the product.
+ */
+export async function writeSpecsAndFits(
+  tx: Writable, productId: string, variantId: string, p: ItemProposal, actor?: Actor,
+): Promise<void> {
+  await tx.execute('DELETE FROM spec_values WHERE product_id = ?', [productId]);
+  for (const sp of p.specs ?? []) {
+    if (!sp.display.trim()) continue;
+    await insertRow(tx, 'spec_values', {
+      product_id: productId,
+      variant_id: sp.axis ? variantId : null,
+      spec_definition_id: sp.def_id,
+      option_id: sp.option_id ?? null,
+      option_ids: sp.option_ids ?? null,
+      value_text: sp.text ?? null,
+      value_number: sp.number ?? null,
+      value_bool: sp.bool == null ? null : sp.bool,
+      display_value: sp.display.trim(),
+    });
+  }
+  await tx.execute('DELETE FROM product_fitments WHERE product_id = ?', [productId]);
+  if (p.universal) return;
+  for (const f of fitsOf(p)) {
+    await insertRow(tx, 'product_fitments', {
+      product_id: productId, variant_id: null, model_id: f.model_id,
+      year_from: f.year_from ?? null, year_to: f.year_to ?? null,
+    }, actor);
+  }
+}
 
 export type ChangeRequest = {
   id: string;
@@ -134,15 +211,19 @@ export async function applyItemProposal(
     }, actor);
   }
 
-  const variantName = [p.type?.trim(), p.colour?.trim()].filter(Boolean).join(' · ') || 'Standard';
-  const text = searchText(p.name, p.family_name, p.type, p.colour, p.car_text, p.year_text);
+  const variantName = variantNameOf(p);
+  const fits = fitsOf(p);
+  // The server rebuilds search text from the spec and car rows once they
+  // sync; this copy makes the item findable on this phone straight away.
+  const text = searchText(p.name, p.family_name, p.type, p.colour, p.car_text, p.year_text,
+    ...(p.specs ?? []).map((s) => s.display), ...fits.map((f) => f.label ?? ''));
 
   const productId = uuidv7();
   await insertRow(tx, 'products', {
     id: productId,
     family_id: familyId,
     name: p.name.trim(),
-    is_universal_fit: !p.model_id,
+    is_universal_fit: !!p.universal || fits.length === 0,
     search_text: text,
     is_active: true,
   }, actor);
@@ -169,9 +250,7 @@ export async function applyItemProposal(
     is_active: true,
   }, actor);
 
-  if (p.model_id) {
-    await insertRow(tx, 'product_fitments', { product_id: productId, variant_id: null, model_id: p.model_id }, actor);
-  }
+  await writeSpecsAndFits(tx, productId, variantId, p, actor);
 
   if ((p.qty ?? 0) > 0 && locationId) {
     await insertRow(tx, 'stock_movements', {

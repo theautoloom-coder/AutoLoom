@@ -172,6 +172,7 @@ export const customers = new Table(
     device_id: column.text,
     created_at: column.text,
     updated_at: column.text,
+    is_cash: column.integer,
   },
   { indexes: { mobile: ['mobile'], code: ['code'] } }
 );
@@ -567,7 +568,6 @@ export const purchases = new Table(
     supplier_invoice_no: column.text,
     supplier_invoice_date: column.text,
     location_id: column.text,
-    bill_photo_path: column.text,
     supplier_name: column.text,
     supplier_gstin: column.text,
     supplier_state_code: column.text,
@@ -594,6 +594,13 @@ export const purchases = new Table(
     device_id: column.text,
     created_at: column.text,
     updated_at: column.text,
+    bill_photo_path: column.text,
+    submitted_at: column.text,
+    submitted_by: column.text,
+    approved_by: column.text,
+    settled_at: column.text,
+    settled_by: column.text,
+    settle_note: column.text,
   },
   { indexes: { supplier: ['supplier_id'], date: ['doc_date'] } }
 );

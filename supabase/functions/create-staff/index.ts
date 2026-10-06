@@ -15,7 +15,8 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const ROLES = ['admin', 'owner', 'purchase', 'sales', 'warehouse', 'accounts', 'workshop'];
+// AutoLoom went wholesale on 6 Oct 2026: partners (owner), admin, staff.
+const ROLES = ['admin', 'owner', 'staff'];
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
   const email = body.email?.trim().toLowerCase();
   const password = body.password ?? '';
   const fullName = body.full_name?.trim();
-  const role = body.role ?? 'sales';
+  const role = body.role ?? 'staff';
 
   if (!email || !email.includes('@')) return json({ error: 'Email theek nahi hai.' }, 400);
   if (password.length < 8) return json({ error: 'Password kam se kam 8 character ka rakho.' }, 400);

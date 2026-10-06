@@ -45,7 +45,7 @@ export function QuickAdd() {
   const actions: Action[] = [
     {
       label: 'Stock Chadhao',
-      hint: 'Supplier se naya maal aaya',
+      hint: 'Supplier se maal aaya — gino aur likho',
       icon: 'arrow-down-circle-outline',
       accent: 'green',
       href: '/stock/add',
@@ -60,19 +60,24 @@ export function QuickAdd() {
       allowed: can('sale.create'),
     },
     {
+      label: 'Paisa Aaya',
+      hint: 'Grahak ne udhaar ka paisa diya',
+      icon: 'cash-outline',
+      accent: 'teal',
+      href: '/payment/edit?direction=in',
+      allowed: can('payment.receive'),
+    },
+    {
       label: 'Kharcha Likho',
       hint: 'Dukaan ka paisa bahar gaya',
       icon: 'wallet-outline',
       accent: 'amber',
       href: '/expenses',
-      // This file's own rule, broken in this one place: a counter hand with no
-      // permission was shown Kharcha Likho and then landed on a screen with no
-      // form on it. expense.record belongs to owner, admin and accounts only.
       allowed: can('expense.record'),
     },
     {
       label: 'Kharab Likho',
-      hint: 'Toota, kharab nikla ya gum ho gaya',
+      hint: 'Toota ya kharab nikla — alag rakh do',
       icon: 'alert-circle-outline',
       accent: 'rose',
       href: '/kharab-maal',

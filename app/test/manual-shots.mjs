@@ -120,9 +120,7 @@ try {
   // A bill half-written: the manual has to show what a line looks like.
   await page.goto(base + '/invoice/edit', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(6000);
-  await page.getByText('Chuno…').first().click();
-  await page.waitForTimeout(1500);
-  await page.getByText('Walk-in Customer', { exact: true }).first().click();
+  // A new bill opens on the cash customer (Walk-in) already.
   await page.waitForTimeout(1500);
   await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
   await page.waitForTimeout(2500);

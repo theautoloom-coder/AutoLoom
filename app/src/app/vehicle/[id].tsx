@@ -28,7 +28,7 @@ import { View } from 'react-native';
 
 import { formatINR, generationForYear } from '@domain';
 
-import { VEHICLE_GENERATIONS, VEHICLE_MODEL, VEHICLE_PRODUCTS } from '@/lib/queries';
+import { SELLABLE_QTY, SPECS_OF, VEHICLE_GENERATIONS, VEHICLE_MODEL, VEHICLE_PRODUCTS } from '@/lib/queries';
 import { Badge, Card, Chip, Empty, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
@@ -72,7 +72,30 @@ export default function VehicleScreen() {
 
   const { data: fits } = useQuery<Hit>(VEHICLE_PRODUCTS.sql, [id, gen?.id ?? '', gen ? 0 : (year ?? 0)]);
 
+  // Bulbs are sold by socket, not by car: an H7 bulb fits every car whose low
+  // beam is H7, whether or not anybody linked it to this car. Matched on the
+  // socket's own text, because each bulb family keeps its own option rows.
+  const { data: bySocket } = useQuery<Hit & { socket: string; specs: string | null }>(`
+    SELECT DISTINCT pv.id, pv.sku, pv.variant_name, pv.retail_price, p.id AS product_id, p.name AS product_name,
+           f.name AS family_name, NULL AS position, sv.display_value AS socket,
+           ${SPECS_OF('p', 'pv')} AS specs,
+           ${SELLABLE_QTY('pv')} AS qty,
+           (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
+      FROM spec_values sv
+      JOIN spec_definitions sd ON sd.id = sv.spec_definition_id AND sd.code = 'socket'
+      JOIN products p ON p.id = sv.product_id AND p.is_active = 1
+      JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = 1 AND (sv.variant_id IS NULL OR sv.variant_id = pv.id)
+      LEFT JOIN product_families f ON f.id = p.family_id
+     WHERE upper(sv.display_value) IN (
+       SELECT upper(o.value) FROM vehicle_spec_map m
+         JOIN vehicle_generations g ON g.id = m.generation_id
+         JOIN spec_options o ON o.id = m.option_id
+        WHERE g.model_id = ?1 AND (?2 = '' OR g.id = ?2))
+     ORDER BY sv.display_value, p.name`, [id, gen?.id ?? '']);
+
   const model = models?.[0];
+  const linkedIds = new Set((fits ?? []).map((r) => r.id));
+  const socketHits = (bySocket ?? []).filter((r) => !linkedIds.has(r.id));
   const all = fits ?? [];
   const shown = inStockOnly ? all.filter((r) => r.qty > 0) : all;
   const inStock = all.filter((r) => r.qty > 0).length;
@@ -160,6 +183,24 @@ export default function VehicleScreen() {
             ))}
           </Card>
         )}
+        {socketHits.length > 0 ? (
+          <>
+            <SectionTitle right={<Text variant="small" color="textFaint">{socketHits.length}</Text>}>Socket se lagne wale bulb</SectionTitle>
+            <Text variant="small" color="textMuted">Is gaadi ke socket ({[...new Set(socketHits.map((r) => r.socket))].join(', ')}) wale bulb — gaadi se jode nahi gaye, par lag jaate hain.</Text>
+            <Card style={{ gap: 0, paddingVertical: 4 }}>
+              {socketHits.map((r) => (
+                <ListRow
+                  key={`s-${r.id}`}
+                  left={<ItemPhoto path={r.photo_path} name={r.product_name} size={44} />}
+                  title={`${r.product_name} · ${r.variant_name}`}
+                  subtitle={[r.specs, r.sku, `Bechna ${formatINR(r.retail_price)}`].filter(Boolean).join(' · ')}
+                  onPress={() => router.push(`/product/${r.product_id}?variant=${r.id}`)}
+                  right={<Text mono color={r.qty <= 0 ? 'danger' : 'ok'}>{r.qty}</Text>}
+                />
+              ))}
+            </Card>
+          </>
+        ) : null}
       </Screen>
     </>
   );

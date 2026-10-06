@@ -9,9 +9,9 @@ import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { insertRow, updateRow } from '@/lib/writes';
 import { Badge, Button, Card, Divider, Input, ListRow, Row, Screen, Text } from '@/ui';
-import { FormSection, MultiSelectField, SelectField, SwitchRow, notify } from '@/ui/forms';
+import { FormSection, SelectField, SwitchRow, notify } from '@/ui/forms';
 
-type Profile = { id: string; full_name: string; mobile: string | null; role: Role; default_location_id: string | null; is_active: number; devices: number; last_seen: string | null };
+type Profile = { id: string; full_name: string; mobile: string | null; role: string; default_location_id: string | null; is_active: number; devices: number; last_seen: string | null };
 
 export default function UsersScreen() {
   const { db } = useSystem();
@@ -21,15 +21,15 @@ export default function UsersScreen() {
     SELECT p.*, (SELECT COUNT(*) FROM devices d WHERE d.user_id = p.id AND d.is_active = 1) AS devices,
            (SELECT MAX(last_seen_at) FROM devices d WHERE d.user_id = p.id) AS last_seen
     FROM profiles p ORDER BY p.is_active DESC, p.full_name`);
-  const { data: locations } = useQuery<{ id: string; name: string }>('SELECT id, name FROM locations WHERE is_active = 1 ORDER BY sort_order');
   const { data: perms } = useQuery<{ role: string; permission: string }>('SELECT role, permission FROM role_permissions ORDER BY permission');
   const { data: heldRoles } = useQuery<{ profile_id: string; role: string }>('SELECT profile_id, role FROM profile_roles');
 
-  /** Every role a person holds, primary included. */
-  const rolesOf = (id: string, primary?: Role): Role[] => {
-    const set = new Set((heldRoles ?? []).filter((r) => r.profile_id === id).map((r) => r.role as Role));
+  /** Every live role a person holds, primary included. Retired roles
+   *  (Counter, Godown…) still sit in old rows but grant nothing. */
+  const rolesOf = (id: string, primary?: string): Role[] => {
+    const set = new Set((heldRoles ?? []).filter((r) => r.profile_id === id).map((r) => r.role));
     if (primary) set.add(primary);
-    return [...set];
+    return [...set].filter((r): r is Role => (ROLES as readonly string[]).includes(r));
   };
 
   /** Would this set of roles still be able to administer users? */
@@ -42,11 +42,11 @@ export default function UsersScreen() {
   const [creating, setCreating] = useState(false);
   const [newPw, setNewPw] = useState('');
   const [resetting, setResetting] = useState(false);
-  const emptyDraft = { full_name: '', email: '', password: '', mobile: '', role: 'sales' as Role, roles: ['sales'] as Role[], default_location_id: null as string | null };
+  const emptyDraft = { full_name: '', email: '', password: '', mobile: '', role: 'staff' as Role, roles: ['staff'] as Role[], default_location_id: null as string | null };
   const [draft, setDraft] = useState(emptyDraft);
 
   async function addStaff() {
-    if (draft.roles.length === 0) { notify('Kam se kam ek role chuno.'); return; }
+    if (draft.roles.length === 0) { notify('Role chuno.'); return; }
     setCreating(true);
     // The Edge Function takes one role — the primary — because that is what
     // profiles.role is. The rest are added here afterwards; the server trigger
@@ -68,7 +68,7 @@ export default function UsersScreen() {
 
   /** Make the stored set match exactly, without disturbing what already matches. */
   async function setRoles(profileId: string, next: Role[]) {
-    const have = new Set(rolesOf(profileId));
+    const have = new Set((heldRoles ?? []).filter((r) => r.profile_id === profileId).map((r) => r.role));
     for (const r of next) {
       // insertRow, not a raw INSERT: it generates the `id` PowerSync keys every
       // uploaded row by. A row written without one stays on the device and the
@@ -76,7 +76,7 @@ export default function UsersScreen() {
       if (!have.has(r)) await insertRow(db, 'profile_roles', { profile_id: profileId, role: r });
     }
     for (const r of have) {
-      if (!next.includes(r)) {
+      if (!(next as string[]).includes(r)) {
         await db.execute('DELETE FROM profile_roles WHERE profile_id = ? AND role = ?', [profileId, r]);
       }
     }
@@ -96,7 +96,7 @@ export default function UsersScreen() {
 
   async function save() {
     if (!editing) return;
-    if (editRoles.length === 0) { notify('Kam se kam ek role rakhna padega.'); return; }
+    if (editRoles.length === 0) { notify('Role chuno.'); return; }
     // Locking yourself out is the one mistake this screen can make that nobody
     // else can undo. The old check looked for the literal role 'admin', which
     // stopped being right the moment the owner also got admin.users.
@@ -110,7 +110,7 @@ export default function UsersScreen() {
     try {
       await updateRow(db, 'profiles', editing.id, {
         full_name: editing.full_name.trim(), mobile: editing.mobile || null,
-        role: editRoles[0], default_location_id: editing.default_location_id, is_active: !!editing.is_active,
+        role: editRoles[0], is_active: !!editing.is_active,
       });
       await setRoles(editing.id, editRoles);
       setEditing(null);
@@ -141,14 +141,12 @@ export default function UsersScreen() {
           <Input label="Email" value={draft.email} onChangeText={(v) => setDraft({ ...draft, email: v })} autoCapitalize="none" keyboardType="email-address" placeholder="ramesh@shop.in" />
           <Input label="Password" value={draft.password} onChangeText={(v) => setDraft({ ...draft, password: v })} hint="Kam se kam 8 character. Staff ko bata dena." />
           <Input label="Mobile" value={draft.mobile} onChangeText={(v) => setDraft({ ...draft, mobile: v })} keyboardType="phone-pad" />
-          <MultiSelectField
+          <SelectField
             label="Role"
-            hint="Ek se zyada chun sakte ho — jaise counter par bhi baithta hai aur maal bhi receive karta hai."
-            values={draft.roles}
+            value={draft.role}
             options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], sublabel: ROLE_DESCRIPTIONS[r] }))}
-            onChange={(v) => setDraft({ ...draft, roles: v as Role[], role: ((v[0] as Role) ?? 'sales') })}
+            onChange={(v) => v && setDraft({ ...draft, roles: [v as Role], role: v as Role })}
           />
-          <SelectField label="Roz ki location" value={draft.default_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => setDraft({ ...draft, default_location_id: v })} allowClear />
           <Button title="Staff banao" size="lg" loading={creating} onPress={addStaff} />
         </FormSection>
       ) : null}
@@ -157,14 +155,12 @@ export default function UsersScreen() {
         <FormSection title={editing.full_name}>
           <Input label="Poora naam" value={editing.full_name} onChangeText={(v) => setEditing({ ...editing, full_name: v })} />
           <Input label="Mobile" value={editing.mobile ?? ''} onChangeText={(v) => setEditing({ ...editing, mobile: v })} keyboardType="phone-pad" />
-          <MultiSelectField
+          <SelectField
             label="Role"
-            hint="Ek se zyada chun sakte ho. Pehla wala list mein dikhega."
-            values={editRoles}
+            value={editRoles[0] ?? null}
             options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], sublabel: ROLE_DESCRIPTIONS[r] }))}
-            onChange={(v) => setEditRoles(v as Role[])}
+            onChange={(v) => v && setEditRoles([v as Role])}
           />
-          <SelectField label="Roz ki location" value={editing.default_location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => setEditing({ ...editing, default_location_id: v })} allowClear />
           <SwitchRow label="Active" hint="Inactive aadmi kisi bhi phone par kuch na dekh sakta hai, na likh sakta hai." value={!!editing.is_active} onChange={(v) => setEditing({ ...editing, is_active: v ? 1 : 0 })} />
 
           {/* Password bhool jaana roz hota hai, aur staff ke email ka koi inbox
@@ -201,17 +197,14 @@ export default function UsersScreen() {
             title={
               <Row gap={6}>
                 <Text variant="heading" color={u.is_active ? 'text' : 'textFaint'}>{u.full_name}</Text>
-                {/* Every role, not just the primary — otherwise the list says
-                    "Sales" for someone who also receives stock, and nobody can
-                    tell who can do what without opening each person. */}
                 {rolesOf(u.id, u.role).map((r) => (
                   <Badge key={r} tone={r === u.role ? 'accent' : 'neutral'}>{ROLE_LABELS[r]}</Badge>
                 ))}
                 {!u.is_active ? <Badge tone="danger">inactive</Badge> : null}
               </Row>
             }
-            subtitle={`${(locations ?? []).find((l) => l.id === u.default_location_id)?.name ?? 'no default location'} · ${u.devices} device${u.devices === 1 ? '' : 's'}${u.last_seen ? ` · seen ${new Date(u.last_seen).toLocaleDateString('en-IN')}` : ''}`}
-            onPress={editable ? () => { setEditing({ ...u }); setEditRoles(rolesOf(u.id, u.role)); setAdding(false); } : undefined}
+            subtitle={`${u.devices} phone${u.devices === 1 ? '' : 's'}${u.last_seen ? ` · aakhri baar ${new Date(u.last_seen).toLocaleDateString('en-IN')}` : ''}`}
+            onPress={editable ? () => { setEditing({ ...u }); setEditRoles(rolesOf(u.id, u.role).slice(0, 1)); setAdding(false); } : undefined}
             right={editable ? <Text color="accent">Badlo</Text> : undefined}
           />
         ))}
@@ -223,7 +216,7 @@ export default function UsersScreen() {
           <Row gap={4} style={{ paddingVertical: 6 }}>
             <Text variant="label" color="textMuted" style={{ flex: 2 }}>Permission</Text>
             {ROLES.map((r) => (
-              <Text key={r} variant="label" color="textMuted" style={{ width: 44, textAlign: 'center' }}>{r.slice(0, 4)}</Text>
+              <Text key={r} variant="label" color="textMuted" style={{ width: 56, textAlign: 'center' }}>{ROLE_LABELS[r]}</Text>
             ))}
           </Row>
           {allPerms.map((p) => (
@@ -232,7 +225,7 @@ export default function UsersScreen() {
               {ROLES.map((r) => {
                 const on = (perms ?? []).some((x) => x.role === r && x.permission === p);
                 return (
-                  <Text key={r} variant="small" style={{ width: 44, textAlign: 'center' }} color={on ? 'ok' : 'textFaint'} onPress={editable && r !== 'admin' ? () => togglePermission(r, p, on) : undefined}>
+                  <Text key={r} variant="small" style={{ width: 56, textAlign: 'center' }} color={on ? 'ok' : 'textFaint'} onPress={editable && r !== 'admin' ? () => togglePermission(r, p, on) : undefined}>
                     {on ? '✓' : '·'}
                   </Text>
                 );

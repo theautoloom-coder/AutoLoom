@@ -120,7 +120,10 @@ export default function ProductScreen() {
 
   const showCost = can('catalog.view_cost');
   const showPrice = can('sale.create') || showCost;
-  const totalQty = (locStock ?? []).reduce((a, l) => a + l.qty, 0);
+  // What can be sold is what is in the godown. Maal in the kharab corner is
+  // waiting for the supplier and must not be offered on a bill.
+  const totalQty = (locStock ?? []).filter((l) => l.type !== 'damaged').reduce((a, l) => a + l.qty, 0);
+  const kharabQty = (locStock ?? []).filter((l) => l.type === 'damaged').reduce((a, l) => a + l.qty, 0);
 
   // The photo for whichever variant is selected, and the plumbing to set it.
   const { data: photoRows } = useQuery<{ id: string; storage_path: string }>(
@@ -189,6 +192,45 @@ export default function ProductScreen() {
           ))}
         </ScrollView>
 
+        {/* Specifications */}
+        <SectionTitle>Spec</SectionTitle>
+        <Card style={{ gap: 0 }}>
+          {productSpecs.length === 0 && axisDefs.length === 0
+            ? <Empty title="Koi spec nahi likha" hint={can('catalog.edit') ? 'Upar “Badlo” dabao — socket, watt, colour jaisi detail bharo.' : undefined} />
+            : null}
+          {variant
+            ? axisDefs.map((d) => <KV key={d.spec_definition_id} k={d.name} v={specFor(variant.id, d.spec_definition_id)} />)
+            : null}
+          {axisDefs.length > 0 && productSpecs.length > 0 ? <Divider /> : null}
+          {productSpecs.map((s) => (
+            <KV key={s.spec_definition_id} k={s.name} v={s.display_value} />
+          ))}
+          <Divider />
+          <KV k="Category" v={[product.category_name ?? product.family_name, product.subcategory_name].filter(Boolean).join(' › ') || '—'} />
+          {product.brand_name ? <KV k="Brand" v={product.brand_name} /> : null}
+          {product.hsn_code ? <KV k="HSN" v={product.hsn_code} mono /> : null}
+        </Card>
+
+        {/* Fitment */}
+        <SectionTitle>Kis gaadi mein lagta hai</SectionTitle>
+        <Card style={{ gap: 0, paddingVertical: 4 }}>
+          {product.is_universal_fit && effectiveFitments.length === 0 ? (
+            <Empty title="Sab gaadi mein lagta hai" hint="Ye spec se bikta hai (socket, size), gaadi se nahi." />
+          ) : effectiveFitments.length === 0 ? (
+            <Empty title="Koi gaadi nahi jodi" />
+          ) : (
+            effectiveFitments.map((f) => (
+              <ListRow
+                key={f.id}
+                title={`${f.make_name} ${fitmentLabel({ modelName: f.model_name, yearFrom: f.year_from ?? f.gen_from, yearTo: f.year_to ?? f.gen_to })}`}
+                subtitle={[f.generation_name, f.position?.replace('_', ' ')].filter(Boolean).join(' · ')}
+                onPress={() => router.push(`/vehicle/${f.model_id}`)}
+               
+              />
+            ))
+          )}
+        </Card>
+
         {variant ? (
           <Card>
             <Row style={{ justifyContent: 'space-between' }} align="flex-start">
@@ -206,17 +248,12 @@ export default function ProductScreen() {
             </Row>
 
             <Divider />
-            <Text variant="label" color="textMuted">
-              Kahan kitna pada hai
-            </Text>
-            {(locStock ?? []).map((l) => (
-              <KV key={l.location_id} k={l.name} v={`${l.qty} ${product.unit_code ?? ''}`.trim()} mono />
-            ))}
-            <KV k="Kul" v={`${totalQty} ${product.unit_code ?? ''}`.trim()} mono />
+            <KV k="Godown mein" v={`${totalQty} ${product.unit_code ?? 'pcs'}`.trim()} mono />
+            {kharabQty > 0 ? <KV k="Kharab mein (supplier ko jaana hai)" v={`${kharabQty} ${product.unit_code ?? 'pcs'}`.trim()} mono /> : null}
             <Row gap={space.sm}>
               {/* Standing on the item's own page is the moment you know its
                   stock is wrong. Before this the fix was four screens away. */}
-              {can('stock.adjust') ? (
+              {can('purchase.create') ? (
                 <Button title="Stock chadhao" size="sm" onPress={() => router.push(`/stock/add?variant=${variant.id}` as never)} />
               ) : null}
               <Button title="Aana-jaana ka hisaab" tone="ghost" size="sm" onPress={() => router.push(`/stock/ledger/${variant.id}`)} />
@@ -341,23 +378,6 @@ export default function ProductScreen() {
           </>
         ) : null}
 
-        {/* Specifications */}
-        <SectionTitle>Spec</SectionTitle>
-        <Card style={{ gap: 0 }}>
-          {productSpecs.length === 0 && axisDefs.length === 0 ? <Empty title="Koi spec nahi likha" /> : null}
-          {variant
-            ? axisDefs.map((d) => <KV key={d.spec_definition_id} k={d.name} v={specFor(variant.id, d.spec_definition_id)} />)
-            : null}
-          {axisDefs.length > 0 && productSpecs.length > 0 ? <Divider /> : null}
-          {productSpecs.map((s) => (
-            <KV key={s.spec_definition_id} k={s.name} v={s.display_value} />
-          ))}
-          <Divider />
-          {product.hsn_code ? <KV k="HSN" v={product.hsn_code} mono /> : null}
-          {product.tax_rate_pct != null ? <KV k="GST" v={`${product.tax_rate_pct}%`} mono /> : null}
-          {product.category_name ? <KV k="Category" v={[product.category_name, product.subcategory_name].filter(Boolean).join(' › ')} /> : null}
-        </Card>
-
         {/* Compare variants */}
         {variants && variants.length > 1 && axisDefs.length > 0 ? (
           <>
@@ -409,26 +429,6 @@ export default function ProductScreen() {
             </ScrollView>
           </>
         ) : null}
-
-        {/* Fitment */}
-        <SectionTitle>Kis gaadi mein lagta hai</SectionTitle>
-        <Card style={{ gap: 0, paddingVertical: 4 }}>
-          {product.is_universal_fit && effectiveFitments.length === 0 ? (
-            <Empty title="Sab gaadi mein lagta hai" hint="Ye spec se bikta hai (socket, size), gaadi se nahi." />
-          ) : effectiveFitments.length === 0 ? (
-            <Empty title="Koi gaadi nahi jodi" />
-          ) : (
-            effectiveFitments.map((f) => (
-              <ListRow
-                key={f.id}
-                title={`${f.make_name} ${fitmentLabel({ modelName: f.model_name, yearFrom: f.year_from ?? f.gen_from, yearTo: f.year_to ?? f.gen_to })}`}
-                subtitle={[f.generation_name, f.position?.replace('_', ' ')].filter(Boolean).join(' · ')}
-                onPress={() => router.push(`/vehicle/${f.model_id}`)}
-               
-              />
-            ))
-          )}
-        </Card>
 
         {/* History */}
         {showCost ? (

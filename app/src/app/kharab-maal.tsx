@@ -1,27 +1,16 @@
 /**
- * KHARAB LIKHO — maal toot gaya, kharab ho gaya, reject nikla ya kam mila.
+ * KHARAB LIKHO — maal toot gaya, kharab nikla, ya reject aaya.
  *
- * This is the "stock goes out and nobody paid for it" screen. It is a plain
- * stock adjustment underneath: one `stock_adjustments` draft, a negative line
- * per item, then `postAdjustment` turns each line into a stock movement.
+ * Broken maal is not written off on the spot any more (owner, 6 Oct 2026):
+ * it goes back to the supplier for replacement or a money adjustment. So
+ * Kharab Likho MOVES it — a transfer from the godown to the "Kharab maal"
+ * corner, where it waits on /kharab until the owner sends it back. It stops
+ * being sellable at once, and no loss is booked unless it is later thrown
+ * away there.
  *
- * Two things here are load-bearing and easy to get wrong:
- *
- *   · The quantity is NEGATIVE. This removes stock; it never adds.
- *   · Every line carries `unit_cost`, taken from the item's average cost.
- *     Hisab reads the day's loss as SUM(-qty * unit_cost) over movements of
- *     type 'damage'. A line saved at zero cost still removes the stock but
- *     reports the loss as ₹0 — the books then look healthier than the shop
- *     is. So the rate is shown on every line and can be corrected before
- *     saving, and an item with no known cost says so out loud.
- *
- * The shop's words are not the database's words. `stock_adjustments.reason`
- * has a CHECK constraint, so "Toot Gaya" is stored as 'damage' and the word
- * the user actually pressed is kept in the line note and the document notes.
- * `postAdjustment` decides the movement type from the LINE's `reason_code`
- * first, which is why that column must hold the allowed value 'damage' and
- * not the Hinglish label — otherwise the loss lands as a plain 'adjustment'
- * and Hisab never counts it.
+ * "Nahi mila" is different: there is nothing to send back, so that one is a
+ * stock adjustment that takes the pieces off and counts the loss at the
+ * item's average cost — Hisab reads movements of type 'missing'/'damage'.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,7 +20,7 @@ import { View, type TextInput } from 'react-native';
 import { formatINR, isDateString, toDateString } from '@domain';
 
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
-import { postAdjustment } from '@/lib/posting';
+import { dispatchTransfer, postAdjustment } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { insertRow } from '@/lib/writes';
@@ -49,12 +38,11 @@ import { space } from '@/ui/theme';
  * free_issue · other.
  */
 const REASONS = [
-  { key: 'kharab', label: 'Kharab', code: 'damage' },
-  { key: 'reject', label: 'Reject', code: 'damage' },
-  { key: 'missing', label: 'Nahi mila', code: 'missing' },
-  { key: 'toota', label: 'Toot Gaya', code: 'damage' },
-  { key: 'count', label: 'Ginti ka farak', code: 'counting_error' },
-  { key: 'other', label: 'Aur kuch', code: 'other' },
+  { key: 'kharab', label: 'Kharab nikla', code: 'damage', aside: true },
+  { key: 'toota', label: 'Toot gaya', code: 'damage', aside: true },
+  { key: 'reject', label: 'Supplier se kharab aaya', code: 'damage', aside: true },
+  { key: 'wapas', label: 'Grahak ne kharab lauta', code: 'damage', aside: true },
+  { key: 'missing', label: 'Nahi mila', code: 'missing', aside: false },
 ] as const;
 
 type Line = { variantId: string; label: string; sku: string; qty: number; cost: number };
@@ -85,6 +73,8 @@ export default function KharabLikho() {
   // return unmounts and blanks the screen at runtime, and tsc says nothing.
   const { data: onHand } = useQuery<{ variant_id: string; qty: number }>(
     'SELECT variant_id, qty FROM stock_on_hand WHERE location_id = ?', [locationId ?? '']);
+  const { data: kharabLoc } = useQuery<{ id: string }>(
+    "SELECT id FROM locations WHERE type = 'damaged' AND is_active = 1 ORDER BY sort_order LIMIT 1");
   const hereMap = useMemo(() => new Map((onHand ?? []).map((r) => [r.variant_id, r.qty])), [onHand]);
 
   // Opened from an item's own page: that item is already the first line.
@@ -135,13 +125,17 @@ export default function KharabLikho() {
     // whole transaction server-side when it tries — silently, long after
     // the screen said it saved. Catch it here, where the person can fix it.
     if (!isDateString(date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
-    if (!locationId) { notify('Location nahi mili. Admin se location set karwao.', 'danger'); return; }
+    if (!locationId) { notify('Godown nahi mila. Sync hone do, phir dobara karo.', 'danger'); return; }
+    const kharabId = kharabLoc?.[0]?.id;
+    if (reason.aside && !kharabId) { notify('“Kharab maal” ki jagah nahi mili. Sync hone do, phir dobara karo.', 'danger'); return; }
 
     const ok = await confirm(
-      `${totalQty} pcs kharab likhein?`,
-      showCost
-        ? `${reason.label} · ${formatINR(totalLoss)} ka nuksan. Stock abhi kam ho jaayega.`
-        : `${reason.label}. Stock abhi kam ho jaayega.`
+      reason.aside ? `${totalQty} pcs kharab mein daal dein?` : `${totalQty} pcs nahi mile — stock se hata dein?`,
+      reason.aside
+        ? `${reason.label}. Godown se nikal ke “Kharab maal” mein chala jayega — wahan se supplier ko wapas jayega.`
+        : showCost
+        ? `${formatINR(totalLoss)} ka nuksan hisab mein judega. Stock abhi kam ho jayega.`
+        : 'Stock abhi kam ho jayega.'
     );
     if (!ok) return;
 
@@ -166,6 +160,17 @@ export default function KharabLikho() {
       ].filter(Boolean).join(' — ');
 
       await db.writeTransaction(async (tx) => {
+        if (reason.aside) {
+          // Set aside: godown → kharab corner, same pieces, nothing lost yet.
+          const tid = await insertRow(tx, 'stock_transfers', {
+            doc_date: date, from_location_id: locationId, to_location_id: kharabId, status: 'draft', notes,
+          }, actor);
+          for (const l of usable) {
+            await insertRow(tx, 'stock_transfer_lines', { transfer_id: tid, variant_id: l.variantId, qty: l.qty, unit_cost: l.cost || 0 });
+          }
+          await dispatchTransfer(tx, tid, actor);
+          return;
+        }
         const id = await insertRow(tx, 'stock_adjustments', {
           doc_date: date,
           location_id: locationId,
@@ -181,16 +186,17 @@ export default function KharabLikho() {
             // Negative: this takes stock off the shelf.
             qty_delta: -l.qty,
             unit_cost: l.cost || 0,
-            // Must be the allowed code, not the Hinglish label: postAdjustment
-            // reads this to decide movement_type === 'damage'.
-            reason_code: reason.code,
+            // The loss code, not the Hinglish label: postAdjustment reads this
+            // to decide movement_type === 'damage', which is what Hisab counts.
+            // A piece that is gone is a loss whether it broke or vanished.
+            reason_code: 'damage',
             note: reason.label,
           });
         }
         await postAdjustment(tx, id, actor);
       });
 
-      notify(`${totalQty} pcs kharab likh diya.`, 'ok');
+      notify(reason.aside ? `${totalQty} pcs kharab mein daal diya.` : `${totalQty} pcs stock se hata diya.`, 'ok');
       router.back();
     } catch (e) {
       notify(`Kharab nahi likha gaya: ${String((e as Error).message ?? e)}`, 'danger');
@@ -218,7 +224,7 @@ export default function KharabLikho() {
         <View>
           <Text variant="display">Kharab Likho</Text>
           <Text variant="small" color="textMuted">
-            Maal toot gaya, kharab nikla ya gum ho gaya? Yahan likho — stock bhi kam hoga aur nuksan hisab mein dikhega.
+            Toota ya kharab maal godown se alag kar do — wo “Kharab maal” mein rukega aur supplier ko wapas jayega. Bechne wale stock mein nahi ginega.
           </Text>
         </View>
 
@@ -271,7 +277,7 @@ export default function KharabLikho() {
                     />
                     {/* The godown writes off kharab maal but does not see what
                         it cost; the average cost is recorded without showing. */}
-                    {showCost ? (
+                    {showCost && !reason.aside ? (
                     <Input
                       ref={(r) => { costRefs.current.set(l.variantId, r); }}
                       containerStyle={{ flex: 1 }}
@@ -284,9 +290,9 @@ export default function KharabLikho() {
                     />
                     ) : null}
                   </Row>
-                  <Text variant="small" color={l.cost || !showCost ? 'textFaint' : 'danger'}>
-                    {!showCost
-                      ? `${l.sku} · abhi ${here} → ${here - l.qty}`
+                  <Text variant="small" color={l.cost || !showCost || reason.aside ? 'textFaint' : 'danger'}>
+                    {!showCost || reason.aside
+                      ? `${l.sku} · godown mein ${here} → ${here - l.qty}`
                       : l.cost
                       ? `${l.sku} · abhi ${here} → ${here - l.qty} · ${formatINR(l.qty * l.cost)} ka nuksan`
                       : `${l.sku} · abhi ${here} → ${here - l.qty} · rate nahi pata, nuksan ₹0 ginega — rate bhar do`}
@@ -308,9 +314,9 @@ export default function KharabLikho() {
             <SectionTitle>Kul</SectionTitle>
             <Row style={{ justifyContent: 'space-between' }}>
               <Text color="textMuted">{totalQty} pcs · {reason.label}</Text>
-              {showCost ? <Text variant="number" color="danger">−{formatINR(totalLoss)}</Text> : null}
+              {showCost && !reason.aside ? <Text variant="number" color="danger">−{formatINR(totalLoss)}</Text> : null}
             </Row>
-            {showCost && anyZeroCost ? (
+            {showCost && !reason.aside && anyZeroCost ? (
               <Text variant="small" color="danger">
                 Kuch item ka rate nahi bhara — utna nuksan hisab mein nahi dikhega.
               </Text>
@@ -319,7 +325,9 @@ export default function KharabLikho() {
         ) : null}
 
         <Button
-          title={totalQty > 0 ? `${totalQty} pcs kharab likh do` : 'Kharab likh do'}
+          title={reason.aside
+            ? (totalQty > 0 ? `${totalQty} pcs kharab mein daalo` : 'Kharab mein daalo')
+            : (totalQty > 0 ? `${totalQty} pcs stock se hatao` : 'Stock se hatao')}
           size="lg"
           full
           tone="danger"

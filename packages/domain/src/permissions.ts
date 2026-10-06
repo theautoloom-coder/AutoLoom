@@ -12,6 +12,9 @@ export const PERMISSIONS = [
   'catalog.edit_price',
   'catalog.view_cost',
   'purchase.create',
+  // Stock a staff member writes in waits until an owner or admin checks the
+  // count, puts the buy rate on it and approves. Only then does it count.
+  'purchase.approve',
   'purchase.cancel',
   'sale.create',
   'sale.override_price',
@@ -21,13 +24,13 @@ export const PERMISSIONS = [
   'payment.receive',
   'payment.pay_supplier',
   // Money out that is not a supplier payment: transport, packing, an advance.
-  // Separate from pay_supplier so a counter hand can write down the chai
+  // Separate from pay_supplier so a staff member can write down the chai
   // without also being able to settle a supplier's account.
   'expense.record',
   'stock.transfer',
   'stock.count',
-  // Kharab Likho: write off broken or missing maal. Narrower than
-  // stock.adjust, which opens every kind of correction; the godown holds this.
+  // Kharab Likho: put broken or missing maal aside. Narrower than
+  // stock.adjust, which opens every kind of correction.
   'stock.damage',
   'stock.adjust',
   'party.edit',
@@ -35,35 +38,40 @@ export const PERMISSIONS = [
   'jobcard.edit',
   'reports.view',
   'reports.view_margin',
+  // What each partner put into the business or took out of it.
+  'partner.capital',
   'admin.users',
   'admin.settings',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const ROLES = ['admin', 'owner', 'purchase', 'sales', 'warehouse', 'accounts', 'workshop'] as const;
+/**
+ * AutoLoom is a wholesaler with partners and a few staff (owner, 6 Oct 2026).
+ * The older roles (purchase, sales, warehouse, accounts, workshop) still exist
+ * in old rows but grant nothing — see migration 20261007100000.
+ */
+export const ROLES = ['owner', 'admin', 'staff'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
+  owner: 'Partner',
   admin: 'Admin',
-  owner: 'Maalik',
-  purchase: 'Kharid',
-  sales: 'Counter',
-  warehouse: 'Godown',
-  accounts: 'Hisaab',
-  workshop: 'Workshop',
+  staff: 'Staff',
 };
 
 /** What each role does day to day, shown on the user form. */
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  admin: 'Sab kuch — staff, settings aur maal ka poora dhaancha.',
-  owner: 'Staff ke alawa sab kuch. Kharid rate aur margin dikhta hai.',
-  purchase: 'Purchase banata hai, maal leta hai, supplier ko paisa deta hai.',
-  sales: 'Bill banata hai, payment leta hai. Rate nahi badal sakta.',
-  warehouse: 'Maal leta hai, transfer karta hai, ginti karta hai, kharab maal likhta hai. Rate nahi dikhte.',
-  accounts: 'Khata, vasooli, payment aur hisaab-kitab.',
-  workshop: 'Job card, workshop ka maal lagata hai, paisa leta hai.',
+  owner: 'Maalik. Sab kuch dekhta hai — kharid rate, munafa, partner ka paisa. Staff ka maal approve karta hai.',
+  admin: 'Maalik jaisa hi — staff, settings, approval. Partner ke paise ka hisaab bhi.',
+  staff: 'Maal aaya to ginke likhta hai, bill banata hai, paisa leta hai, kharcha likhta hai. Rate aur munafa nahi dikhta.',
 };
+
+/** A role's label, for any role name including the retired ones. */
+export function roleLabel(role: string | null | undefined): string {
+  if (!role) return '';
+  return (ROLE_LABELS as Record<string, string>)[role] ?? 'Staff';
+}
 
 export function can(permissions: Iterable<string>, permission: Permission): boolean {
   const set = permissions instanceof Set ? permissions : new Set(permissions);
@@ -75,7 +83,7 @@ export function canAny(permissions: Iterable<string>, required: Permission[]): b
   return required.some((p) => set.has(p));
 }
 
-/** Which tabs a role sees, so a warehouse phone is not full of billing screens. */
+/** Which tabs a role sees. */
 export function visibleSections(permissions: Iterable<string>): {
   home: boolean;
   search: boolean;
@@ -90,7 +98,7 @@ export function visibleSections(permissions: Iterable<string>): {
     home: true,
     search: true,
     sell: set.has('sale.create'),
-    stock: set.has('purchase.create') || set.has('stock.transfer') || set.has('stock.count'),
+    stock: set.has('purchase.create') || set.has('stock.count') || set.has('stock.damage'),
     parties: set.has('party.edit') || set.has('payment.receive') || set.has('payment.pay_supplier'),
     reports: set.has('reports.view'),
     admin: set.has('admin.settings') || set.has('admin.users') || set.has('catalog.edit'),

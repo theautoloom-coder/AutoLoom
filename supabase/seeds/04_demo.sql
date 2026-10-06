@@ -10,11 +10,11 @@
 
 select seed_util.seed_user('admin@autoloom.local',     'autoloom123', 'System Admin',   'admin',     'MAIN');
 select seed_util.seed_user('owner@autoloom.local',     'autoloom123', 'Business Owner', 'owner',     'MAIN');
-select seed_util.seed_user('purchase@autoloom.local',  'autoloom123', 'Purchase Staff', 'purchase',  'MAIN');
-select seed_util.seed_user('sales@autoloom.local',     'autoloom123', 'Counter Sales',  'sales',     'SHOP');
-select seed_util.seed_user('warehouse@autoloom.local', 'autoloom123', 'Warehouse Staff','warehouse', 'MAIN');
-select seed_util.seed_user('accounts@autoloom.local',  'autoloom123', 'Accountant',     'accounts',  'MAIN');
-select seed_util.seed_user('workshop@autoloom.local',  'autoloom123', 'Workshop Tech',  'workshop',  'WSHP');
+select seed_util.seed_user('purchase@autoloom.local',  'autoloom123', 'Purchase Staff', 'staff',     'MAIN');
+select seed_util.seed_user('sales@autoloom.local',     'autoloom123', 'Counter Sales',  'staff',     'MAIN');
+select seed_util.seed_user('warehouse@autoloom.local', 'autoloom123', 'Warehouse Staff','staff',     'MAIN');
+select seed_util.seed_user('accounts@autoloom.local',  'autoloom123', 'Accountant',     'staff',     'MAIN');
+select seed_util.seed_user('workshop@autoloom.local',  'autoloom123', 'Workshop Tech',  'staff',     'MAIN');
 
 -- -----------------------------------------------------------------------------
 -- Brands
@@ -63,7 +63,7 @@ begin
   perform seed_util.set_spec(p, v, 'LED', 'wattage', '60');
   perform seed_util.set_spec(p, v, 'LED', 'pack', 'Pair');
   perform seed_util.open_stock(v, 'MAIN', 25, 1450);
-  perform seed_util.open_stock(v, 'SHOP', 6,  1450);
+  perform seed_util.open_stock(v, 'MAIN', 6,  1450);
 
   v := seed_util.new_variant(p, 'H7 60W Pair',  'LED-AFY-H7-60W',  '8901234500028', 3200, 2400, 1900, 1750, 1700, 15);
   perform seed_util.set_spec(p, v, 'LED', 'socket', 'H7');
@@ -103,7 +103,7 @@ begin
   perform seed_util.set_spec(p, v, 'HAL', 'wattage', '60');
   perform seed_util.set_spec(p, v, 'HAL', 'pack', 'Single');
   perform seed_util.open_stock(v, 'MAIN', 180, 305);
-  perform seed_util.open_stock(v, 'SHOP', 24,  305);
+  perform seed_util.open_stock(v, 'MAIN', 24,  305);
 
   v := seed_util.new_variant(p, 'H7 55W Single', 'HAL-PHL-H7-55W', '8901234500127', 640, 495, 410, 385, 375, 40);
   perform seed_util.set_spec(p, v, 'HAL', 'socket', 'H7');
@@ -130,7 +130,7 @@ begin
   perform seed_util.set_spec(p, v, 'MAT', 'border', 'Contrast Stitch');
   perform seed_util.add_fitment(p, v, 'Creta', 'Facelift 2024+', 'full_set');
   perform seed_util.open_stock(v, 'MAIN', 11, 3350);
-  perform seed_util.open_stock(v, 'SHOP', 2,  3350);
+  perform seed_util.open_stock(v, 'MAIN', 2,  3350);
 
   v := seed_util.new_variant(p, 'Creta 2024+ Brown', 'MAT-ELG-CRETA-7D-BRN', '8901234500227', 8500, 6200, 4600, 4300, 4200, 4);
   perform seed_util.set_spec(p, v, 'MAT', 'colour', 'Brown');
@@ -182,7 +182,7 @@ begin
   perform seed_util.set_spec(p, v, 'HORN', 'horn_type', 'Windtone');
   perform seed_util.set_spec(p, v, 'HORN', 'config',    'Twin');
   perform seed_util.open_stock(v, 'MAIN', 22, 760);
-  perform seed_util.open_stock(v, 'SHOP', 4,  760);
+  perform seed_util.open_stock(v, 'MAIN', 4,  760);
 
   v := seed_util.new_variant(p, 'Disc Twin', 'HORN-RTS-DISC-TWIN', '8901234500427', 1450, 1100, 860, 810, 790, 10);
   perform seed_util.set_spec(p, v, 'HORN', 'horn_type', 'Disc');
@@ -360,3 +360,11 @@ insert into public.ledger_entries (party_type, party_id, entry_date, doc_type, d
 select 'supplier', s.id, current_date - 45, 'opening', 0, b.amount, 'Opening balance'
 from (values ('S0001', 96000::numeric), ('S0003', 34500::numeric)) as b(code, amount)
 join public.suppliers s on s.code = b.code;
+
+-- The walk-in customer is the cash one (migration 20261007100000 made a
+-- "Cash Grahak" before these demo rows existed; the tests bill "Walk-in
+-- Customer", so that is the one that never takes udhaar).
+update public.customers set is_cash = false where code = 'CASH';
+delete from public.customers c where c.code = 'CASH'
+   and not exists (select 1 from public.sales_invoices i where i.customer_id = c.id);
+update public.customers set is_cash = true where code = 'C0005';

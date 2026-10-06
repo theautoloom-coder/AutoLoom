@@ -149,10 +149,13 @@ export default function RequestReview() {
         <Card>
           <KV k="Category" v={family?.name ?? '—'} />
           <KV k="Item" v={p?.name ?? '—'} />
-          <KV k="Type" v={p?.type || '—'} />
-          <KV k="Colour" v={p?.colour || '—'} />
-          <KV k="Gaadi" v={p?.car_text || 'Sab gaadi'} />
-          <KV k="Model / saal" v={p?.year_text || '—'} />
+          {(p?.specs ?? []).length
+            ? (p?.specs ?? []).map((sp) => <KV key={sp.def_id} k={sp.name} v={sp.display} />)
+            : (<>
+                <KV k="Type" v={p?.type || '—'} />
+                <KV k="Colour" v={p?.colour || '—'} />
+              </>)}
+          <KV k="Gaadi" v={p?.universal ? 'Sab gaadi' : (p?.fits ?? []).map((f) => f.label).filter(Boolean).join(', ') || [p?.car_text, p?.year_text].filter(Boolean).join(' ') || 'Sab gaadi'} />
           <Divider />
           <KV k="Qty" v={String(p?.qty ?? 0)} mono />
           <KV k="Bechne ka rate" v={p?.price != null ? `₹${p.price}` : '—'} mono />

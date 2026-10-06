@@ -113,9 +113,12 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
   const { ctx, page } = await session('sales@autoloom.local');
   await step('udhaar bill + payment from the bill', async () => {
     await go(page, '/invoice/edit', 6500);
-    await page.getByText('Chuno…').first().click();
+    // The cash customer never takes udhaar: an udhaar bill goes on a khata.
+    await page.getByText('Walk-in Customer', { exact: true }).locator('visible=true').first().click();
     await page.waitForTimeout(1200);
-    await page.getByText('Walk-in Customer', { exact: true }).first().click();
+    await page.getByPlaceholder('Naam likh ke dhoondo').fill('XYZ');
+    await page.waitForTimeout(900);
+    await page.getByText('XYZ Accessories', { exact: true }).locator('visible=true').first().click();
     await page.waitForTimeout(1200);
     await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
     await page.waitForTimeout(2500);
@@ -146,7 +149,7 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n▸ godown: stock-in with a new supplier typed in, ginti, transfer');
+console.log('\n▸ staff (godown): stock-in with a new supplier typed in, ginti');
 {
   const { ctx, page } = await session('warehouse@autoloom.local');
   const tag = `E2E Sup ${Date.now().toString().slice(-5)}`;
@@ -163,12 +166,14 @@ console.log('\n▸ godown: stock-in with a new supplier typed in, ginti, transfe
     await page.waitForTimeout(2500);
     await page.getByText(/X-tremeVision/i).first().click();
     await page.waitForTimeout(2000);
-    // No rate: staff record the maal, the owner prices it later.
-    check('godown is not shown a buy-rate box', !(await page.getByLabel(/Ek ka rate/).first().isVisible().catch(() => false)));
-    await page.getByRole('button', { name: /chadha do/i }).click();
+    // No rate: staff count the maal; the owner prices and approves it.
+    check('staff are not shown a buy-rate box', !(await page.getByLabel(/Kharid rate/).first().isVisible().catch(() => false)));
+    await page.getByRole('button', { name: /owner ko bhejo/i }).click();
     await page.waitForTimeout(9000);
     const after = num("select count(*) from purchases where status='posted'");
-    check('purchase by the godown posted', after === before + 1, `${before} → ${after}`);
+    check('staff stock-in waits for approval, not posted', after === before, `${before} → ${after}`);
+    check('staff stock-in is waiting for the owner',
+      num(`select count(*) from purchases p join suppliers s on s.id = p.supplier_id where s.name = '${tag}' and p.status = 'draft' and p.submitted_at is not null`) === 1);
     check('the new supplier reached the server with a code',
       sql(`select coalesce(code,'') from suppliers where name='${tag}'`).startsWith('S'), sql(`select coalesce(code,'-') from suppliers where name='${tag}'`));
     // No rate was given, so no "last rate" of ₹0 is remembered for this supplier.
@@ -197,29 +202,6 @@ console.log('\n▸ godown: stock-in with a new supplier typed in, ginti, transfe
     check('ginti posted on the server', after === before + 1, `${before} → ${after}`);
   });
 
-  await step('transfer as the godown', async () => {
-    const before = num("select count(*) from stock_transfers where status='received'");
-    await go(page, '/transfer/edit', 6500);
-    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
-    await page.waitForTimeout(2500);
-    await page.getByText(/X-tremeVision/i).first().click();
-    await page.waitForTimeout(2000);
-    await page.getByRole('button', { name: /Bhej do/i }).click();
-    await confirmYes(page);
-    await page.waitForTimeout(7000);
-    await scan(page, '/transfer/[id]');
-    const after = num("select count(*) from stock_transfers where status='received'");
-    check('transfer landed', after === before + 1, `${before} → ${after}`);
-  });
-
-  await step('leaving an empty transfer leaves no draft', async () => {
-    const before = num("select count(*) from stock_transfers where status='draft'");
-    await go(page, '/transfer/edit', 6000);
-    await page.getByRole('button', { name: 'Peeche jao' }).click().catch(() => page.goBack());
-    await page.waitForTimeout(6000);
-    const after = num("select count(*) from stock_transfers where status='draft'");
-    check('no empty transfer draft left behind', after === before, `${before} → ${after}`);
-  });
   await ctx.close();
 }
 
@@ -228,7 +210,11 @@ console.log('\n▸ purchase: return to the supplier');
 {
   const { ctx, page } = await session('owner@autoloom.local');
   await step('purchase return opens with lines and posts', async () => {
-    const pid = sql("select id from purchases where status='posted' and doc_type='purchase' order by posted_at desc limit 1");
+    // An ordinary receipt — a replacement against a return has no return of its own.
+    const pid = sql(`select p.id from purchases p where p.status='posted' and p.doc_type='purchase' and p.against_purchase_id is null
+                       and exists (select 1 from purchase_lines l where l.purchase_id = p.id and l.qty > coalesce((select sum(x.qty)
+                         from purchase_lines x join purchases px on px.id = x.purchase_id where x.against_line_id = l.id and px.status = 'posted'), 0))
+                     order by p.posted_at desc limit 1`);
     const before = num("select count(*) from purchases where status='posted' and doc_type='debit_note'");
     await go(page, `/purchase/${pid}`, 5000);
     await page.getByRole('button', { name: /maal wapas|wapsi/i }).click();
@@ -275,7 +261,7 @@ console.log('\n▸ purchase: return to the supplier');
 
   await step('Hisab takes returns off the sale', async () => {
     const expect = num(`select coalesce(sum(case when doc_type='credit_note' then -grand_total else grand_total end),0)
-                          from sales_invoices where status='posted' and doc_type in ('invoice','credit_note') and doc_date = current_date`);
+                          from sales_invoices where status='posted' and doc_type in ('invoice','credit_note') and doc_date = (now() at time zone 'Asia/Kolkata')::date`);
     await go(page, '/hisab', 5000);
     await page.getByText('Aaj', { exact: true }).first().click();
     await page.waitForTimeout(2500);
@@ -285,16 +271,16 @@ console.log('\n▸ purchase: return to the supplier');
   });
 
   for (const p of ['/', '/stock', '/parchi', '/hisab', '/more', '/reminders', '/customers', '/suppliers', '/purchases',
-    '/payments', '/transfers', '/adjustments', '/reorder', '/expenses', '/partner-kharcha', '/requests', '/sync', '/help', '/search']) {
+    '/payments', '/kharab', '/khata', '/reports', '/partner-paisa', '/reorder', '/expenses', '/requests', '/sync', '/help', '/search']) {
     await step(`screen ${p}`, async () => { await go(page, p, 3500); });
   }
   await ctx.close();
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n▸ accounts: pay a supplier, write kharcha; salesman edits a grahak');
+console.log('\n▸ owner: pay a supplier; staff edits a grahak');
 {
-  const { ctx, page } = await session('accounts@autoloom.local');
+  const { ctx, page } = await session('owner@autoloom.local');
   await step('supplier payment', async () => {
     // party_balance_live is the phone's view; the server keeps party_balances.
     const sid = sql("select party_id from party_balances where party_type='supplier' and balance > 100 limit 1");
@@ -311,11 +297,11 @@ console.log('\n▸ accounts: pay a supplier, write kharcha; salesman edits a gra
 {
   const { ctx, page } = await session('sales@autoloom.local');
   await step('edit a grahak, then one Peeche back to the list', async () => {
-    const cid = sql("select id from customers where name='Walk-in Customer' limit 1");
+    const cid = sql("select id from customers where name='XYZ Accessories' limit 1");
     // Into the customer through the app, so there is a list to go back to —
     // a direct URL starts a fresh history.
-    await go(page, '/customers', 4000);
-    await page.getByText('Walk-in Customer', { exact: true }).first().click();
+    await go(page, '/khata', 4000);
+    await page.getByText('XYZ Accessories', { exact: true }).first().click();
     await page.waitForTimeout(4000);
     await page.getByRole('button', { name: 'Badlo' }).click();
     await page.waitForTimeout(4000);
@@ -328,7 +314,7 @@ console.log('\n▸ accounts: pay a supplier, write kharcha; salesman edits a gra
     check('after saving, on the customer page', page.url().includes(`/customer/${cid}`), page.url().replace(base, ''));
     await page.getByRole('button', { name: 'Peeche jao' }).click();
     await page.waitForTimeout(2500);
-    check('one Peeche goes back to the list, not to the same page again', page.url().endsWith('/customers'), page.url().replace(base, ''));
+    check('one Peeche goes back to the list, not to the same page again', /\/khata/.test(page.url()), page.url().replace(base, ''));
   });
   await ctx.close();
 }

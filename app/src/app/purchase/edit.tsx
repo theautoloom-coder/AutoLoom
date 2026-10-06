@@ -1,126 +1,185 @@
 /**
- * Receive a purchase (or record a purchase return as a debit note).
+ * Maal ki entry — one form for every way maal moves between AutoLoom and a
+ * supplier (owner, 6 Oct 2026):
  *
- * The draft is saved to the local database as you go, so a half-entered bill
- * survives closing the app. Posting assigns the number, writes the stock
- * movements and the supplier ledger entry in one transaction.
+ *   /purchase/edit                     a new receipt (staff mostly use Stock Chadhao)
+ *   /purchase/edit?id=…                a draft: a staff entry waiting for approval,
+ *   /purchase/approve?id=…               or one sent back to be fixed
+ *   /purchase/edit?against=<purchase>  good maal going back against a receipt
+ *   /purchase/edit?kharab=1            kharab maal going back to the supplier
+ *   /purchase/edit?replace=<return>    the supplier's replacement for a return
+ *
+ * Only an owner or admin posts. A staff member's receipt is sent for approval
+ * instead — the owner checks the count, puts the buy rate on and approves, and
+ * only then does stock go up and the supplier's khata get the amount. Returns
+ * are the owner's to write: they take money off a supplier's khata.
+ *
+ * The shop keeps GST off, so the form is qty and rate. The draft is saved to
+ * the phone as you go, so a half-written entry survives closing the app.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { formatINR, isInterstate, toDateString, uuidv7 } from '@domain';
+import { formatINR, isDateString, toDateString } from '@domain';
 
+import { useDropEmptyDraft } from '@/lib/drafts';
 import { postPurchase, totalLines, type DraftLine } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
-import { deleteRow, insertRow, updateRow } from '@/lib/writes';
-import { useDropEmptyDraft } from '@/lib/drafts';
-import { Badge, Button, Card, Divider, Input, KV, Row, Screen, SectionTitle, Text } from '@/ui';
+import { deleteRow, insertRow, nextPartyCode, searchText, updateRow } from '@/lib/writes';
+import { Badge, Button, Card, Divider, Empty, Input, KV, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
 import { LineCard, VariantPicker, type PickedVariant } from '@/ui/lines';
-import { space } from '@/ui/theme';
 import { PreparingDraft } from '@/ui/pending';
+import { space } from '@/ui/theme';
 
-type Purchase = { id: string; doc_type: 'purchase' | 'debit_note'; status: string; supplier_id: string | null; supplier_invoice_no: string | null; supplier_invoice_date: string | null; doc_date: string; location_id: string | null; is_interstate: number; other_charges: number; notes: string | null; against_purchase_id: string | null };
-type Line = DraftLine & { purchase_id: string; line_no: number };
+type Purchase = {
+  id: string; doc_type: 'purchase' | 'debit_note'; status: string; supplier_id: string | null; doc_date: string;
+  location_id: string | null; other_charges: number; notes: string | null; against_purchase_id: string | null;
+  submitted_at: string | null; submitted_by: string | null; supplier_invoice_no: string | null;
+};
+type Line = DraftLine & { purchase_id: string; line_no: number; sku: string | null; last_cost: number; here: number };
+type SourceLine = DraftLine & { line_no: number; done: number };
 
 export default function PurchaseEdit() {
-  const { id: paramId, against } = useLocalSearchParams<{ id?: string; against?: string }>();
+  const params = useLocalSearchParams<{ id?: string; against?: string; kharab?: string; replace?: string }>();
   const router = useRouter();
   const { db } = useSystem();
   const { can, actor, locationId } = useSession();
+  const approver = can('purchase.approve');
+  const showCost = can('catalog.view_cost');
 
-  const [id, setId] = useState<string | null>(paramId ?? null);
+  const [id, setId] = useState<string | null>(params.id ?? null);
+  const [creating, setCreating] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [backNote, setBackNote] = useState('');
+
   const { data: rows } = useQuery<Purchase>('SELECT * FROM purchases WHERE id = ?', [id ?? '']);
   const doc = rows?.[0] ?? null;
-  const { data: lines } = useQuery<Line>('SELECT * FROM purchase_lines WHERE purchase_id = ? ORDER BY line_no', [id ?? '']);
-  const { data: suppliers } = useQuery<{ id: string; name: string; state_code: string | null; gstin: string | null; company_name: string | null }>('SELECT id, name, state_code, gstin, company_name FROM suppliers WHERE is_active = 1 ORDER BY name');
-  const { data: locations } = useQuery<{ id: string; name: string; type: string }>("SELECT id, name, type FROM locations WHERE is_active = 1 AND type <> 'damaged' ORDER BY sort_order");
-  const { data: company } = useQuery<{ state_code: string; round_to_rupee: number }>('SELECT state_code, round_to_rupee FROM company_settings LIMIT 1');
-  const { data: original, isLoading: originalLoading } = useQuery<{ id: string; doc_no: string; supplier_id: string; location_id: string; is_interstate: number }>('SELECT id, doc_no, supplier_id, location_id, is_interstate FROM purchases WHERE id = ?', [against ?? '']);
-  const { data: originalLines, isLoading: originalLinesLoading } = useQuery<Line & { returned: number }>(
-    `SELECT pl.*, COALESCE((SELECT SUM(x.qty) FROM purchase_lines x JOIN purchases px ON px.id = x.purchase_id WHERE x.against_line_id = pl.id AND px.status = 'posted'), 0) AS returned
-     FROM purchase_lines pl WHERE pl.purchase_id = ? ORDER BY pl.line_no`, [against ?? '']);
+  const { data: lines } = useQuery<Line>(
+    `SELECT l.*, pv.sku, COALESCE(NULLIF(pv.last_purchase_cost, 0), pv.avg_cost, 0) AS last_cost,
+            COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id = l.variant_id AND s.location_id = p.location_id), 0) AS here
+       FROM purchase_lines l JOIN purchases p ON p.id = l.purchase_id JOIN product_variants pv ON pv.id = l.variant_id
+      WHERE l.purchase_id = ? ORDER BY l.line_no`, [id ?? '']);
+  const { data: suppliers } = useQuery<{ id: string; name: string }>('SELECT id, name FROM suppliers WHERE is_active = 1 ORDER BY name');
+  const { data: kharabLoc } = useQuery<{ id: string }>("SELECT id FROM locations WHERE type = 'damaged' AND is_active = 1 ORDER BY sort_order LIMIT 1");
+  const { data: submitter } = useQuery<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ?', [doc?.submitted_by ?? '']);
 
-  const [posting, setPosting] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const supplier = suppliers?.find((s) => s.id === doc?.supplier_id) ?? null;
+  // Whatever this entry is copied from: the receipt being returned against,
+  // or the return being replaced. `done` is what has already gone back / come back.
+  const sourceId = params.against ?? params.replace ?? doc?.against_purchase_id ?? '';
+  const { data: source, isLoading: sourceLoading } = useQuery<{ id: string; doc_no: string; doc_type: string; supplier_id: string; location_id: string; settled_at: string | null }>(
+    'SELECT id, doc_no, doc_type, supplier_id, location_id, settled_at FROM purchases WHERE id = ?', [sourceId]);
+  const { data: sourceLines, isLoading: sourceLinesLoading } = useQuery<SourceLine>(
+    `SELECT pl.*,
+            CASE WHEN p.doc_type = 'purchase'
+              THEN COALESCE((SELECT SUM(x.qty) FROM purchase_lines x JOIN purchases px ON px.id = x.purchase_id
+                              WHERE x.against_line_id = pl.id AND px.status = 'posted'), 0)
+              ELSE COALESCE((SELECT SUM(x.qty) FROM purchase_lines x JOIN purchases px ON px.id = x.purchase_id
+                              WHERE px.against_purchase_id = p.id AND px.doc_type = 'purchase' AND px.status = 'posted'
+                                AND x.variant_id = pl.variant_id), 0)
+            END AS done
+       FROM purchase_lines pl JOIN purchases p ON p.id = pl.purchase_id
+      WHERE pl.purchase_id = ? ORDER BY pl.line_no`, [sourceId]);
 
-  // Create the draft row on first open.
+  // Create the draft on first open, once whatever it copies from has loaded.
+  // isLoading, not `undefined`: PowerSync answers [] while it is still reading.
   const markCreated = useDropEmptyDraft(db, 'purchases');
   useEffect(() => {
     if (id || creating || !locationId) return;
-    // A return to the supplier copies the original's lines, so it has to wait
-    // for them — on isLoading, because PowerSync answers [] while it is still
-    // reading, and a wait on undefined let every return open empty (the same
-    // bug the bill's "Maal wapas" had).
-    if (against && (originalLoading || originalLinesLoading || !original?.[0])) return;
+    const copying = params.against || params.replace;
+    if (copying && (sourceLoading || sourceLinesLoading || !source?.[0])) return;
+    if (params.kharab && !kharabLoc?.[0]) return;
     setCreating(true);
     (async () => {
-      const base = original?.[0];
+      const base = source?.[0];
+      const isReturn = !!params.against || !!params.kharab;
+      const where = params.kharab ? kharabLoc![0].id
+        : params.against ? base?.location_id ?? locationId
+        : locationId;
       const newId = await insertRow(db, 'purchases', {
-        doc_type: against ? 'debit_note' : 'purchase', doc_date: toDateString(), supplier_id: base?.supplier_id ?? null, location_id: base?.location_id ?? locationId,
-        is_interstate: base?.is_interstate ?? false, other_charges: 0, status: 'draft', against_purchase_id: against || null,
+        doc_type: isReturn ? 'debit_note' : 'purchase', doc_date: toDateString(),
+        supplier_id: base?.supplier_id ?? null, location_id: where,
+        is_interstate: false, other_charges: 0, status: 'draft',
+        against_purchase_id: params.against || params.replace || null,
       }, actor);
-      if (against && originalLines) {
-        for (const ol of originalLines) {
-          const remaining = ol.qty - ol.returned;
-          if (remaining <= 0) continue;
-          await insertRow(db, 'purchase_lines', { purchase_id: newId, line_no: ol.line_no, variant_id: ol.variant_id, description: ol.description, hsn_code: ol.hsn_code, qty: remaining, unit_code: ol.unit_code, rate: ol.rate, discount_pct: ol.discount_pct, discount_amt: 0, tax_rate_pct: ol.tax_rate_pct, against_line_id: ol.id });
+      if (copying && sourceLines) {
+        let n = 0;
+        for (const sl of sourceLines) {
+          const left = sl.qty - sl.done;
+          if (left <= 0) continue;
+          n += 1;
+          await insertRow(db, 'purchase_lines', {
+            purchase_id: newId, line_no: n, variant_id: sl.variant_id, description: sl.description,
+            qty: left, unit_code: sl.unit_code, rate: sl.rate, discount_pct: 0, discount_amt: 0, tax_rate_pct: 0,
+            against_line_id: params.against ? sl.id : null,
+          });
         }
       }
       markCreated(newId);
       setId(newId);
-    })().catch((e) => notify(String(e)));
-  }, [id, creating, locationId, db, actor, against, original, originalLines, originalLoading, originalLinesLoading, markCreated]);
+    })().catch((e) => notify(String((e as Error).message ?? e), 'danger'));
+  }, [id, creating, locationId, db, actor, params.against, params.replace, params.kharab, source, sourceLines, sourceLoading, sourceLinesLoading, kharabLoc, markCreated]);
 
-  const interstate = !!doc?.is_interstate;
-  const totals = useMemo(() => totalLines(lines ?? [], interstate, doc?.other_charges ?? 0, company?.[0]?.round_to_rupee !== 0), [lines, interstate, doc?.other_charges, company]);
+  const totals = useMemo(() => totalLines(lines ?? [], false, doc?.other_charges ?? 0, true), [lines, doc?.other_charges]);
+  const supplier = suppliers?.find((s) => s.id === doc?.supplier_id) ?? null;
 
-  async function patch(p: Record<string, string | number | boolean | null>) {
-    if (!id) return;
-    await updateRow(db, 'purchases', id, p);
-  }
+  const patch = (p: Record<string, string | number | boolean | null>) => id ? updateRow(db, 'purchases', id, p) : Promise.resolve();
+  const patchLine = (lineId: string, p: Record<string, string | number | null>) => updateRow(db, 'purchase_lines', lineId, p);
 
-  async function chooseSupplier(sid: string | null) {
-    const s = suppliers?.find((x) => x.id === sid);
-    await patch({ supplier_id: sid, supplier_name: s?.company_name ?? s?.name ?? null, supplier_gstin: s?.gstin ?? null, supplier_state_code: s?.state_code ?? null, is_interstate: isInterstate(company?.[0]?.state_code, s?.state_code) });
+  async function addSupplier(name: string) {
+    const sid = await insertRow(db, 'suppliers', {
+      code: await nextPartyCode(db, 'suppliers'), name: name.trim(), is_active: true, search_text: searchText(name),
+    }, actor);
+    await patch({ supplier_id: sid, supplier_name: name.trim() });
   }
 
   async function addLine(v: PickedVariant) {
     if (!id) return;
     const existing = (lines ?? []).find((l) => l.variant_id === v.id);
-    if (existing) {
-      await updateRow(db, 'purchase_lines', existing.id, { qty: existing.qty + 1 });
-      return;
-    }
+    if (existing) { await patchLine(existing.id, { qty: existing.qty + 1 }); return; }
     await insertRow(db, 'purchase_lines', {
-      purchase_id: id, line_no: (lines?.length ?? 0) + 1, variant_id: v.id, description: `${v.product_name} ${v.variant_name}`, hsn_code: v.hsn_code ?? null, qty: 1, unit_code: v.unit_code ?? null,
-      rate: v.last_purchase_cost || 0, discount_pct: 0, discount_amt: 0, tax_rate_pct: v.tax_rate_pct ?? 0, mrp: v.mrp,
+      purchase_id: id, line_no: (lines?.length ?? 0) + 1, variant_id: v.id, description: `${v.product_name} · ${v.variant_name}`,
+      qty: 1, unit_code: v.unit_code ?? null, discount_pct: 0, discount_amt: 0, tax_rate_pct: 0,
+      // A return goes back at what the maal cost; a receipt starts at the last buy rate.
+      rate: showCost ? (doc?.doc_type === 'debit_note' ? v.avg_cost || v.last_purchase_cost : v.last_purchase_cost || v.avg_cost) || 0 : 0,
     });
   }
 
-  async function patchLine(lineId: string, p: Record<string, string | number | null>) {
-    await updateRow(db, 'purchase_lines', lineId, p);
-  }
-
-  async function post() {
-    if (!id || !doc) return;
-    if (!doc.supplier_id) { notify('Supplier chuno.'); return; }
-    if (!doc.location_id) { notify('Jahan maal aa raha hai wo location chuno.'); return; }
-    if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
-    if ((lines ?? []).some((l) => l.qty <= 0 || l.rate < 0)) { notify('Har line mein qty aur rate dono chahiye.'); return; }
+  function problems(): string | null {
+    if (!doc) return 'Entry abhi khuli nahi';
+    if (!doc.supplier_id) return 'Supplier chuno — ya naam likh ke naya bana lo.';
+    if (!isDateString(doc.doc_date)) return 'Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.';
+    if (!(lines ?? []).length) return 'Kam se kam ek item daalo.';
+    if ((lines ?? []).some((l) => l.qty <= 0)) return 'Har line mein qty chahiye.';
     if (doc.doc_type === 'debit_note') {
       for (const l of lines ?? []) {
-        const ol = originalLines?.find((x) => x.id === l.against_line_id);
-        if (ol && l.qty > ol.qty - ol.returned) { notify(`Cannot return ${l.qty} of ${l.description}: only ${ol.qty - ol.returned} left to return.`); return; }
+        const sl = sourceLines?.find((x) => x.id === l.against_line_id);
+        if (sl && l.qty > sl.qty - sl.done) return `${l.description}: sirf ${sl.qty - sl.done} aur wapas ja sakte hain.`;
+        if (!sl && l.qty > l.here) return `${l.description}: kharab mein sirf ${l.here} pade hain.`;
       }
     }
+    return null;
+  }
+
+  /** Owner or admin: post it. Stock moves and the supplier's khata changes. */
+  async function approve() {
+    if (!id || !doc) return;
+    const bad = problems();
+    if (bad) { notify(bad, 'danger'); return; }
+    const isReturn = doc.doc_type === 'debit_note';
+    const unpriced = (lines ?? []).filter((l) => !l.rate).length;
     const ok = await confirm(
-      doc.doc_type === 'purchase' ? 'Purchase post kar dein?' : 'Debit note post kar dein?',
-      `${supplier?.name} ka ${formatINR(totals.totals.grand_total)}. Stock chadh jaayega aur supplier ke khate mein bhi lag jaayega. Uske baad ye bill badla nahi ja sakta.`
+      isReturn ? 'Supplier ko wapsi likh dein?' : 'Approve karke stock chadha dein?',
+      [
+        `${supplier?.name ?? 'Supplier'} · ${(lines ?? []).reduce((a, l) => a + l.qty, 0)} pcs · ${formatINR(totals.totals.grand_total)}.`,
+        isReturn
+          ? 'Maal stock se nikal jayega aur supplier ke khaate se itna kam ho jayega.'
+          : 'Stock badh jayega aur supplier ke khaate mein chadh jayega.',
+        !isReturn && unpriced ? `${unpriced} item ka kharid rate nahi bhara — baad mein “Rate baaki” se bhar sakte ho.` : null,
+      ].filter(Boolean).join('\n\n'),
     );
     if (!ok) return;
     setPosting(true);
@@ -128,17 +187,36 @@ export default function PurchaseEdit() {
       let docNo = '';
       await db.writeTransaction(async (tx) => { docNo = await postPurchase(tx, id, actor); });
       router.replace(`/purchase/${id}`);
-      notify(`Posted ${docNo}`);
+      notify(isReturn ? `Wapsi ${docNo} likh di.` : `${docNo} approve — stock chadh gaya.`, 'ok');
     } catch (e) {
-      notify(`Could not post: ${(e as Error).message}`);
+      notify(`Nahi hua: ${(e as Error).message}`, 'danger');
     } finally {
       setPosting(false);
     }
   }
 
+  /** Staff: hand it to the owner. */
+  async function submit() {
+    if (!id) return;
+    const bad = problems();
+    if (bad) { notify(bad, 'danger'); return; }
+    await patch({ submitted_at: new Date().toISOString(), submitted_by: actor.userId });
+    notify('Owner ko bhej diya. Approve hote hi stock mein chadh jayega.', 'ok');
+    router.back();
+  }
+
+  /** Owner: send it back to the staff member with a reason. */
+  async function sendBack() {
+    if (!id || !doc) return;
+    if (!backNote.trim()) { notify('Wajah likho — kya theek karna hai.', 'danger'); return; }
+    await patch({ submitted_at: null, notes: [doc.notes, `Owner: ${backNote.trim()}`].filter(Boolean).join(' · ') });
+    notify('Wapas bhej diya.', 'ok');
+    router.back();
+  }
+
   async function discard() {
     if (!id) return;
-    if (!(await confirm('Adhoora bill chhod dein?', 'Ye draft aur iski saari line mit jaayengi.'))) return;
+    if (!(await confirm('Ye entry hata dein?', 'Ye entry aur iski saari line mit jaayengi. Stock par koi asar nahi.'))) return;
     await db.writeTransaction(async (tx) => {
       await tx.execute('DELETE FROM purchase_lines WHERE purchase_id = ?', [id]);
       await deleteRow(tx, 'purchases', id);
@@ -146,100 +224,158 @@ export default function PurchaseEdit() {
     router.back();
   }
 
-  if (!can('purchase.create')) return <Screen><Text>Aapko purchase lene ki permission nahi hai.</Text></Screen>;
-  if (!doc) return <PreparingDraft what="draft" />;
+  if (!can('purchase.create')) {
+    return <Screen><Empty title="Iski permission nahi hai" hint="Owner se maal likhne ka haq maango." /></Screen>;
+  }
+  if (!doc) return <PreparingDraft what="entry" />;
   if (doc.status !== 'draft') { router.replace(`/purchase/${doc.id}`); return null; }
 
   const isReturn = doc.doc_type === 'debit_note';
+  const isReplacement = !isReturn && source?.[0]?.doc_type === 'debit_note';
+  const waiting = !!doc.submitted_at;
+  // A staff member cannot touch an entry once it is with the owner.
+  const locked = waiting && !approver;
+  const fromKharab = isReturn && !doc.against_purchase_id;
+  const title = isReturn ? 'Supplier ko wapsi' : isReplacement ? 'Replacement aaya' : 'Maal aaya';
 
   return (
     <>
-      <Stack.Screen options={{ title: isReturn ? 'Supplier ko wapsi' : 'Maal aaya' }} />
+      <Stack.Screen options={{ title }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Text variant="display">{isReturn ? 'Supplier ko wapsi' : 'Maal aaya'}</Text>
-          <Badge>adhoora</Badge>
+          <Text variant="display">{title}</Text>
+          <Badge tone={waiting ? 'warn' : 'neutral'}>{waiting ? 'approval baaki' : 'adhoora'}</Badge>
         </Row>
-        {isReturn && original?.[0] ? <Text variant="small" color="textMuted">{original[0].doc_no} ka maal supplier ko wapas. Jitna abhi wapas nahi gaya, utni qty pehle se bhari hai — sirf utna rakho jitna sach mein ja raha hai.</Text> : null}
 
-        <FormSection title="Supplier aur bill">
-          <SelectField label="Supplier" value={doc.supplier_id} options={(suppliers ?? []).map((s) => ({ value: s.id, label: s.name, sublabel: s.gstin ?? undefined }))} onChange={chooseSupplier} />
+        {waiting && approver ? (
+          <Card spine="warn">
+            <Text variant="heading">{submitter?.[0]?.full_name ?? 'Staff'} ne bheja hai</Text>
+            <Text variant="small" color="textMuted">
+              Gin ke dekho qty sahi hai na, har item ka kharid rate bharo, phir approve karo. Tab stock badhega.
+            </Text>
+          </Card>
+        ) : null}
+        {locked ? (
+          <Card spine="warn">
+            <Text variant="heading">Owner ke approval ka intezaar</Text>
+            <Text variant="small" color="textMuted">Approve hote hi stock mein chadh jayega. Kuch badalna hai to “Wapas lo” dabao.</Text>
+          </Card>
+        ) : null}
+        {!waiting && doc.notes?.includes('Owner:') && !approver ? (
+          <Card spine="accent">
+            <Text variant="heading">Owner ne wapas bheja</Text>
+            <Text variant="small">{doc.notes}</Text>
+          </Card>
+        ) : null}
+        {isReturn && source?.[0] ? <Text variant="small" color="textMuted">{source[0].doc_no} ka maal supplier ko wapas. Sirf utna rakho jitna sach mein ja raha hai.</Text> : null}
+        {fromKharab ? <Text variant="small" color="textMuted">Kharab maal supplier ko wapas. Supplier ke khaate se iski keemat kam ho jayegi; replacement aaye to wapsi kholke “Replacement aaya” dabao.</Text> : null}
+        {isReplacement ? <Text variant="small" color="textMuted">Wapsi {source?.[0]?.doc_no} ke badle aaya maal. Jitna aaya utna rakho — baaki baad mein aa sakta hai.</Text> : null}
+
+        <FormSection title="Supplier">
+          <SelectField
+            label="Supplier"
+            value={doc.supplier_id}
+            options={(suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))}
+            onChange={(v) => patch({ supplier_id: v, supplier_name: suppliers?.find((s) => s.id === v)?.name ?? null })}
+            onCreate={locked || isReplacement || !!doc.against_purchase_id ? undefined : addSupplier}
+            placeholder="Kis supplier ka maal?"
+          />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Supplier bill no." value={doc.supplier_invoice_no ?? ''} onChangeText={(v) => patch({ supplier_invoice_no: v })} autoCapitalize="characters" />
-            <Input containerStyle={{ flex: 1 }} label="Unke bill ki tareekh" value={doc.supplier_invoice_date ?? ''} onChangeText={(v) => patch({ supplier_invoice_date: v })} placeholder="YYYY-MM-DD" />
-          </Row>
-          <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Hamari tareekh" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" />
-            <View style={{ flex: 1 }}>
-              <SelectField label={isReturn ? 'Kahan se wapas' : 'Maal kahan rakha'} value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} />
-            </View>
-          </Row>
-          <Row gap={8}>
-            <Badge tone={interstate ? 'info' : 'neutral'}>{interstate ? 'Doosra state · IGST' : 'Apna state · CGST + SGST'}</Badge>
-            <Button title="Toggle" tone="ghost" size="sm" onPress={() => patch({ is_interstate: !interstate })} />
+            <Input containerStyle={{ flex: 1 }} label="Tareekh" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" editable={!locked} />
+            <Input containerStyle={{ flex: 1 }} label="Supplier ka bill no." value={doc.supplier_invoice_no ?? ''} onChangeText={(v) => patch({ supplier_invoice_no: v || null })} autoCapitalize="characters" editable={!locked} />
           </Row>
         </FormSection>
 
         <SectionTitle>Maal · {(lines ?? []).length}</SectionTitle>
-        {!isReturn ? (
+        {!locked && !doc.against_purchase_id ? (
           <Card>
-            <VariantPicker onPick={addLine} showCost locationId={doc.location_id} autoFocus={false}
-                canCreate={can('catalog.edit')}
-                onCreate={(text) =>
-                  router.push(
-                    `/admin/item?name=${encodeURIComponent(text)}&back=${encodeURIComponent(`/purchase/edit?id=${doc.id}`)}`
-                  )
-                }
-              />
+            <VariantPicker
+              onPick={addLine}
+              showCost={showCost}
+              locationId={doc.location_id}
+              autoFocus={false}
+              canCreate={!isReturn && can('catalog.edit')}
+              onCreate={(text) => router.push(`/admin/item?name=${encodeURIComponent(text)}&back=${encodeURIComponent(`/purchase/edit?id=${doc.id}`)}`)}
+            />
           </Card>
         ) : null}
-        {(lines ?? []).map((l, i) => {
-          const tl = totals.taxed[i];
-          return (
-            <LineCard key={l.id} title={l.description} subtitle={`HSN ${l.hsn_code ?? '—'} · GST ${l.tax_rate_pct}%`} onRemove={() => deleteRow(db, 'purchase_lines', l.id)}>
-              <Row gap={12} wrap>
-                <View style={{ flex: 1, minWidth: 90 }}><NumberField label={`Qty${l.unit_code ? ` (${l.unit_code})` : ''}`} value={l.qty} onChange={(v) => patchLine(l.id, { qty: v ?? 0 })} decimals={3} /></View>
-                <View style={{ flex: 1, minWidth: 110 }}><NumberField label="Rate (GST se pehle)" value={l.rate} onChange={(v) => patchLine(l.id, { rate: v ?? 0 })} /></View>
-                <View style={{ flex: 1, minWidth: 90 }}><NumberField label="Chhoot %" value={l.discount_pct} onChange={(v) => patchLine(l.id, { discount_pct: v ?? 0 })} /></View>
-                <View style={{ flex: 1, minWidth: 90 }}><NumberField label="GST %" value={l.tax_rate_pct} onChange={(v) => patchLine(l.id, { tax_rate_pct: v ?? 0 })} /></View>
-                {!isReturn ? <View style={{ flex: 1, minWidth: 90 }}><NumberField label="MRP" value={l.mrp ?? null} onChange={(v) => patchLine(l.id, { mrp: v })} /></View> : null}
-              </Row>
-              {!isReturn ? (
-                <Row gap={12}>
-                  <Input containerStyle={{ flex: 1 }} label="Batch" value={l.batch_no ?? ''} onChangeText={(v) => patchLine(l.id, { batch_no: v || null })} />
-                  <View style={{ flex: 1 }}><NumberField label="Warranty (mahine)" value={l.warranty_months ?? null} onChange={(v) => patchLine(l.id, { warranty_months: v })} decimals={0} /></View>
-                </Row>
+        {(lines ?? []).map((l, i) => (
+          <LineCard
+            key={l.id}
+            title={l.description}
+            subtitle={`${l.sku ?? ''} · ${fromKharab ? 'kharab mein' : 'godown mein'} ${l.here}`}
+            onRemove={locked ? undefined : () => deleteRow(db, 'purchase_lines', l.id)}>
+            <Row gap={12} wrap>
+              <View style={{ flex: 1, minWidth: 90 }}>
+                <NumberField label={isReturn ? 'Kitne wapas' : 'Kitne aaye'} value={l.qty} onChange={(v) => patchLine(l.id, { qty: v ?? 0 })} decimals={0} editable={!locked} />
+              </View>
+              {showCost ? (
+                <View style={{ flex: 1, minWidth: 110 }}>
+                  <NumberField
+                    label={isReturn ? 'Ek ka rate' : 'Kharid rate'}
+                    value={l.rate || null}
+                    onChange={(v) => patchLine(l.id, { rate: v ?? 0 })}
+                    hint={!l.rate && l.last_cost ? `Pichhli baar ${formatINR(l.last_cost)}` : undefined}
+                  />
+                </View>
               ) : null}
+            </Row>
+            {showCost && !l.rate && l.last_cost && approver ? (
+              <Button title={`${formatINR(l.last_cost)} lagao`} tone="ghost" size="sm" onPress={() => patchLine(l.id, { rate: l.last_cost })} />
+            ) : null}
+            {showCost ? (
               <Row style={{ justifyContent: 'space-between' }}>
-                <Text variant="small" color="textMuted">Taxable {formatINR(tl?.taxable_value ?? 0)} · tax {formatINR(tl?.tax_total ?? 0)} · landed {formatINR(totals.landed[i] ?? 0)}/unit</Text>
-                <Text mono style={{ fontWeight: '600' }}>{formatINR(tl?.line_total ?? 0)}</Text>
+                <Text variant="small" color="textMuted">{l.qty} × {formatINR(l.rate)}</Text>
+                <Text mono style={{ fontWeight: '600' }}>{formatINR(totals.taxed[i]?.line_total ?? 0)}</Text>
               </Row>
-            </LineCard>
-          );
-        })}
+            ) : null}
+          </LineCard>
+        ))}
 
-        <FormSection title="Total">
-          <NumberField label="Bhada / aur kharcha (har item ke cost mein bat jaayega)" value={doc.other_charges} onChange={(v) => patch({ other_charges: v ?? 0 })} />
-          <Input label="Note" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v })} />
-          <Divider />
-          <KV k="Subtotal" v={formatINR(totals.totals.subtotal)} mono />
-          {totals.totals.discount_total ? <KV k="Chhoot" v={`- ${formatINR(totals.totals.discount_total)}`} mono /> : null}
-          <KV k="Taxable" v={formatINR(totals.totals.taxable_total)} mono />
-          {interstate ? <KV k="IGST" v={formatINR(totals.totals.igst_total)} mono /> : <><KV k="CGST" v={formatINR(totals.totals.cgst_total)} mono /><KV k="SGST" v={formatINR(totals.totals.sgst_total)} mono /></>}
-          {doc.other_charges ? <KV k="Aur kharcha" v={formatINR(doc.other_charges)} mono /> : null}
-          {totals.totals.round_off ? <KV k="Round off" v={formatINR(totals.totals.round_off, { paise: true })} mono /> : null}
-          <Divider />
-          <Row style={{ justifyContent: 'space-between' }}>
-            <Text variant="title">Poora total</Text>
-            <Text variant="number" mono>{formatINR(totals.totals.grand_total)}</Text>
-          </Row>
+        <FormSection title={showCost ? 'Total' : 'Note'}>
+          <Input label="Note" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v || null })} placeholder="Gaadi number, driver, kuch bhi" editable={!locked} />
+          {showCost ? (
+            <>
+              <NumberField label="Bhada (har item ki cost mein bat jayega)" value={doc.other_charges || null} onChange={(v) => patch({ other_charges: v ?? 0 })} />
+              <Divider />
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Text variant="title">{(lines ?? []).reduce((a, l) => a + l.qty, 0)} pcs</Text>
+                <Text variant="number" mono>{formatINR(totals.totals.grand_total)}</Text>
+              </Row>
+            </>
+          ) : (
+            <KV k="Kul" v={`${(lines ?? []).reduce((a, l) => a + l.qty, 0)} pcs`} mono />
+          )}
         </FormSection>
 
-        <Row gap={space.sm}>
-          <Button title={isReturn ? 'Wapsi likh do' : 'Maal chadha do'} size="lg" onPress={post} loading={posting} style={{ flex: 1 }} />
-          <Button title="Chhod do" tone="danger" onPress={discard} />
-        </Row>
-        <Text variant="small" color="textFaint">Adhoore bill likhte hi is phone par save hote rehte hain, aur baaki sab ki tarah sync ho jaate hain.</Text>
+        {approver ? (
+          <>
+            <Button
+              title={isReturn ? 'Wapsi likh do' : waiting ? 'Approve karo — stock chadhao' : 'Stock chadha do'}
+              size="lg" full onPress={approve} loading={posting}
+            />
+            {waiting ? (
+              <Card style={{ gap: space.sm }}>
+                <Input label="Wapas bhejne ki wajah" value={backNote} onChangeText={setBackNote} placeholder="Qty galat hai, dobara gino" />
+                <Row gap={space.sm}>
+                  <Button title="Wapas bhejo" tone="secondary" onPress={sendBack} style={{ flex: 1 }} />
+                  <Button title="Hata do" tone="danger" onPress={discard} />
+                </Row>
+              </Card>
+            ) : (
+              <Button title="Chhod do" tone="danger" onPress={discard} />
+            )}
+          </>
+        ) : isReturn ? (
+          <Empty title="Supplier ko wapsi owner likhta hai" hint="Kharab maal “Kharab Likho” se alag rakh do — owner supplier ko bhejega." />
+        ) : locked ? (
+          <Button title="Wapas lo — badlav karna hai" tone="secondary" onPress={() => patch({ submitted_at: null })} />
+        ) : (
+          <Row gap={space.sm}>
+            <Button title="Owner ko bhejo" size="lg" onPress={submit} style={{ flex: 1 }} />
+            <Button title="Chhod do" tone="danger" onPress={discard} />
+          </Row>
+        )}
       </Screen>
     </>
   );

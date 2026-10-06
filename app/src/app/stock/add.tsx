@@ -14,6 +14,11 @@
  *
  * Counting something you did not know you had is a different job and belongs
  * to Ginti Karo.
+ *
+ * Staff entries wait for the owner (owner, 6 Oct 2026): a staff member counts
+ * what came and sends it; it sits as a submitted draft until an owner or admin
+ * checks it on /purchase/approve, puts the buy rate on it and approves. Only
+ * then does the stock go up. An owner's own entry posts at once.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -41,6 +46,8 @@ export default function StockChadhao() {
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
   const showCost = can('catalog.view_cost');
+  // Who decides whether this goes straight in or waits for a yes.
+  const approver = can('purchase.approve');
   const { variant: variantParam } = useLocalSearchParams<{ variant?: string }>();
 
   const [supplierId, setSupplierId] = useState<string | null>(null);
@@ -141,6 +148,10 @@ export default function StockChadhao() {
           bill_photo_path: billPath,
           notes: note.trim() || null,
           status: 'draft',
+          // A staff entry is handed to the owner; the owner's own goes in now.
+          submitted_at: approver ? null : new Date().toISOString(),
+          submitted_by: approver ? null : actor.userId,
+          approved_by: approver ? actor.userId : null,
         }, actor);
 
         for (const [i, l] of usable.entries()) {
@@ -149,10 +160,12 @@ export default function StockChadhao() {
             qty: l.qty, rate: l.rate, tax_rate_pct: 0,
           }, actor);
         }
-        await postPurchase(tx, id, actor);
+        if (approver) await postPurchase(tx, id, actor);
       });
 
-      notify(`${totalQty} pcs stock mein chadh gaya.`, 'ok');
+      notify(approver
+        ? `${totalQty} pcs stock mein chadh gaya.`
+        : `${totalQty} pcs owner ko bhej diya. Approve hote hi stock mein chadh jayega.`, 'ok');
       router.back();
     } catch (e) {
       notify(`Stock nahi chadha: ${String((e as Error).message ?? e)}`, 'danger');
@@ -180,7 +193,9 @@ export default function StockChadhao() {
         <View>
           <Text variant="display">Stock Chadhao</Text>
           <Text variant="small" color="textMuted">
-            Supplier se naya maal aaya? Yahan daalo — kitna aaya, kahan rakha. Stock turant badh jayega.
+            {approver
+              ? 'Supplier se maal aaya? Kitna aaya likho, kharid rate ho to bhar do. Stock turant badh jayega.'
+              : 'Supplier se maal aaya? Gin ke likho kitna aaya. Owner dekh ke approve karega, tab stock badhega.'}
           </Text>
         </View>
 
@@ -233,7 +248,7 @@ export default function StockChadhao() {
                     {showCost ? (
                       <Input
                         containerStyle={{ flex: 1 }}
-                        label="Ek ka rate (zaroori nahi)"
+                        label="Kharid rate (zaroori nahi)"
                         value={l.rate ? String(l.rate) : ''}
                         onChangeText={(v) => patch(l.variantId, { rate: Number(v.replace(/[^0-9.]/g, '')) || 0 })}
                         keyboardType="decimal-pad"
@@ -242,7 +257,7 @@ export default function StockChadhao() {
                     ) : null}
                   </Row>
                   <Text variant="small" color="textFaint">
-                    {l.sku} · abhi {here} → {here + l.qty}{showCost && l.rate ? ` · ${formatINR(l.qty * l.rate)}` : ''}
+                    {l.sku} · abhi {here}{approver ? ` → ${here + l.qty}` : ` · approve hone par ${here + l.qty}`}{showCost && l.rate ? ` · ${formatINR(l.qty * l.rate)}` : ''}
                   </Text>
                 </View>
               );
@@ -270,7 +285,9 @@ export default function StockChadhao() {
         ) : null}
 
         <Button
-          title={totalQty > 0 ? `${totalQty} pcs chadha do` : 'Stock chadha do'}
+          title={approver
+            ? (totalQty > 0 ? `${totalQty} pcs chadha do` : 'Stock chadha do')
+            : (totalQty > 0 ? `${totalQty} pcs owner ko bhejo` : 'Owner ko bhejo')}
           size="lg"
           full
           onPress={save}

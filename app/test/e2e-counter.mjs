@@ -83,9 +83,14 @@ async function postBill(page, mode) {
 async function bill(mode) {
   await page.goto(base + '/invoice/edit', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(6500);
-  await page.getByText('Chuno…').first().click();
-  await page.waitForTimeout(1500);
-  await page.getByText('Walk-in Customer', { exact: true }).first().click();
+  // A new bill opens on the cash customer; udhaar goes on a khata.
+  if (mode === 'Udhaar') {
+    await page.getByText('Walk-in Customer', { exact: true }).locator('visible=true').first().click();
+    await page.waitForTimeout(1200);
+    await page.getByPlaceholder('Naam likh ke dhoondo').fill('XYZ');
+    await page.waitForTimeout(900);
+    await page.getByText('XYZ Accessories', { exact: true }).locator('visible=true').first().click();
+  }
   await page.waitForTimeout(1500);
   await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
   await page.waitForTimeout(2800);

@@ -27,11 +27,14 @@ import { insertRow, updateRow, type Actor } from './writes';
 
 type DocType = 'sales_invoice' | 'credit_note' | 'purchase' | 'debit_note' | 'payment_in' | 'payment_out' | 'stock_adjustment' | 'stock_transfer' | 'stock_audit' | 'job_card';
 
-async function one<T>(tx: Transaction, sql: string, params: unknown[] = []): Promise<T | null> {
+/** A transaction, or the database itself for a read outside one. */
+type Executor = Pick<Transaction, 'execute'>;
+
+async function one<T>(tx: Executor, sql: string, params: unknown[] = []): Promise<T | null> {
   const r = await tx.execute(sql, params as (string | number | null)[]);
   return (r.rows?._array?.[0] as T) ?? null;
 }
-async function all<T>(tx: Transaction, sql: string, params: unknown[] = []): Promise<T[]> {
+async function all<T>(tx: Executor, sql: string, params: unknown[] = []): Promise<T[]> {
   const r = await tx.execute(sql, params as (string | number | null)[]);
   return (r.rows?._array as T[]) ?? [];
 }
@@ -195,18 +198,56 @@ export async function postPurchase(tx: Transaction, purchaseId: string, actor: A
   }
 
   await updateRow(tx, 'purchases', purchaseId, {
-    doc_no: docNo, status: 'posted', posted_at: now, paid_total: 0,
+    doc_no: docNo, status: 'posted', posted_at: now, paid_total: 0, approved_by: actor.userId,
     subtotal: totals.subtotal, discount_total: totals.discount_total, taxable_total: totals.taxable_total, cgst_total: totals.cgst_total, sgst_total: totals.sgst_total, igst_total: totals.igst_total,
     round_off: totals.round_off, grand_total: totals.grand_total,
   });
 
+  // A purchase against a supplier return is the replacement for it.
+  const replacing = p.doc_type === 'purchase' && p.against_purchase_id
+    ? await one<{ id: string; doc_no: string; settled_at: string | null }>(
+        tx, `SELECT id, doc_no, settled_at FROM purchases WHERE id = ? AND doc_type = 'debit_note' AND status = 'posted'`,
+        [p.against_purchase_id])
+    : null;
+
   await insertRow(tx, 'ledger_entries', {
     party_type: 'supplier', party_id: p.supplier_id, entry_date: p.doc_date, doc_type: p.doc_type, doc_id: purchaseId, doc_no: docNo,
     debit: p.doc_type === 'debit_note' ? totals.grand_total : 0, credit: p.doc_type === 'purchase' ? totals.grand_total : 0,
-    narration: p.doc_type === 'purchase' ? `Maal aaya ${docNo}` : `Maal wapas bheja ${docNo}`,
+    narration: replacing ? `Replacement aaya ${docNo} (wapasi ${replacing.doc_no} ke badle)`
+      : p.doc_type === 'purchase' ? `Maal aaya ${docNo}` : `Maal wapas bheja ${docNo}`,
   }, actor);
 
+  // Once everything that went back has come back, the return is settled.
+  if (replacing && !replacing.settled_at) {
+    const left = await returnStillOpen(tx, replacing.id);
+    if (left.qty <= 0) {
+      await updateRow(tx, 'purchases', replacing.id, {
+        settled_at: now, settled_by: actor.userId, settle_note: 'Poora replacement aa gaya',
+      });
+    }
+  }
+
   return docNo;
+}
+
+/**
+ * How much of a supplier return is still waiting to be settled: the pieces
+ * that went back, less those that came back as replacement, and the money
+ * that represents at the return's own rates.
+ */
+export async function returnStillOpen(tx: Executor, debitNoteId: string): Promise<{ qty: number; value: number }> {
+  const r = await one<{ qty: number; value: number }>(tx, `
+    SELECT COALESCE(SUM(MAX(l.qty - COALESCE(back.qty, 0), 0)), 0) AS qty,
+           COALESCE(SUM(MAX(l.qty - COALESCE(back.qty, 0), 0) * l.rate), 0) AS value
+      FROM purchase_lines l
+      LEFT JOIN (
+        SELECT rl.variant_id, SUM(rl.qty) AS qty
+          FROM purchase_lines rl JOIN purchases r ON r.id = rl.purchase_id
+         WHERE r.against_purchase_id = ?1 AND r.doc_type = 'purchase' AND r.status = 'posted'
+         GROUP BY rl.variant_id
+      ) back ON back.variant_id = l.variant_id
+     WHERE l.purchase_id = ?1`, [debitNoteId]);
+  return { qty: r?.qty ?? 0, value: r?.value ?? 0 };
 }
 
 export async function cancelPurchase(tx: Transaction, purchaseId: string, reason: string, actor: Actor): Promise<void> {

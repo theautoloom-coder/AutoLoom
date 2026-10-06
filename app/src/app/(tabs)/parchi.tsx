@@ -105,7 +105,7 @@ const RANGE_FEED = `
            COALESCE((SELECT c2.name FROM customers c2 WHERE c2.id = pm.party_id),
                     (SELECT s2.name FROM suppliers s2 WHERE s2.id = pm.party_id)), 0
       FROM payments pm
-     WHERE pm.status = 'posted' AND pm.payment_date >= ?1 AND pm.payment_date <= ?2
+     WHERE pm.status = 'posted' AND pm.party_type <> 'partner' AND pm.payment_date >= ?1 AND pm.payment_date <= ?2
     UNION ALL
     SELECT CASE WHEN a.reason = 'damage' THEN 'damage' ELSE 'adjust' END,
            a.id, a.created_at, a.doc_date,

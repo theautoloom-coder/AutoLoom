@@ -23,6 +23,44 @@ export function tokenize(input: string): string[] {
   return input.trim().toLowerCase().split(/\s+/).filter(Boolean);
 }
 
+/**
+ * The specs that tell two items apart, in the family's own order: "H4 ·
+ * 60/55 W · 3200 K" for a bulb, "7D · Black · PU leather" for a mat.
+ * Variant-level values win over product-level ones for the same spec.
+ */
+export const SPECS_OF = (p: string, pv: string) => `
+  (SELECT GROUP_CONCAT(v, ' · ') FROM (
+     SELECT COALESCE(
+              (SELECT x.display_value FROM spec_values x
+                WHERE x.spec_definition_id = sd.id AND x.variant_id = ${pv}.id AND x.display_value <> ''),
+              (SELECT x.display_value FROM spec_values x
+                WHERE x.spec_definition_id = sd.id AND x.product_id = ${p}.id AND x.variant_id IS NULL AND x.display_value <> '')
+            ) AS v
+       FROM spec_definitions sd
+      WHERE sd.family_id = ${p}.family_id
+      ORDER BY sd.sort_order, sd.name
+   ) WHERE v IS NOT NULL)`;
+
+/** Which cars an item goes on: "Creta 2019–2023, Venue 2020+". */
+export const FITS_OF = (p: string, pv: string) => `
+  (SELECT CASE WHEN ${p}.is_universal_fit = 1 THEN 'Sab gaadi' ELSE GROUP_CONCAT(label, ', ') END FROM (
+     SELECT vm.name || COALESCE(' ' || COALESCE(pf.year_from, g.year_from)
+              || CASE WHEN COALESCE(pf.year_to, g.year_to) IS NULL THEN '+'
+                      WHEN COALESCE(pf.year_to, g.year_to) = COALESCE(pf.year_from, g.year_from) THEN ''
+                      ELSE '–' || COALESCE(pf.year_to, g.year_to) END, '') AS label
+       FROM product_fitments pf
+       JOIN vehicle_models vm ON vm.id = pf.model_id
+       LEFT JOIN vehicle_generations g ON g.id = pf.generation_id
+      WHERE pf.product_id = ${p}.id AND (pf.variant_id IS NULL OR pf.variant_id = ${pv}.id)
+      ORDER BY vm.name, COALESCE(pf.year_from, g.year_from)
+      LIMIT 4))`;
+
+/** What can be sold: the godown, not the kharab corner. */
+export const SELLABLE_QTY = (pv: string) => `
+  COALESCE((SELECT SUM(sl.qty) FROM stock_on_hand sl
+             WHERE sl.variant_id = ${pv}.id
+               AND sl.location_id NOT IN (SELECT id FROM locations WHERE type = 'damaged')), 0)`;
+
 export const SEARCH_VARIANTS = (tokens: string[], limit = 40) => {
   const { sql, params } = tokenClause('pv.search_text', tokens);
   return {
@@ -31,7 +69,9 @@ export const SEARCH_VARIANTS = (tokens: string[], limit = 40) => {
              pv.mrp, pv.min_stock, pv.reorder_level, pv.avg_cost, pv.last_purchase_cost,
              p.id AS product_id, p.name AS product_name, p.is_universal_fit,
              b.name AS brand_name, f.name AS family_name, f.code AS family_code,
-             COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id), 0) AS qty,
+             ${SPECS_OF('p', 'pv')} AS specs,
+             ${FITS_OF('p', 'pv')} AS fits,
+             ${SELLABLE_QTY('pv')} AS qty,
              (SELECT pi.storage_path FROM product_images pi
                WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
       FROM product_variants pv
@@ -128,7 +168,7 @@ export const VEHICLE_PRODUCTS = {
            p.id AS product_id, p.name AS product_name, p.is_universal_fit,
            b.name AS brand_name, f.name AS family_name, f.sort_order AS family_sort,
            pf.position,
-           COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id), 0) AS qty,
+           ${SELLABLE_QTY('pv')} AS qty,
            (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
     FROM product_fitments pf
     JOIN products p ON p.id = pf.product_id AND p.is_active = 1
@@ -163,7 +203,7 @@ export const VARIANTS_BY_OPTIONS = (optionIds: string[]) => ({
            p.id AS product_id, p.name AS product_name, p.is_universal_fit,
            b.name AS brand_name, f.name AS family_name, f.sort_order AS family_sort,
            so.value AS socket,
-           COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id), 0) AS qty
+           ${SELLABLE_QTY('pv')} AS qty
     FROM spec_values sv
     JOIN spec_options so ON so.id = sv.option_id
     JOIN product_variants pv ON pv.id = sv.variant_id AND pv.is_active = 1
@@ -195,7 +235,7 @@ export const PRODUCT = {
 
 export const PRODUCT_VARIANTS = {
   sql: `
-    SELECT pv.*, COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id), 0) AS qty
+    SELECT pv.*, ${SELLABLE_QTY('pv')} AS qty
     FROM product_variants pv WHERE pv.product_id = ? AND pv.is_active = 1
     ORDER BY pv.sort_order, pv.variant_name`,
 };
@@ -288,8 +328,8 @@ export const DASHBOARD_TODAY = {
       (SELECT COALESCE(SUM(grand_total),0) FROM sales_invoices WHERE doc_type='invoice' AND status='posted' AND doc_date = ?1 AND payment_mode <> 'credit') AS cash_sales_today,
       (SELECT COALESCE(SUM(grand_total),0) FROM purchases WHERE doc_type='purchase' AND status='posted' AND doc_date = ?1) AS purchases_today,
       (SELECT COUNT(*) FROM purchases WHERE doc_type='purchase' AND status='posted' AND doc_date = ?1) AS purchase_docs_today,
-      (SELECT COALESCE(SUM(amount),0) FROM payments WHERE direction='in' AND status='posted' AND payment_date = ?1) AS collected_today,
-      (SELECT COUNT(*) FROM payments WHERE direction='in' AND status='posted' AND payment_date = ?1) AS receipts_today,
+      (SELECT COALESCE(SUM(amount),0) FROM payments WHERE direction='in' AND party_type <> 'partner' AND status='posted' AND payment_date = ?1) AS collected_today,
+      (SELECT COUNT(*) FROM payments WHERE direction='in' AND party_type <> 'partner' AND status='posted' AND payment_date = ?1) AS receipts_today,
       (SELECT COALESCE(SUM(balance),0) FROM party_balance_live WHERE party_type='customer' AND balance > 0) AS receivables,
       (SELECT COALESCE(SUM(balance),0) FROM party_balance_live WHERE party_type='supplier' AND balance > 0) AS payables,
       (SELECT COALESCE(SUM(sl.qty * pv.avg_cost),0) FROM stock_on_hand sl JOIN product_variants pv ON pv.id = sl.variant_id JOIN locations l ON l.id = sl.location_id WHERE l.type <> 'damaged') AS stock_value,
@@ -431,7 +471,7 @@ export const TODAY_FEED = {
       SELECT 'payment', pm.id, pm.created_at,
              CASE WHEN pm.direction='in' THEN 'Paisa aaya' ELSE 'Paisa diya' END,
              pm.amount, NULL
-        FROM payments pm WHERE pm.status='posted' AND pm.payment_date = ?1
+        FROM payments pm WHERE pm.status='posted' AND pm.party_type <> 'partner' AND pm.payment_date = ?1
       UNION ALL
       SELECT CASE WHEN a.reason='damage' THEN 'damage' ELSE 'adjust' END, a.id, a.created_at,
              COALESCE(a.notes, a.reason), NULL,

@@ -30,12 +30,14 @@ import { PreparingDraft } from '@/ui/pending';
 
 type Inv = { id: string; doc_type: 'invoice' | 'credit_note'; status: string; customer_id: string | null; customer_vehicle_id: string | null; location_id: string | null; price_list_id: string | null; doc_date: string; is_interstate: number; place_of_supply_state: string | null; other_charges: number; payment_mode: string | null; credit_days: number; notes: string | null; against_invoice_id: string | null; salesperson_id: string | null };
 type Line = DraftLine & { invoice_id: string; line_no: number; list_price: number | null; price_source: string | null; override_approved_by: string | null; return_condition: string | null; return_note: string | null; sku: string; avg_cost: number; min_selling_price: number | null; last_purchase_cost: number; retail_price: number; dealer_price: number | null; wholesale_price: number | null; here: number };
-type Customer = { id: string; name: string; mobile: string | null; state_code: string | null; gstin: string | null; price_list_id: string | null; credit_limit: number; credit_days: number; customer_type: string; balance: number };
+type Customer = { id: string; name: string; mobile: string | null; state_code: string | null; gstin: string | null; price_list_id: string | null; credit_limit: number; credit_days: number; customer_type: string; balance: number; is_cash: number };
 
 /** A rate equal to the resolved approved/last price is pre-approved; the floor only guards manual changes. */
 function needsFloorCheck(l: { rate: number; list_price: number | null; price_source: string | null }): boolean {
   return !(l.price_source && l.price_source !== 'manual' && l.list_price != null && Math.abs(l.rate - l.list_price) < 0.005);
 }
+
+const isCNDoc = (d: { doc_type: string }) => d.doc_type === 'credit_note';
 
 const MODES = [
   { value: 'cash', label: 'Cash' }, { value: 'upi', label: 'Online / UPI' }, { value: 'credit', label: 'Udhaar' },
@@ -60,9 +62,11 @@ export default function InvoiceEdit() {
     `SELECT l.*, pv.sku, pv.avg_cost, pv.min_selling_price, pv.last_purchase_cost, pv.retail_price, pv.dealer_price, pv.wholesale_price,
             COALESCE((SELECT qty FROM stock_on_hand sl WHERE sl.variant_id = l.variant_id AND sl.location_id = i.location_id), 0) AS here
      FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id JOIN product_variants pv ON pv.id = l.variant_id WHERE l.invoice_id = ? ORDER BY l.line_no`, [id ?? '']);
-  const { data: customers } = useQuery<Customer>(`SELECT c.id, c.name, c.mobile, c.state_code, c.gstin, c.price_list_id, c.credit_limit, c.credit_days, c.customer_type, COALESCE(pb.balance,0) AS balance FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id WHERE c.is_active=1 ORDER BY c.name`);
+  // The cash customer first — most bills at a wholesaler that are not on a
+  // khata are a walk-in paying on the spot — then every khata by name.
+  const { data: customers, isLoading: customersLoading } = useQuery<Customer>(`SELECT c.id, c.name, c.mobile, c.state_code, c.gstin, c.price_list_id, c.credit_limit, c.credit_days, c.customer_type, COALESCE(c.is_cash, 0) AS is_cash, COALESCE(pb.balance,0) AS balance FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id WHERE c.is_active=1 ORDER BY COALESCE(c.is_cash, 0) DESC, c.name`);
+  const cashCustomer = customers?.find((c) => c.is_cash) ?? null;
   const customer = customers?.find((c) => c.id === doc?.customer_id) ?? null;
-  const { data: locations } = useQuery<{ id: string; name: string }>("SELECT id, name FROM locations WHERE is_active = 1 AND type <> 'damaged' ORDER BY sort_order");
   const { data: original, isLoading: originalLoading } = useQuery<{ id: string; doc_no: string; customer_id: string; location_id: string; is_interstate: number; price_list_id: string | null }>('SELECT id, doc_no, customer_id, location_id, is_interstate, price_list_id FROM sales_invoices WHERE id = ?', [against ?? '']);
   // `returned` counts POSTED returns only. It counted every return not
   // cancelled — drafts included, this very draft among them — so posting a
@@ -93,11 +97,13 @@ export default function InvoiceEdit() {
     // shop's phone, "Maal wapas" on a real bill gave Chuno… and MAAL · 0.
     // isLoading is the only honest signal, and the bill itself must be there.
     if (against && (originalLoading || originalLinesLoading || !original?.[0])) return;
+    // A new bill starts on the cash customer, so wait for the list to know who that is.
+    if (!against && !customerParam && customersLoading) return;
     setCreating(true);
     (async () => {
       const base = original?.[0];
       const newId = await insertRow(db, 'sales_invoices', {
-        doc_type: against ? 'credit_note' : 'invoice', doc_date: toDateString(), customer_id: base?.customer_id ?? (customerParam || null), location_id: base?.location_id ?? locationId,
+        doc_type: against ? 'credit_note' : 'invoice', doc_date: toDateString(), customer_id: base?.customer_id ?? (customerParam || cashCustomer?.id || null), location_id: base?.location_id ?? locationId,
         price_list_id: base?.price_list_id ?? null, is_interstate: base?.is_interstate ?? false, other_charges: 0,
         // Cash, not credit. Every new bill used to open on Udhaar, so a bill
         // made by tapping straight through went into the grahak's khata as
@@ -118,7 +124,7 @@ export default function InvoiceEdit() {
       createdHere.current = newId;
       setId(newId);
     })().catch((e) => notify(`Naya bill nahi khula: ${String((e as Error).message ?? e)}`, 'danger'));
-  }, [id, creating, locationId, db, actor, against, original, originalLines, originalLoading, originalLinesLoading, customerParam, profile?.id]);
+  }, [id, creating, locationId, db, actor, against, original, originalLines, originalLoading, originalLinesLoading, customerParam, profile?.id, customersLoading, cashCustomer?.id]);
 
   // Opening Bill Banao makes a draft at once, so the screen has something to
   // write lines into. Backing out without adding anything left that empty
@@ -177,7 +183,9 @@ export default function InvoiceEdit() {
     const c = customers?.find((x) => x.id === cid)
       ?? (cid ? await db.getOptional<Customer>('SELECT id, name, state_code, price_list_id, credit_days FROM customers WHERE id = ?', [cid]) : null)
       ?? undefined;
-    await patch({ customer_id: cid, customer_vehicle_id: null, price_list_id: c?.price_list_id ?? null, place_of_supply_state: c?.state_code ?? null, is_interstate: isInterstate(shop.company?.state_code, c?.state_code), credit_days: c?.credit_days ?? 0 });
+    const cash = !!(c as Customer | undefined)?.is_cash;
+    const mode = cash && (doc?.payment_mode === 'credit' || doc?.payment_mode === 'mixed') ? 'cash' : doc?.payment_mode;
+    await patch({ customer_id: cid, customer_vehicle_id: null, price_list_id: c?.price_list_id ?? null, place_of_supply_state: c?.state_code ?? null, is_interstate: isInterstate(shop.company?.state_code, c?.state_code), credit_days: cash ? 0 : c?.credit_days ?? 0, payment_mode: mode });
     for (const l of lines ?? []) {
       const p = await priceFor(cid, l);
       await updateRow(db, 'sales_invoice_lines', l.id, { list_price: p.price, rate: p.price, price_source: p.source, override_approved_by: null });
@@ -209,6 +217,10 @@ export default function InvoiceEdit() {
   async function post() {
     if (!id || !doc) return;
     if (!doc.customer_id) { notify('Grahak chuno.'); return; }
+    if (customer?.is_cash && !isCNDoc(doc) && (doc.payment_mode === 'credit' || doc.payment_mode === 'mixed')) {
+      notify('Cash grahak ka udhaar nahi hota. Udhaar dena hai to grahak ka khata chuno ya naya banao.');
+      return;
+    }
     // See isDateString: a blank date is discarded by the sync long after the
     // screen has said the bill was made.
     if (!isDateString(doc.doc_date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
@@ -291,7 +303,7 @@ export default function InvoiceEdit() {
             <Text variant="small" color="textMuted">
               {isCN
                 ? 'Grahak jo maal wapas laaya, wo yahan likho — paisa uske khaate mein wapas jud jayega.'
-                : 'Grahak ko maal de rahe ho? Yahan bill banao — stock kam hoga aur udhaar ho to khaate mein chadh jayega.'}
+                : 'Kisko maal diya? Khata wala ho to udhaar uske khaate mein chadhega; Cash grahak ka poora paisa abhi.'}
             </Text>
           </View>
           <Text variant="mono" color="textFaint">{statusLabel(doc.status)}</Text>
@@ -299,8 +311,8 @@ export default function InvoiceEdit() {
         {isCN && original?.[0] ? <Text variant="small" color="textMuted">Bill {original[0].doc_no} ke against. Qty utni hi rakho jitna maal sach mein wapas aaya. Jo toota ya kharab hai use "Kharab / toota hua" mark karo — wo bechne wale stock mein wapas nahi jayega.</Text> : null}
 
         <FormSection title="Grahak">
-          <SelectField label={isCN ? 'Kaun lauta raha hai' : 'Kaun le raha hai'} value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: `${customerTypeLabel(c.customer_type)}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={(text) => router.push({ pathname: '/customer/edit', params: { name: text, forBill: '1' } })} />
-          {customer ? <CreditBlock customer={customer} credit={credit} gst={gst} interstate={interstate} /> : null}
+          <SelectField label={isCN ? 'Kaun lauta raha hai' : 'Kaun le raha hai'} value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: c.is_cash ? 'Turant paisa — koi udhaar nahi' : `${customerTypeLabel(c.customer_type)}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={(text) => router.push({ pathname: '/customer/edit', params: { name: text, forBill: '1' } })} />
+          {customer && !customer.is_cash ? <CreditBlock customer={customer} credit={credit} gst={gst} interstate={interstate} /> : null}
           <Row gap={12}>
             {/* Already today's date — the draft was created with it. The job
                 here is only to stop autocorrect rewriting it on the rare day
@@ -316,7 +328,6 @@ export default function InvoiceEdit() {
               autoCorrect={false}
               returnKeyType="done"
             />
-            <View style={{ flex: 1 }}><SelectField label={isCN ? 'Maal kahan rakhna hai' : 'Maal kahan se'} value={doc.location_id} options={(locations ?? []).map((l) => ({ value: l.id, label: l.name }))} onChange={(v) => patch({ location_id: v })} /></View>
           </Row>
         </FormSection>
 
@@ -346,7 +357,7 @@ export default function InvoiceEdit() {
                   <Row gap={8} align="center" wrap>
                     <Text variant="label" color="textMuted">Maal ki haalat</Text>
                     <Chip label="Theek hai · stock mein wapas" selected={l.return_condition !== 'damaged'} onPress={() => updateRow(db, 'sales_invoice_lines', l.id, { return_condition: 'sellable' })} />
-                    <Chip label="Kharab / toota hua" selected={l.return_condition === 'damaged'} onPress={() => updateRow(db, 'sales_invoice_lines', l.id, { return_condition: 'damaged' })} />
+                    <Chip label="Kharab · supplier ko jayega" selected={l.return_condition === 'damaged'} onPress={() => updateRow(db, 'sales_invoice_lines', l.id, { return_condition: 'damaged' })} />
                   </Row>
                   <Input label="Wapasi ka note" value={l.return_note ?? ''} onChangeText={(v) => updateRow(db, 'sales_invoice_lines', l.id, { return_note: v || null })} placeholder="Size galat · ek bulb nahi chala · dabba toota" returnKeyType="done" />
                 </>
@@ -364,7 +375,8 @@ export default function InvoiceEdit() {
           {!isCN ? (
             <>
               <Text variant="label" color="textMuted">PAISA KAISE AAYA</Text>
-              <Row gap={space.xs} wrap>{MODES.map((m) => <Chip key={m.value} label={m.label} selected={doc.payment_mode === m.value} onPress={() => patch({ payment_mode: m.value })} />)}</Row>
+              <Row gap={space.xs} wrap>{MODES.filter((m) => !customer?.is_cash || (m.value !== 'credit' && m.value !== 'mixed')).map((m) => <Chip key={m.value} label={m.label} selected={doc.payment_mode === m.value} onPress={() => patch({ payment_mode: m.value })} />)}</Row>
+              {customer?.is_cash ? <Text variant="small" color="textFaint">Cash grahak — poora paisa abhi. Udhaar ke liye grahak ka khata chuno.</Text> : null}
             </>
           ) : null}
           {doc.payment_mode === 'credit' && !isCN && customer?.credit_days ? <Text variant="small" color="textFaint">{doc.credit_days || customer.credit_days} din mein paisa dena hai</Text> : null}

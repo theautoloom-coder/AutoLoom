@@ -7,6 +7,10 @@
  *
  * Rejections are given the loudest treatment on purpose. A rejection that is
  * easy to miss is a rejection that gets resubmitted unchanged next week.
+ *
+ * Two kinds of thing wait here: maal a staff member counted in (it does not
+ * reach the stock until an owner or admin approves it — owner, 6 Oct 2026),
+ * and new items a staff member asked for.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useRouter } from 'expo-router';
@@ -17,6 +21,10 @@ import { parseProposal, type ChangeRequest } from '@/lib/requests';
 import { Badge, Button, Card, Divider, Empty, ListRow, Screen, SectionTitle, Text } from '@/ui';
 
 type Row = ChangeRequest & { submitter: string | null };
+type Entry = {
+  id: string; doc_date: string; submitted_at: string | null; notes: string | null;
+  supplier: string | null; submitter: string | null; items: number; qty: number;
+};
 
 const when = (iso: string) => {
   const d = new Date(iso);
@@ -46,7 +54,25 @@ export default function RequestsScreen() {
   const router = useRouter();
   const { can, actor } = useSession();
   const isReviewer = can('catalog.edit');
+  const approver = can('purchase.approve');
   const me = actor.userId ?? '';
+
+  // Stock entries from staff: the approver sees all of them, staff their own.
+  // submitted_at set = waiting; cleared = sent back for a fix.
+  const { data: entryRows } = useQuery<Entry>(
+    `SELECT p.id, p.doc_date, p.submitted_at, p.notes, s.name AS supplier, pr.full_name AS submitter,
+            (SELECT COUNT(*) FROM purchase_lines l WHERE l.purchase_id = p.id) AS items,
+            (SELECT COALESCE(SUM(l.qty), 0) FROM purchase_lines l WHERE l.purchase_id = p.id) AS qty
+       FROM purchases p
+       LEFT JOIN suppliers s ON s.id = p.supplier_id
+       LEFT JOIN profiles pr ON pr.id = p.submitted_by
+      WHERE p.status = 'draft' AND p.doc_type = 'purchase' AND p.submitted_by IS NOT NULL
+        AND (?1 = 1 OR p.submitted_by = ?2)
+      ORDER BY COALESCE(p.submitted_at, p.updated_at) DESC`,
+    [approver ? 1 : 0, me],
+  );
+  const waiting = (entryRows ?? []).filter((e) => e.submitted_at);
+  const sentBack = (entryRows ?? []).filter((e) => !e.submitted_at);
 
   // A reviewer sees the whole queue; everyone else sees only their own.
   const { data: rows } = useQuery<Row>(
@@ -73,9 +99,49 @@ export default function RequestsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isReviewer ? 'Requests' : 'Meri requests' }} />
+      <Stack.Screen options={{ title: isReviewer ? 'Approval' : 'Maine kya bheja' }} />
       <Screen>
-        <Text variant="display">{isReviewer ? 'Requests' : 'Meri requests'}</Text>
+        <Text variant="display">{isReviewer ? 'Approval' : 'Maine kya bheja'}</Text>
+
+        {/* Maal first: until it is approved the godown holds pieces the app
+            does not know about, and a bill for them would show short. */}
+        {sentBack.length > 0 ? (
+          <>
+            <SectionTitle>{approver ? 'Maal — wapas bheja hua' : 'Maal wapas aaya — theek karke bhejo'}</SectionTitle>
+            {sentBack.map((e) => (
+              <Card key={e.id} keyline={!approver} spine="accent">
+                <Text variant="rowTitle">{e.supplier ?? 'Supplier'} · {e.qty} pcs</Text>
+                <Text variant="small" color="textMuted">{[approver ? e.submitter : null, `${e.items} item`, e.doc_date].filter(Boolean).join('  ·  ')}</Text>
+                {e.notes ? <Text variant="small">{e.notes}</Text> : null}
+                <Button title={approver ? 'Dekho' : 'Theek karo'} tone={approver ? 'secondary' : 'primary'} onPress={() => router.push(`/purchase/approve?id=${e.id}`)} />
+              </Card>
+            ))}
+          </>
+        ) : null}
+
+        <SectionTitle>{approver ? `Aaya hua maal — approve karo ${waiting.length || ''}` : `Mera aaya hua maal ${waiting.length || ''}`}</SectionTitle>
+        {waiting.length === 0 ? (
+          <Empty
+            title={approver ? 'Koi maal approval ke liye nahi' : 'Kuch baaki nahi'}
+            hint={approver
+              ? 'Staff “Stock Chadhao” se maal likhega to yahan aayega. Rate bhar ke approve karo, tab stock badhega.'
+              : 'Maal aaye to “+” → Stock Chadhao. Owner approve karega, tab stock mein dikhega.'}
+          />
+        ) : (
+          <Card style={{ gap: 0 }}>
+            {waiting.map((e, i) => (
+              <React.Fragment key={e.id}>
+                {i > 0 ? <Divider /> : null}
+                <ListRow
+                  title={`${e.supplier ?? 'Supplier'} · ${e.qty} pcs`}
+                  subtitle={[approver ? e.submitter : null, `${e.items} item`, e.doc_date].filter(Boolean).join('  ·  ')}
+                  right={<Badge tone="warn">{approver ? 'Approve karo' : 'Intezaar'}</Badge>}
+                  onPress={() => router.push(`/purchase/approve?id=${e.id}`)}
+                />
+              </React.Fragment>
+            ))}
+          </Card>
+        )}
 
         {/* The submitter's rejections come first: they are the only items here
             that need someone to do something today. */}
@@ -105,7 +171,7 @@ export default function RequestsScreen() {
         ) : null}
 
         <SectionTitle>
-          {isReviewer ? `Approve karne hain ${pending.length || ''}` : `Bheji hui ${pending.length || ''}`}
+          {isReviewer ? `Naye item — approve karo ${pending.length || ''}` : `Naye item jo bheje ${pending.length || ''}`}
         </SectionTitle>
         {pending.length === 0 ? (
           <Empty

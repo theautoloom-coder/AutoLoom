@@ -21,17 +21,10 @@ import { formatINR, formatINRShort } from '@domain';
 
 import { SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
-import { Badge, Card, Chip, Empty, Grid, Input, ListRow, Row, Screen, SectionTitle, StatTile, Text, type IconName } from '@/ui';
+import { Badge, Card, Chip, Empty, Grid, Input, ListRow, Row, Screen, SectionTitle, StatTile, Text } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { Skeleton, SkeletonList, SkeletonTile } from '@/ui/skeleton';
 import { radius, space } from '@/ui/theme';
-
-const LOCATION_LOOK: Record<string, { icon: IconName; accent: string }> = {
-  warehouse: { icon: 'business-outline', accent: 'blue' },
-  shop: { icon: 'storefront-outline', accent: 'green' },
-  workshop: { icon: 'construct-outline', accent: 'violet' },
-  damaged: { icon: 'alert-circle-outline', accent: 'amber' },
-};
 
 type Row = {
   id: string;
@@ -46,6 +39,11 @@ type Row = {
   last_purchase_cost: number;
   retail_price: number;
   photo_path: string | null;
+  /** "H4 · 60/55W" — the specs that tell two bulbs apart. */
+  specs: string | null;
+  /** "Creta 2019–2023, Venue" — which cars it goes on. */
+  fits: string | null;
+  family_name: string | null;
 };
 type LocRow = { id: string; code: string; name: string; type: string; value: number; units: number };
 
@@ -67,6 +65,9 @@ export default function StockScreen() {
   // screen was picking the second reading every time it opened.
   const { data: rows, isLoading: rowsLoading } = useQuery<Row>(sq.sql, sq.params);
   const { data: locations, isLoading: locationsLoading } = useQuery<LocRow>(STOCK_VALUE_BY_LOCATION.sql);
+  const { data: waiting } = useQuery<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL`);
+  const waitingCount = waiting?.[0]?.n ?? 0;
   const { data: negative } = useQuery<{ id: string; sku: string; product_name: string; variant_name: string; location: string; qty: number; photo_path: string | null }>(
     `SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, l.name AS location, s.qty,
             (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
@@ -77,6 +78,8 @@ export default function StockScreen() {
       WHERE s.qty < 0 ORDER BY s.qty`);
 
   const showCost = can('catalog.view_cost');
+  const godown = (locations ?? []).find((l) => l.type !== 'damaged');
+  const kharab = (locations ?? []).find((l) => l.type === 'damaged');
 
   const all = rows ?? [];
   const counts = {
@@ -146,34 +149,45 @@ export default function StockScreen() {
         </>
       ) : null}
 
-      <SectionTitle>Maal kahan pada hai</SectionTitle>
-      {/* Grid, not a wrapping Row of flex: 1 children. That pattern looks right
-          in a browser and is broken on Android: flex: 1 means flexBasis 0, and
-          Yoga cannot work out the wrapped lines from a basis of nothing, so it
-          sized the container for ONE line of tiles. The first two came out
-          stretched to twice their height, and the second two were drawn on top
-          of the "Saara maal" heading and the first item below it. Every
-          screenshot taken in a browser showed it fine, which is how it reached
-          the owner's phone. Grid gives each cell a real basis. */}
+      {/* One godown, and the kharab corner beside it — maal that is broken
+          or came back, waiting to go to the supplier. Grid, not a wrapping Row
+          of flex: 1 children: on Android that pattern stacks tiles on top of
+          the next heading. */}
       {locationsLoading ? (
-        // Four, because the locations table is godown / counter / workshop /
-        // kharab and a shop rarely adds a fifth.
         <Grid min={150}>
-          {[0, 1, 2, 3].map((i) => <SkeletonTile key={i} />)}
+          {[0, 1].map((i) => <SkeletonTile key={i} />)}
         </Grid>
       ) : (
         <Grid min={150}>
-          {(locations ?? []).map((l) => (
+          {godown ? (
             <StatTile
-              key={l.id}
-              label={l.name}
-              value={String(Math.round(l.units))}
-              sub={`pcs${showCost ? ` · ${formatINRShort(l.value)}` : ''}`}
-              icon={(LOCATION_LOOK[l.type] ?? { icon: 'cube-outline' as IconName }).icon}
-              accent={(LOCATION_LOOK[l.type] ?? { accent: 'teal' }).accent}
-              tone={l.units < 0 ? 'danger' : undefined}
+              label="Godown"
+              value={String(Math.round(godown.units))}
+              sub={`pcs${showCost ? ` · ${formatINRShort(godown.value)}` : ''}`}
+              icon="business-outline"
+              accent="blue"
+              tone={godown.units < 0 ? 'danger' : undefined}
             />
-          ))}
+          ) : null}
+          <StatTile
+            label="Kharab maal"
+            value={String(Math.round(kharab?.units ?? 0))}
+            sub="pcs · supplier ko jaana hai"
+            icon="alert-circle-outline"
+            accent="amber"
+            onPress={() => router.push('/kharab' as never)}
+          />
+          {can('purchase.approve') && waitingCount > 0 ? (
+            <StatTile
+              label="Approval baaki"
+              value={String(waitingCount)}
+              sub="staff ki entry — rate bharo"
+              icon="checkmark-done-outline"
+              accent="rose"
+              tone="danger"
+              onPress={() => router.push('/requests')}
+            />
+          ) : null}
         </Grid>
       )}
 
@@ -200,6 +214,8 @@ export default function StockScreen() {
                 title={`${r.product_name} · ${r.variant_name}`}
                 subtitle={
                   <Row gap={space.sm} wrap>
+                    {r.specs ? <Text variant="small" color="text">{r.specs}</Text> : null}
+                    {r.fits ? <Text variant="small" color="info">{r.fits}</Text> : null}
                     <Text variant="small" color="textFaint" mono>{r.sku}</Text>
                     {showCost ? (
                       <Text variant="small" color="textMuted">

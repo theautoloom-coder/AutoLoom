@@ -23,7 +23,7 @@ export default function PaymentsScreen() {
   const { data: rows } = useQuery<P>(`
     SELECT p.*, COALESCE(c.name, s.name) AS party_name
     FROM payments p LEFT JOIN customers c ON c.id = p.party_id AND p.party_type = 'customer' LEFT JOIN suppliers s ON s.id = p.party_id AND p.party_type = 'supplier'
-    WHERE (?1 = 'all' OR p.direction = ?1) ORDER BY p.payment_date DESC, p.created_at DESC LIMIT 300`, [dir]);
+    WHERE p.party_type <> 'partner' AND (?1 = 'all' OR p.direction = ?1) ORDER BY p.payment_date DESC, p.created_at DESC LIMIT 300`, [dir]);
 
   async function reverse(p: P) {
     const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Reason (e.g. cheque bounced, entered twice)') : 'Reversed';

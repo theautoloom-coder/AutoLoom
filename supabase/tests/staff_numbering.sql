@@ -64,16 +64,17 @@ begin
   end;
 
   -- 4. A refused write takes the whole transaction with it. The movement goes
-  --    first and is perfectly valid; the damage write-off after it is not
-  --    allowed for a salesman. Before apply_crud the movement stayed.
+  --    first and is perfectly valid; the "found" correction after it — stock
+  --    added out of nowhere — needs stock.adjust, which staff do not hold.
+  --    Before apply_crud the movement stayed.
   begin
     perform public.apply_crud(jsonb_build_array(
       jsonb_build_object('op', 'PUT', 'table', 'stock_movements', 'id', mv, 'data', jsonb_build_object(
         'variant_id', variant, 'location_id', loc, 'qty', -1, 'movement_type', 'sale', 'unit_cost', 10, 'occurred_at', now())),
       jsonb_build_object('op', 'PUT', 'table', 'stock_adjustments', 'id', adj, 'data', jsonb_build_object(
-        'location_id', loc, 'reason', 'damage', 'status', 'draft', 'doc_date', current_date))
+        'location_id', loc, 'reason', 'found', 'status', 'draft', 'doc_date', current_date))
     ));
-    raise notice 'FAIL  a salesman wrote a damage write-off'; fail := fail + 1;
+    raise notice 'FAIL  a staff member added stock out of nowhere'; fail := fail + 1;
   exception when insufficient_privilege then
     raise notice 'PASS  the refused write raised 42501'; pass := pass + 1;
   end;

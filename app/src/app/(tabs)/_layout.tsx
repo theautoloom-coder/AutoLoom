@@ -71,15 +71,16 @@ type OwnerItem = NavItem & { badge?: number };
 function useOwnerNav(): OwnerItem[] {
   const { can } = useSession();
   const { data } = useQuery<{ pending: number }>(
-    "SELECT COUNT(*) AS pending FROM change_requests WHERE status = 'pending'");
+    `SELECT (SELECT COUNT(*) FROM change_requests WHERE status = 'pending')
+          + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL) AS pending`);
   const pending = data?.[0]?.pending ?? 0;
 
   const out: OwnerItem[] = [];
   if (can('catalog.edit') || can('admin.settings') || can('admin.users')) {
     out.push({ key: 'admin', href: '/admin', title: 'Admin', symbol: 'options-outline' });
   }
-  if (can('catalog.edit')) {
-    out.push({ key: 'requests', href: '/requests', title: 'Requests', symbol: 'checkmark-done-outline', badge: pending || undefined });
+  if (can('catalog.edit') || can('purchase.approve')) {
+    out.push({ key: 'requests', href: '/requests', title: 'Approval', symbol: 'checkmark-done-outline', badge: pending || undefined });
   }
   if (can('admin.users')) {
     out.push({ key: 'staff', href: '/admin/users', title: 'Staff', symbol: 'people-outline' });
@@ -93,11 +94,17 @@ function useNavItems(): NavItem[] {
   // Five places, named for what the shop calls them. Everything that used to
   // need a tab of its own — billing, search — is either inside one of these or
   // behind the "+", because a tab bar is for places you go, not jobs you do.
+  //
+  // A wholesaler lives in its ledgers, so Khata is a tab. The fourth place
+  // depends on who is holding the phone: staff get the day's bills, partners
+  // get Hisab — sale over time, munafa, partner money, reports — with the
+  // day's entries one tap inside it.
   return [
     { key: 'index', href: '/', title: 'Ghar', symbol: 'home' },
     { key: 'stock', href: '/stock', title: 'Stock', symbol: 'cube-outline', visible: sections.stock },
-    { key: 'parchi', href: '/parchi', title: 'Bill', symbol: 'receipt-outline' },
-    { key: 'hisab', href: '/hisab', title: 'Hisab', symbol: 'stats-chart-outline' },
+    { key: 'khata', href: '/khata', title: 'Khata', symbol: 'people-outline' },
+    { key: 'parchi', href: '/parchi', title: 'Bill', symbol: 'receipt-outline', visible: !sections.reports },
+    { key: 'hisab', href: '/hisab', title: 'Hisab', symbol: 'stats-chart-outline', visible: sections.reports },
     { key: 'more', href: '/more', title: 'Aur', symbol: 'ellipsis-horizontal' },
   ];
 }

@@ -36,9 +36,8 @@ export type SessionState = {
   /** Stamped onto every row this device writes. */
   actor: Actor;
   deviceId: string | null;
-  /** The location this user bills from by default. */
+  /** The godown. AutoLoom keeps all its stock in one place. */
   locationId: string | null;
-  setLocationId: (id: string) => void;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
 };
@@ -49,7 +48,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const system = useSystem();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [locationOverride, setLocationOverride] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,10 +101,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // same reason the server does it: an older code path may have written only
   // the primary, and a staff member whose permissions briefly resolve to
   // nothing sees every screen empty and assumes the app is broken.
+  //
+  // Only the three live roles count (migration 20261007100000): a leftover
+  // 'purchase' row from before the shop went wholesale grants nothing.
   const { data: permRows } = useQuery<{ permission: string }>(
     `SELECT DISTINCT rp.permission
        FROM role_permissions rp
-      WHERE rp.role IN (
+      WHERE rp.role IN ('owner', 'admin', 'staff')
+        AND rp.role IN (
         SELECT role FROM profile_roles WHERE profile_id = ?1
         UNION
         SELECT role FROM profiles WHERE id = ?1
@@ -116,7 +118,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   /** Every role this person holds, primary first. For display. */
   const { data: roleRows } = useQuery<{ role: string }>(
-    'SELECT role FROM profile_roles WHERE profile_id = ? ORDER BY role',
+    `SELECT role FROM profile_roles WHERE profile_id = ? AND role IN ('owner', 'admin', 'staff') ORDER BY role`,
     [userId ?? '']
   );
   const roles = useMemo(() => {
@@ -133,11 +135,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // much as a draft: the insert is refused by the server, PowerSync reverts the
   // local row, and the screen sits on "Preparing draft…" for ever with nothing
   // to explain it. A profile with no default_location_id is ordinary — the
-  // owner's own profile has none — so fall back to the shop's first location
-  // rather than to null. The user can still switch it from More.
+  // owner's own profile has none. AutoLoom has one godown, so every session
+  // works there; the kharab corner is a place stock waits, not one to work from.
   const { data: locationRows } = useQuery<{ id: string }>(
-    'SELECT id FROM locations WHERE is_active = 1 ORDER BY sort_order, name LIMIT 1');
-  const firstLocationId = locationRows?.[0]?.id ?? null;
+    `SELECT id FROM locations WHERE is_active = 1 AND type <> 'damaged'
+      ORDER BY CASE type WHEN 'warehouse' THEN 0 ELSE 1 END, sort_order, name LIMIT 1`);
+  const godownId = locationRows?.[0]?.id ?? null;
 
   const value = useMemo<SessionState>(
     () => ({
@@ -149,8 +152,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       can: (p) => can(permissions, p),
       actor: { userId, deviceId },
       deviceId,
-      locationId: locationOverride ?? profile?.default_location_id ?? firstLocationId,
-      setLocationId: setLocationOverride,
+      locationId: godownId ?? profile?.default_location_id ?? null,
       async signIn(email, password) {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         return error ? friendlyAuthError(error.message) : null;
@@ -160,7 +162,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
       },
     }),
-    [loading, session, profile, permissions, roles, locationOverride, firstLocationId, system, userId, deviceId]
+    [loading, session, profile, permissions, roles, godownId, system, userId, deviceId]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

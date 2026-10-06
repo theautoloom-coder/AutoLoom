@@ -28,13 +28,14 @@
  * commented at the line where somebody would expect to find it.
  */
 import { useQuery } from '@powersync/react';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { formatINR, toDateString } from '@domain';
 
 import { useSession } from '@/lib/session';
-import { Card, Chip, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
+import { Button, Card, Chip, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
 import { Sheet } from '@/ui/sheet';
 import { Skeleton } from '@/ui/skeleton';
 import { space } from '@/ui/theme';
@@ -334,6 +335,7 @@ function Line({
 
 export default function HisabScreen() {
   const { can } = useSession();
+  const router = useRouter();
   // Cost, munafa and loss: owner and admin only.
   const showProfit = can('reports.view_margin');
   const t = useTheme();
@@ -397,6 +399,16 @@ export default function HisabScreen() {
           Kitna bika, kitna kharcha hua, aur kitna bacha.
         </Text>
       </View>
+
+      {/* The day's entries and the PDFs live one tap in from here: the
+          partners' fourth tab is Hisab, not the staff's Bill list. */}
+      <Row gap={space.sm} wrap>
+        <Button title="Saari entries" tone="secondary" size="sm" onPress={() => router.push('/parchi')} />
+        <Button title="Report — PDF" tone="secondary" size="sm" onPress={() => router.push('/reports' as never)} />
+        {can('partner.capital') ? (
+          <Button title="Partner ka paisa" tone="secondary" size="sm" onPress={() => router.push('/partner-paisa' as never)} />
+        ) : null}
+      </Row>
 
       <Row gap={space.xs} wrap>
         {PRESETS.map(([k, label]) => (

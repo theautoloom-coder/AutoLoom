@@ -55,6 +55,11 @@ export default function HomeScreen() {
   // that — so the counter hand saw the day's profit on the first screen.
   const showProfit = can('reports.view_margin');
   const showCost = can('catalog.view_cost');
+  const seeTotals = can('reports.view');
+  const approver = can('purchase.approve');
+  const { data: waitingRows } = useQuery<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL`);
+  const waiting = waitingRows?.[0]?.n ?? 0;
   // Same count the Grid below renders, so the grey tiles and the real ones
   // occupy the same rows and nothing reflows underneath them.
   const tileCount = 3 + (showProfit ? 1 : 0) + (showCost ? 1 : 0);
@@ -112,8 +117,19 @@ export default function HomeScreen() {
         </Grid>
       ) : (
         <Grid min={150}>
-          <StatTile label="Aaj ki sale" value={formatINR(takings)} sub={`${k?.invoices_today ?? 0} bill`} icon="trending-up-outline" accent="blue" onPress={() => router.push('/parchi')} />
-          <StatTile label="Aaj ka kharcha" value={formatINR(spent)} sub="business ka" icon="wallet-outline" accent="amber" onPress={() => router.push('/expenses')} />
+          {/* The day's total sale is the partners' number (owner, 6 Oct 2026);
+              staff see how many bills went out, which is what they act on. */}
+          {seeTotals ? (
+            <StatTile label="Aaj ki sale" value={formatINR(takings)} sub={`${k?.invoices_today ?? 0} bill`} icon="trending-up-outline" accent="blue" onPress={() => router.push('/hisab')} />
+          ) : (
+            <StatTile label="Aaj ke bill" value={String(k?.invoices_today ?? 0)} sub="bill bane" icon="receipt-outline" accent="blue" onPress={() => router.push('/parchi')} />
+          )}
+          {seeTotals ? (
+            <StatTile label="Aaj ka kharcha" value={formatINR(spent)} sub="business ka" icon="wallet-outline" accent="amber" onPress={() => router.push('/expenses')} />
+          ) : null}
+          {approver && waiting > 0 ? (
+            <StatTile label="Approval baaki" value={String(waiting)} sub="staff ka maal — rate bharo" icon="checkmark-done-outline" accent="rose" tone="danger" onPress={() => router.push('/requests')} />
+          ) : null}
           {showProfit ? (
             <StatTile
               label="Aaj ka munafa"

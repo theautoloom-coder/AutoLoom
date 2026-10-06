@@ -71,11 +71,11 @@ on conflict (code) do nothing;
 -- -----------------------------------------------------------------------------
 -- Locations
 -- -----------------------------------------------------------------------------
+-- One godown, and the corner where kharab maal waits for the supplier
+-- (owner, 6 Oct 2026: AutoLoom is a wholesaler — no counter, no workshop).
 insert into public.locations (code, name, type, sort_order) values
-  ('MAIN', 'Main Warehouse', 'warehouse', 1),
-  ('SHOP', 'Shop Counter',   'shop',      2),
-  ('WSHP', 'Workshop',       'workshop',  3),
-  ('DMGD', 'Damaged / Returns', 'damaged', 9)
+  ('MAIN', 'AutoLoom', 'warehouse', 1),
+  ('DMGD', 'Kharab maal', 'damaged', 9)
 on conflict (code) do nothing;
 
 -- -----------------------------------------------------------------------------
@@ -93,39 +93,40 @@ on conflict (code) do nothing;
 insert into public.role_permissions (role, permission)
 select r.role, p.permission
 from (values
-  -- permission,                 admin owner purch sales whse  acct  wshop
-  ('catalog.view',                true, true, true, true, true, true, true),
-  ('catalog.edit',                true, true, false,false,false,false,false),
-  ('catalog.edit_price',          true, true, false,false,false,false,false),
-  ('catalog.view_cost',           true, true, false,false,false,false,false),
-  ('purchase.create',             true, true, true, false,true, false,false),
-  ('purchase.cancel',             true, true, false,false,false,false,false),
-  ('sale.create',                 true, true, false,true, false,false,true),
-  ('sale.override_price',         true, true, false,false,false,false,false),
-  ('sale.override_credit',        true, true, false,false,false,false,false),
-  ('sale.cancel',                 true, true, false,false,false,false,false),
-  ('sale.return',                 true, true, false,true, false,true, false),
-  ('payment.receive',             true, true, false,true, false,true, true),
-  ('payment.pay_supplier',        true, true, true, false,false,true, false),
-  ('expense.record',              true, true, false,false,false,true, false),
-  ('stock.transfer',              true, true, false,false,true, false,true),
-  ('stock.count',                 true, true, false,false,true, false,true),
-  ('stock.damage',                true, true, false,false,true, false,false),
-  ('stock.adjust',                true, true, false,false,false,false,false),
-  ('party.edit',                  true, true, true, true, false,true, false),
-  ('party.edit_credit_limit',     true, true, false,false,false,false,false),
-  ('jobcard.edit',                true, true, false,false,false,false,true),
-  ('reports.view',                true, true, false,false,false,true, false),
-  ('reports.view_margin',         true, true, false,false,false,false,false),
-  -- The owner hires the staff and sets the shop's own details; see
-  -- migration 20260922140000. Kept in step with it so a db reset agrees.
-  ('admin.users',                 true, true, false,false,false,false,false),
-  ('admin.settings',              true, true, false,false,false,false,false)
-) as p(permission, a, o, pu, s, w, ac, ws)
-cross join lateral (values
-  ('admin', p.a), ('owner', p.o), ('purchase', p.pu), ('sales', p.s),
-  ('warehouse', p.w), ('accounts', p.ac), ('workshop', p.ws)
-) as r(role, granted)
+  -- permission,                 admin owner staff
+  -- The partners (owner) and the admin do everything; staff count stock in
+  -- (it waits for approval), bill it out, take money, write a small kharcha,
+  -- put kharab maal aside and open a party on the spot. Kept in step with
+  -- migration 20261007100000 so a db reset agrees with production.
+  ('catalog.view',                true, true, true),
+  ('catalog.edit',                true, true, false),
+  ('catalog.edit_price',          true, true, false),
+  ('catalog.view_cost',           true, true, false),
+  ('purchase.create',             true, true, true),
+  ('purchase.approve',            true, true, false),
+  ('purchase.cancel',             true, true, false),
+  ('sale.create',                 true, true, true),
+  ('sale.override_price',         true, true, false),
+  ('sale.override_credit',        true, true, false),
+  ('sale.cancel',                 true, true, false),
+  ('sale.return',                 true, true, true),
+  ('payment.receive',             true, true, true),
+  ('payment.pay_supplier',        true, true, false),
+  ('expense.record',              true, true, true),
+  ('stock.transfer',              true, true, false),
+  ('stock.count',                 true, true, true),
+  ('stock.damage',                true, true, true),
+  ('stock.adjust',                true, true, false),
+  ('party.edit',                  true, true, true),
+  ('party.edit_credit_limit',     true, true, false),
+  ('jobcard.edit',                true, true, false),
+  ('reports.view',                true, true, false),
+  ('reports.view_margin',         true, true, false),
+  ('partner.capital',             true, true, false),
+  ('admin.users',                 true, true, false),
+  ('admin.settings',              true, true, false)
+) as p(permission, a, o, st)
+cross join lateral (values ('admin', p.a), ('owner', p.o), ('staff', p.st)) as r(role, granted)
 where r.granted
 on conflict (role, permission) do nothing;
 
@@ -135,16 +136,16 @@ on conflict (role, permission) do nothing;
 insert into public.document_sequences (series_code, doc_type, financial_year, prefix, next_number, location_id)
 select v.series, v.doc_type, '26-27', v.prefix, 1, l.id
 from (values
-  ('A', 'sales_invoice',    'NOI/A/26-27/', 'SHOP'),
-  ('A', 'credit_note',      'CN/A/26-27/',  'SHOP'),
-  ('A', 'payment_in',       'RCP/26-27/',   'SHOP'),
+  ('A', 'sales_invoice',    'NOI/A/26-27/', 'MAIN'),
+  ('A', 'credit_note',      'CN/A/26-27/',  'MAIN'),
+  ('A', 'payment_in',       'RCP/26-27/',   'MAIN'),
   ('A', 'purchase',         'PUR/26-27/',   'MAIN'),
   ('A', 'debit_note',       'DN/26-27/',    'MAIN'),
   ('A', 'payment_out',      'PAY/26-27/',   'MAIN'),
   ('A', 'stock_adjustment', 'ADJ/26-27/',   'MAIN'),
   ('A', 'stock_transfer',   'TRF/26-27/',   'MAIN'),
   ('A', 'stock_audit',      'AUD/26-27/',   'MAIN'),
-  ('A', 'job_card',         'JOB/26-27/',   'WSHP')
+  ('A', 'job_card',         'JOB/26-27/',   'MAIN')
 ) as v(series, doc_type, prefix, loc)
 join public.locations l on l.code = v.loc
 on conflict (series_code, doc_type, financial_year) do nothing;

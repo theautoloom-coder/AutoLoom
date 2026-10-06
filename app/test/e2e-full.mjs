@@ -87,9 +87,7 @@ console.log('\n▸ Bill Banao');
 {
   const before = num("select count(*) from sales_invoices where status='posted'");
   await go('/invoice/edit', 6500);
-  await page.getByText('Chuno…').first().click();
-  await page.waitForTimeout(1500);
-  await page.getByText('Walk-in Customer', { exact: true }).first().click();
+  // A new bill opens on the cash customer (Walk-in) already.
   await page.waitForTimeout(1500);
   await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
   await page.waitForTimeout(2800);
@@ -143,15 +141,17 @@ console.log('\n▸ Maal wapas');
 // ---------------------------------------------------------------------------
 console.log('\n▸ Kharab Likho');
 {
-  const before = num("select count(*) from stock_movements where movement_type='damage'");
+  // Broken maal is set aside, not written off (owner, 6 Oct 2026): it moves
+  // into the kharab corner and waits there for the supplier. No loss yet.
+  const kharab = () => num("select coalesce(sum(m.qty),0) from stock_movements m join locations l on l.id = m.location_id where l.type = 'damaged'");
+  const before = kharab();
+  const losses = num("select count(*) from stock_movements where movement_type='damage'");
   await go('/kharab-maal', 6500);
-  await page.getByText('Kharab', { exact: true }).first().click().catch(() => {});
-  await page.waitForTimeout(400);
   await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
   await page.waitForTimeout(2800);
   await page.getByText(/X-tremeVision/i).first().click();
   await page.waitForTimeout(2500);
-  const btn = page.getByRole('button', { name: /kharab likh do/i });
+  const btn = page.getByRole('button', { name: /kharab mein daalo/i });
   if (await btn.isEnabled().catch(() => false)) {
     await btn.click();
     await page.waitForTimeout(2000);
@@ -160,10 +160,8 @@ console.log('\n▸ Kharab Likho');
   } else {
     check('kharab button enabled', false, 'stayed disabled');
   }
-  const after = num("select count(*) from stock_movements where movement_type='damage'");
-  check('damage movement written', after === before + 1, `${before} → ${after}`);
-  const dcost = num("select coalesce(unit_cost,0) from stock_movements where movement_type='damage' order by created_at desc limit 1");
-  check('damage carries a cost, so the loss is real money', dcost > 0, `unit_cost ${dcost}`);
+  check('maal moved into the kharab corner', kharab() === before + 1, `${before} → ${kharab()}`);
+  check('no loss booked for maal set aside', num("select count(*) from stock_movements where movement_type='damage'") === losses);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,8 +208,8 @@ console.log('\n▸ the books agree');
 
 // ---------------------------------------------------------------------------
 console.log('\n▸ every screen still renders');
-const SCREENS = ['/', '/stock', '/parchi', '/hisab', '/more', '/search', '/help', '/warehouse',
-  '/customers', '/suppliers', '/reminders', '/reorder', '/stock-check', '/partner-kharcha',
+const SCREENS = ['/', '/stock', '/parchi', '/hisab', '/more', '/search', '/help', '/kharab',
+  '/customers', '/suppliers', '/reminders', '/reorder', '/stock-check', '/partner-paisa',
   '/admin', '/admin/users', '/admin/item', '/admin/products', '/purchases', '/payments'];
 let broken = 0;
 for (const p of SCREENS) {

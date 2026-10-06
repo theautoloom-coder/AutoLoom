@@ -53,9 +53,7 @@ for (const k of (process.env.SKIP_KHARCHA ? [] : KHARCHA)) {
 await page.goto(base + '/invoice/edit', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForTimeout(6000);
 
-await page.getByText('Chuno…').first().click();
-await page.waitForTimeout(1500);
-await page.getByText('Walk-in Customer', { exact: true }).first().click();
+// A new bill opens on the cash customer (Walk-in) already.
 await page.waitForTimeout(2000);
 
 const search = page.getByPlaceholder('Scan karo ya SKU / naam likho');

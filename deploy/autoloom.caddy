@@ -1,4 +1,8 @@
 # --- AutoLoom ----------------------------------------------------------------
+# OLD VPS (38.49.209.165) ONLY. Since 6 Oct 2026 app.theautoloom.in is served by
+# the Oracle Cloud Mumbai server from /opt/theautoloom/www; that config lives in
+# the store repo, deploy/oracle/theautoloom.caddy. Kept for reference.
+#
 # The shop's khata / billing app. This is a static bundle: the browser talks to
 # Supabase and PowerSync directly, so there is no application server here, no
 # database on this box and nothing to keep running. Caddy obtains and renews the

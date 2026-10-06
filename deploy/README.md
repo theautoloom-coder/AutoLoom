@@ -1,69 +1,55 @@
-# Deploying AutoLoom to the VPS
+# Deploying AutoLoom
 
 The web app is a static bundle. It talks to Supabase and PowerSync directly
 from the browser, so the server only ever serves files — no Node process, no
-database on the VPS, nothing to keep running.
+database on the server, nothing to keep running.
 
 ## The server this deploys to
 
-`root@38.49.209.165` — Ubuntu 26.04, reached with the key at
-`D:\Gulshan\Keys\ServoRica_TradeOS`.
+The **Oracle Cloud Mumbai** server, `theautoloom@137.23.39.214`, reached with
+the key `C:\Users\91971\.ssh\theautoloom_oracle` (moved there from the old
+VPS, 38.49.209.165, on 6 Oct 2026). It also runs the store
+(theautoloom.in), which owns the setup:
 
-**This box is shared.** It already runs seven other sites behind **Caddy**,
-including a payment gateway, so:
+- Everything AutoLoom serves lives in `/opt/theautoloom/www`: `autoloom/`
+  (the app), `autoloom-download/` (the APK), `autoloom-install/` (the install
+  page), `autoloom-manual/` (the PDF manual).
+- **Caddy** serves `app.theautoloom.in` from the site file
+  `/etc/caddy/sites/theautoloom.caddy`. Its source of truth is
+  `deploy/oracle/theautoloom.caddy` in the **store** repo
+  (TheAutoLoomStore); `deploy/autoloom.caddy` here is only the old VPS copy.
+- **DNS is at Cloudflare**, proxied (orange cloud): `app` is an A record to
+  137.23.39.214. The server only accepts Cloudflare's IPs, and presents a
+  Cloudflare Origin CA certificate (`/opt/theautoloom/tls`).
+- The box is shared with other apps: never touch anything outside
+  `/opt/theautoloom`.
 
-- **Caddy is the web server, not nginx.** nginx is installed but stopped, and
-  must stay stopped — starting it would fight Caddy for ports 80 and 443 and
-  take every other site down with it.
-- Caddy gets and renews its own Let's Encrypt certificates. There is no
-  certbot step.
-- AutoLoom only ever adds one hostname block and one directory. Nothing above
-  its block in the Caddyfile is touched.
+## Every deploy: push to main
 
-## One time
-
-### 1. DNS
-
-There is no wildcard record, so the subdomain needs its own. DNS for
-`theautoloom.in` is at **BigRock**. The root domain is for the product
-website; the app lives on a subdomain.
-
-| Type | Name       | Value            | TTL      |
-|------|------------|------------------|----------|
-| A    | `app`      | `38.49.209.165`  | lowest   |
-
-BigRock warns the record takes 4–6 hours to take effect. Check it landed
-before going further — Caddy cannot get a certificate for a name that does
-not resolve:
+The server checks GitHub every 2 minutes. When `main` has moved, it builds the
+bundle on the server (the `appbuild` container, running this repo's
+`deploy/build-and-deploy.sh` with the `local` target) and swaps it in. A failed
+build changes nothing — the previous bundle keeps serving. Status and logs:
 
 ```bash
-dig +short app.theautoloom.in      # must print 38.49.209.165
+ssh -i ~/.ssh/theautoloom_oracle theautoloom@137.23.39.214 tail /opt/theautoloom/deploy/autodeploy.log
 ```
 
-### 2. The Caddy block
+The first push after the switch-over is what starts it: until then the server
+leaves the live bundle alone.
+
+## Deploying by hand (a build that is not pushed yet)
 
 ```bash
-# Back up first — this file is what keeps the other seven sites online.
-cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak-$(date +%F-%H%M%S)
-cat deploy/autoloom.caddy >> /etc/caddy/Caddyfile
-
-# validate BEFORE reload: a refused reload leaves the running config alone,
-# so a mistake here cannot take the other sites down.
-caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+./deploy/build-and-deploy.sh
 ```
 
-The certificate is issued on the first request, within a few seconds.
+It builds against production here, checks the PWA files are present, uploads
+into `/opt/theautoloom/www/autoloom` and swaps it in. Takes a couple of
+minutes, most of it the bundle. No Caddy reload is needed.
 
-## Every deploy, from this repo
-
-```bash
-SSH_KEY="/d/Gulshan/Keys/ServoRica_TradeOS" \
-  ./deploy/build-and-deploy.sh app.theautoloom.in root@38.49.209.165
-```
-
-It builds against production, checks the PWA files are present, rsyncs into
-`/var/www/autoloom`, validates the Caddy config and reloads. Takes a couple of
-minutes, most of it the bundle.
+The APK: `node scripts/ship-apk.mjs` (from `app/`) has the server fetch the
+finished EAS build into `/opt/theautoloom/www/autoloom-download`.
 
 ## On the iPhone
 
@@ -114,6 +100,13 @@ ever removed, the public anon key becomes enough to create an admin login.
 ## Rolling back
 
 The deploy only replaces files in one directory, so checking out the previous
-commit and re-running the deploy script undoes it. To take the site off the
-internet entirely, delete its block from the Caddyfile and reload — or restore
-one of the `/etc/caddy/Caddyfile.bak-*` copies.
+commit and re-running the deploy script undoes it. Faster, the build it
+replaced is still on the server:
+
+```bash
+ssh -i ~/.ssh/theautoloom_oracle theautoloom@137.23.39.214 \
+  'cd /opt/theautoloom/www && mv autoloom autoloom.bad && mv autoloom.old autoloom'
+```
+
+To take the site off the internet entirely, remove the `app.theautoloom.in`
+block from `deploy/oracle/theautoloom.caddy` in the store repo and deploy that.

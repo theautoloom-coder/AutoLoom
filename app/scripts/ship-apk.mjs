@@ -5,7 +5,7 @@
  *
  * With no id it takes the most recent Android build.
  *
- * The APK is fetched **by the VPS**, not through this machine: the server sits
+ * The APK is fetched **by the server**, not through this machine: the server sits
  * on a fast link and a laptop on shop wifi does not, so pulling 40 MB down and
  * pushing it back up is the slowest possible route. The artifact URL is public
  * and unguessable, so curl on the far end is all it takes.
@@ -16,6 +16,8 @@
  */
 import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 // eas-cli reads EXPO_TOKEN from the environment and npm does not load .env, so
 // without this the script runs unauthenticated and reports "Not logged in" as
@@ -35,9 +37,12 @@ if (!process.env.EXPO_TOKEN) {
   process.exit(1);
 }
 
-const SSH_KEY = process.env.SSH_KEY ?? '/d/Gulshan/Keys/ServoRica_TradeOS';
-const HOST = process.env.APK_HOST ?? 'root@38.49.209.165';
-const DEST = '/var/www/autoloom-download/autoloom.apk';
+// The Oracle Cloud Mumbai server. The download directory sits next to the web
+// app (/opt/theautoloom/www/autoloom) so a web deploy never takes the APK with it.
+const SSH_KEY = process.env.SSH_KEY ?? join(homedir(), '.ssh', 'theautoloom_oracle');
+const HOST = process.env.APK_HOST ?? 'theautoloom@137.23.39.214';
+const DIR = '/opt/theautoloom/www/autoloom-download';
+const DEST = `${DIR}/autoloom.apk`;
 const buildId = process.argv[2];
 
 // execSync, not execFileSync: on Windows `npx` is a .cmd shim and cannot be
@@ -110,7 +115,8 @@ console.log(`\n▸ artifact ${url}`);
 console.log('▸ server is downloading it');
 const out = ssh(
   `set -e
-   cd /var/www/autoloom-download
+   mkdir -p ${DIR}
+   cd ${DIR}
    curl -fSL --retry 3 --retry-delay 5 -o autoloom.apk.part "${url}"
    size=$(stat -c%s autoloom.apk.part)
    # An APK is a ZIP: the first two bytes are PK. Anything else is an error page.
@@ -118,8 +124,8 @@ const out = ssh(
    if [ "$magic" != "PK" ] || [ "$size" -lt 1000000 ]; then
      rm -f autoloom.apk.part; echo "BAD: $size bytes, magic '$magic'"; exit 1
    fi
+   chmod 644 autoloom.apk.part
    mv autoloom.apk.part ${DEST}
-   chown caddy:caddy ${DEST}
    echo "OK $(numfmt --to=iec $size)"`,
 );
 console.log(`  ${out.trim()}`);
@@ -129,7 +135,9 @@ console.log(`  ${out.trim()}`);
 // about what a phone gets: Cloudflare sits in front, and the first time this
 // shipped it went on handing out the previous APK for hours while this line
 // printed a healthy 200. A deploy nobody can download is not a deploy.
-const origin = ssh(`curl -sS -o /dev/null -m 60 -w "%{http_code} %{size_download}" --resolve app.theautoloom.in:443:127.0.0.1 https://app.theautoloom.in/download/autoloom.apk`);
+// -k: the box presents a Cloudflare Origin CA certificate, which only
+// Cloudflare trusts; the request is pinned to 127.0.0.1, so nothing is lost.
+const origin = ssh(`curl -sSk -o /dev/null -m 60 -w "%{http_code} %{size_download}" --resolve app.theautoloom.in:443:127.0.0.1 https://app.theautoloom.in/download/autoloom.apk`);
 console.log(`▸ origin: HTTP ${origin.trim()}`);
 const originSize = Number(origin.trim().split(' ')[1] ?? 0);
 

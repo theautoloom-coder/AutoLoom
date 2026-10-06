@@ -89,7 +89,9 @@ export default function StockChadhao() {
         label: `${v.product_name} · ${v.variant_name}`,
         sku: v.sku,
         qty: 1,
-        rate: v.last_purchase_cost || v.avg_cost || 0,
+        // Only for those allowed to see buy rates; everyone else types the
+        // rate off the supplier's bill in their hand.
+        rate: can('catalog.view_cost') ? v.last_purchase_cost || v.avg_cost || 0 : 0,
       }];
     });
   }
@@ -105,6 +107,11 @@ export default function StockChadhao() {
     if (!supplierId) { notify('Supplier chuno — ya naam likh ke naya bana lo.', 'danger'); return; }
     if (usable.length === 0) { notify('Kam se kam ek item daalo.', 'danger'); return; }
     if (!locationId) { notify('Location nahi mili. Admin se location set karwao.', 'danger'); return; }
+    // Staff no longer get last time's rate filled in (buy rates are the
+    // owner's), so a forgotten rate would post the supplier's bill at ₹0 —
+    // their khata would say the shop owes nothing for maal it received.
+    const noRate = usable.find((l) => !(l.rate > 0));
+    if (noRate) { notify(`${noRate.label}: ek ka rate likho — supplier ke bill se.`, 'danger'); return; }
     // A NOT NULL date column will not take "", and PowerSync discards the
     // whole transaction server-side when it tries — silently, long after
     // the screen said it saved. Catch it here, where the person can fix it.

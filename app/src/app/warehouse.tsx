@@ -63,7 +63,7 @@ export default function Warehouse() {
     [openLoc ?? '']
   );
 
-  const showMoney = can('catalog.view_cost') || can('reports.view');
+  const showMoney = can('catalog.view_cost');
   const here = items ?? [];
 
   return (

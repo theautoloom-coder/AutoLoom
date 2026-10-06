@@ -37,6 +37,7 @@ import {
   Card, Chip, Divider, Empty, IconBadge, Input, ListRow, Row, Screen, SectionTitle, Text,
   type IconName,
 } from '@/ui';
+import { useSession } from '@/lib/session';
 import { clockOf, KIND } from '@/ui/kinds';
 import { Skeleton, SkeletonList } from '@/ui/skeleton';
 import { space } from '@/ui/theme';
@@ -175,6 +176,9 @@ function Bar({ width }: { width: number }) {
 
 export default function ParchiScreen() {
   const router = useRouter();
+  const { can } = useSession();
+  // What a purchase cost is the owner's number; staff see the maal, not the rate.
+  const showCost = can('catalog.view_cost');
   const today = toDateString();
   const [range, setRange] = useState<RangeKey>('aaj');
   const [custom, setCustom] = useState(today);
@@ -385,7 +389,7 @@ export default function ParchiScreen() {
                       }
                       right={
                         <View style={{ alignItems: 'flex-end' }}>
-                          {e.amount != null ? (
+                          {e.amount != null && (e.kind !== 'purchase' || showCost) ? (
                             <Text mono color={look.sign === '−' ? 'warn' : 'text'}>
                               {look.sign}
                               {formatINR(e.amount)}

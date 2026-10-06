@@ -98,7 +98,7 @@ export default function SupplierScreen() {
             <SectionTitle>Inse aane wala maal</SectionTitle>
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(top ?? []).map((p) => (
-                <ListRow key={p.id} title={`${p.product_name} · ${p.variant_name}`} subtitle={`${p.sku} · aakhri baar ${dayLabel(p.last_date)}`} right={<View style={{ alignItems: 'flex-end' }}><Text mono>{p.qty} pcs</Text><Text variant="small" color="textMuted" mono>@ {formatINR(p.last_rate)}</Text></View>} />
+                <ListRow key={p.id} title={`${p.product_name} · ${p.variant_name}`} subtitle={`${p.sku} · aakhri baar ${dayLabel(p.last_date)}`} right={<View style={{ alignItems: 'flex-end' }}><Text mono>{p.qty} pcs</Text>{can('catalog.view_cost') ? <Text variant="small" color="textMuted" mono>@ {formatINR(p.last_rate)}</Text> : null}</View>} />
               ))}
               {(top ?? []).length === 0 ? <Empty title="Abhi tak kuch nahi kharida" /> : null}
             </Card>

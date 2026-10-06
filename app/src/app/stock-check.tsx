@@ -215,7 +215,7 @@ export default function GintiKaro() {
             ))}
           </Card>
 
-          {lossValue > 0 ? (
+          {lossValue > 0 && can('catalog.view_cost') ? (
             <Card>
               <Row style={{ justifyContent: 'space-between' }}>
                 <Text color="textMuted">Kam nikla maal</Text>

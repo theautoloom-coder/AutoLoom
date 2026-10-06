@@ -97,7 +97,7 @@ from (values
   ('catalog.view',                true, true, true, true, true, true, true),
   ('catalog.edit',                true, true, false,false,false,false,false),
   ('catalog.edit_price',          true, true, false,false,false,false,false),
-  ('catalog.view_cost',           true, true, true, false,false,true, false),
+  ('catalog.view_cost',           true, true, false,false,false,false,false),
   ('purchase.create',             true, true, true, false,true, false,false),
   ('purchase.cancel',             true, true, false,false,false,false,false),
   ('sale.create',                 true, true, false,true, false,false,true),

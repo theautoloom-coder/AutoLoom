@@ -63,6 +63,7 @@ export default function KharabLikho() {
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
+  const showCost = can('catalog.view_cost');
   const { variant: variantParam } = useLocalSearchParams<{ variant?: string }>();
 
   const [reasonKey, setReasonKey] = useState<string>('kharab');
@@ -138,7 +139,9 @@ export default function KharabLikho() {
 
     const ok = await confirm(
       `${totalQty} pcs kharab likhein?`,
-      `${reason.label} · ${formatINR(totalLoss)} ka nuksan. Stock abhi kam ho jaayega.`
+      showCost
+        ? `${reason.label} · ${formatINR(totalLoss)} ka nuksan. Stock abhi kam ho jaayega.`
+        : `${reason.label}. Stock abhi kam ho jaayega.`
     );
     if (!ok) return;
 
@@ -266,6 +269,9 @@ export default function KharabLikho() {
                       onSubmitEditing={() => costRefs.current.get(l.variantId)?.focus()}
                       submitBehavior="submit"
                     />
+                    {/* The godown writes off kharab maal but does not see what
+                        it cost; the average cost is recorded without showing. */}
+                    {showCost ? (
                     <Input
                       ref={(r) => { costRefs.current.set(l.variantId, r); }}
                       containerStyle={{ flex: 1 }}
@@ -276,9 +282,12 @@ export default function KharabLikho() {
                       hint="Isi se nuksan gina jaata hai"
                       returnKeyType="done"
                     />
+                    ) : null}
                   </Row>
-                  <Text variant="small" color={l.cost ? 'textFaint' : 'danger'}>
-                    {l.cost
+                  <Text variant="small" color={l.cost || !showCost ? 'textFaint' : 'danger'}>
+                    {!showCost
+                      ? `${l.sku} · abhi ${here} → ${here - l.qty}`
+                      : l.cost
                       ? `${l.sku} · abhi ${here} → ${here - l.qty} · ${formatINR(l.qty * l.cost)} ka nuksan`
                       : `${l.sku} · abhi ${here} → ${here - l.qty} · rate nahi pata, nuksan ₹0 ginega — rate bhar do`}
                   </Text>
@@ -299,9 +308,9 @@ export default function KharabLikho() {
             <SectionTitle>Kul</SectionTitle>
             <Row style={{ justifyContent: 'space-between' }}>
               <Text color="textMuted">{totalQty} pcs · {reason.label}</Text>
-              <Text variant="number" color="danger">−{formatINR(totalLoss)}</Text>
+              {showCost ? <Text variant="number" color="danger">−{formatINR(totalLoss)}</Text> : null}
             </Row>
-            {anyZeroCost ? (
+            {showCost && anyZeroCost ? (
               <Text variant="small" color="danger">
                 Kuch item ka rate nahi bhara — utna nuksan hisab mein nahi dikhega.
               </Text>

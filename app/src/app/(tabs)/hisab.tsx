@@ -334,6 +334,8 @@ function Line({
 
 export default function HisabScreen() {
   const { can } = useSession();
+  // Cost, munafa and loss: owner and admin only.
+  const showProfit = can('reports.view_margin');
   const t = useTheme();
 
   const [preset, setPreset] = useState<Preset>('mahina');
@@ -426,18 +428,27 @@ export default function HisabScreen() {
 
       <Card keyline style={{ padding: 0, gap: 0, paddingVertical: space.sm }}>
         <Line label="Sale" hint="Pakke bill ka total" value={sale} loading={isLoading} onPress={() => setOpen('sale')} />
-        <Line label="Maal Ki Cost" hint="Jo maal bika, uski cost" value={cogs} minus loading={isLoading} onPress={() => setOpen('cogs')} />
+        {/* Cost, munafa and loss are the owner's (owner's call, 6 Oct 2026).
+            The Hisaab role keeps sale and kharcha — what it reconciles. */}
+        {showProfit ? (
+          <>
+            <Line label="Maal Ki Cost" hint="Jo maal bika, uski cost" value={cogs} minus loading={isLoading} onPress={() => setOpen('cogs')} />
 
-        <Divider style={{ marginVertical: 4 }} />
-        <Line label="Maal par munafa" hint="Sale minus maal ki cost" value={gross} tone="rule" loading={isLoading} onPress={() => setOpen('gross')} />
-        <Divider style={{ marginVertical: 4 }} />
+            <Divider style={{ marginVertical: 4 }} />
+            <Line label="Maal par munafa" hint="Sale minus maal ki cost" value={gross} tone="rule" loading={isLoading} onPress={() => setOpen('gross')} />
+            <Divider style={{ marginVertical: 4 }} />
+          </>
+        ) : null}
 
         <Line label="Business Kharcha" hint="Rent, bijli, diesel, chai" value={kharcha} minus loading={isLoading} onPress={() => setOpen('kharcha')} />
-        <Line label="Kharab / Loss" hint="Toota-phoota maal ki cost" value={damage} minus loading={isLoading} onPress={() => setOpen('damage')} />
+        {showProfit ? (
+          <Line label="Kharab / Loss" hint="Toota-phoota maal ki cost" value={damage} minus loading={isLoading} onPress={() => setOpen('damage')} />
+        ) : null}
 
-        <Divider style={{ marginTop: 4 }} />
+        {showProfit ? <Divider style={{ marginTop: 4 }} /> : null}
 
         {/* The reason the screen exists — so it gets the one hero figure. */}
+        {showProfit ? (
         <Pressable
           onPress={() => setOpen('munafa')}
           disabled={isLoading}
@@ -474,6 +485,7 @@ export default function HisabScreen() {
             </Text>
           )}
         </Pressable>
+        ) : null}
       </Card>
 
       <Text variant="small" color="textFaint">

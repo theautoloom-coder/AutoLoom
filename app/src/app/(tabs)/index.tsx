@@ -50,10 +50,14 @@ export default function HomeScreen() {
   const k = kpiRows?.[0];
   const { data: feed, isLoading: feedLoading } = useQuery<Feed>(TODAY_FEED.sql, [today]);
 
-  const showMoney = can('reports.view') || can('catalog.view_cost');
+  // Munafa and what the stock cost are the owner's numbers (owner's call,
+  // 6 Oct 2026). reports.view used to open them, and the Hisaab role holds
+  // that — so the counter hand saw the day's profit on the first screen.
+  const showProfit = can('reports.view_margin');
+  const showCost = can('catalog.view_cost');
   // Same count the Grid below renders, so the grey tiles and the real ones
   // occupy the same rows and nothing reflows underneath them.
-  const tileCount = showMoney ? 5 : 3;
+  const tileCount = 3 + (showProfit ? 1 : 0) + (showCost ? 1 : 0);
 
   const sale = k?.sales_today ?? 0;
   const spent = k?.spent_today ?? 0;
@@ -110,7 +114,7 @@ export default function HomeScreen() {
         <Grid min={150}>
           <StatTile label="Aaj ki sale" value={formatINR(takings)} sub={`${k?.invoices_today ?? 0} bill`} icon="trending-up-outline" accent="blue" onPress={() => router.push('/parchi')} />
           <StatTile label="Aaj ka kharcha" value={formatINR(spent)} sub="business ka" icon="wallet-outline" accent="amber" onPress={() => router.push('/expenses')} />
-          {showMoney ? (
+          {showProfit ? (
             <StatTile
               label="Aaj ka munafa"
               value={formatINR(profit)}
@@ -121,7 +125,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/hisab')}
             />
           ) : null}
-          {showMoney ? (
+          {showCost ? (
             <StatTile label="Total stock" value={formatINRShort(k?.stock_value ?? 0)} sub="godown ki keemat" icon="cube-outline" accent="violet" onPress={() => router.push('/stock')} />
           ) : null}
           <StatTile
@@ -163,7 +167,8 @@ export default function HomeScreen() {
                   </Row>
                 }
                 right={
-                  f.amount != null ? (
+                  // A purchase's amount is what the maal cost; owner only.
+                  f.amount != null && (f.kind !== 'purchase' || showCost) ? (
                     <Text mono color={look.sign === '−' ? 'warn' : 'text'}>
                       {look.sign}
                       {formatINR(f.amount)}

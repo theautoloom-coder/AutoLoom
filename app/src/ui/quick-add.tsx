@@ -76,7 +76,7 @@ export function QuickAdd() {
       icon: 'alert-circle-outline',
       accent: 'rose',
       href: '/kharab-maal',
-      allowed: can('stock.adjust'),
+      allowed: can('stock.adjust') || can('stock.damage'),
     },
     {
       label: 'Ginti Karo',

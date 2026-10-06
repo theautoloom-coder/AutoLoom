@@ -110,6 +110,7 @@ from (values
   ('expense.record',              true, true, false,false,false,true, false),
   ('stock.transfer',              true, true, false,false,true, false,true),
   ('stock.count',                 true, true, false,false,true, false,true),
+  ('stock.damage',                true, true, false,false,true, false,false),
   ('stock.adjust',                true, true, false,false,false,false,false),
   ('party.edit',                  true, true, true, true, false,true, false),
   ('party.edit_credit_limit',     true, true, false,false,false,false,false),

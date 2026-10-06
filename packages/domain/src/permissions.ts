@@ -26,6 +26,9 @@ export const PERMISSIONS = [
   'expense.record',
   'stock.transfer',
   'stock.count',
+  // Kharab Likho: write off broken or missing maal. Narrower than
+  // stock.adjust, which opens every kind of correction; the godown holds this.
+  'stock.damage',
   'stock.adjust',
   'party.edit',
   'party.edit_credit_limit',
@@ -57,7 +60,7 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   owner: 'Staff ke alawa sab kuch. Kharid rate aur margin dikhta hai.',
   purchase: 'Purchase banata hai, maal leta hai, supplier ko paisa deta hai.',
   sales: 'Bill banata hai, payment leta hai. Rate nahi badal sakta.',
-  warehouse: 'Maal leta hai, transfer karta hai, ginti karta hai. Rate nahi dikhte.',
+  warehouse: 'Maal leta hai, transfer karta hai, ginti karta hai, kharab maal likhta hai. Rate nahi dikhte.',
   accounts: 'Khata, vasooli, payment aur hisaab-kitab.',
   workshop: 'Job card, workshop ka maal lagata hai, paisa leta hai.',
 };

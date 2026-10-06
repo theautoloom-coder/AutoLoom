@@ -233,7 +233,7 @@ export default function MoreScreen() {
           subtitle="Godown, dukan, workshop — kis jagah kitna maal aur kitne ka"
           onPress={() => router.push('/warehouse')}
         />
-        {canStock ? (
+        {canStock || can('stock.damage') ? (
           <ListRow
             left={<IconBadge name="alert-circle-outline" accent="rose" />}
             title="Kharab Likho"
@@ -241,7 +241,7 @@ export default function MoreScreen() {
             onPress={() => router.push('/kharab-maal')}
           />
         ) : null}
-        {canStock ? (
+        {canStock || can('stock.count') ? (
           <ListRow
             left={<IconBadge name="checkbox-outline" accent="teal" />}
             title="Ginti Karo"

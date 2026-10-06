@@ -196,7 +196,7 @@ export default function KharabLikho() {
     }
   }
 
-  if (!can('stock.adjust')) {
+  if (!can('stock.adjust') && !can('stock.damage')) {
     return (
       <>
         <Stack.Screen options={{ title: 'Kharab Likho' }} />

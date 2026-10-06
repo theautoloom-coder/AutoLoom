@@ -20,10 +20,13 @@ export type WaSettings = {
   templates: { slip: string; reminder: string; paid: string };
 };
 
+// The shop's own words, not "payment reminder" and "pending balance" — the
+// owner asked for Hinglish (6 Oct 2026). Editable from Admin; a shop that
+// changed its wording keeps it.
 export const DEFAULT_TEMPLATES = {
-  slip: 'Namaste {name} ji 🙏\n{shop} se aaj ka maal:\n{items}\nBill {bill_no} · Total ₹{total}\nAapka total pending: ₹{pending}\n{upi_line}\nDhanyavaad!',
-  reminder: 'Namaste {name} ji 🙏\n{shop} ki taraf se payment reminder.\nAapka pending balance: ₹{pending}\n{upi_line}\nPayment karne ke baad screenshot bhej dijiye. Dhanyavaad! 🙏',
-  paid: 'Namaste {name} ji 🙏\n₹{amount} payment mil gayi ({mode}). Dhanyavaad!\nAb pending: ₹{pending}',
+  slip: 'Namaste {name} ji 🙏\n{shop} se aaj ka maal:\n{items}\nBill {bill_no} · Kul ₹{total}\nAapka kul baaki: ₹{pending}\n{upi_line}\nDhanyavaad!',
+  reminder: 'Namaste {name} ji 🙏\n{shop} ki taraf se yaad dila rahe hain.\nAapka baaki: ₹{pending}\n{upi_line}\nPaisa bhejne ke baad screenshot bhej dijiye. Dhanyavaad! 🙏',
+  paid: 'Namaste {name} ji 🙏\n₹{amount} mil gaye ({mode}). Dhanyavaad!\nAb baaki: ₹{pending}',
 };
 
 /** Indian mobile → international digits for wa.me (10 digits get 91 prefixed). */

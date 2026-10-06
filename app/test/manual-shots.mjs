@@ -55,31 +55,52 @@ const e2eSuppliers = sql(`select id || '|' || is_active || '|' || name from supp
 e2eSuppliers.forEach(([id], i) => sql(`update suppliers set is_active = false,
   name = '${SHOP_NAMES[i % SHOP_NAMES.length]}${i >= SHOP_NAMES.length ? ` ${i + 1}` : ''}' where id = '${id}'`));
 
+// Items the e2e runs made ("E2E Bulb 04078") hide for the shots too.
+const e2eProducts = sql(`update products set is_active = false where name ~* '^e2e' and is_active returning id`)
+  .split('\n').map((l) => l.trim()).filter((l) => /^[0-9a-f-]{36}$/.test(l));
+
+// The best-described item: the most specs, and at least one car.
+const shown = sql(`select p.id || '|' || pv.id from products p join product_variants pv on pv.product_id = p.id
+                    where p.is_active and exists (select 1 from product_fitments f where f.product_id = p.id)
+                    order by (select count(*) from spec_values sv where sv.product_id = p.id) desc limit 1`).split('|');
+
+// A staff stock entry waiting for the owner, so Approval has something on it.
+const staffId = sql(`select id from profiles where role = 'staff' and is_active order by full_name limit 1`);
+const waitingId = sql(`insert into purchases (doc_type, supplier_id, location_id, status, submitted_at, submitted_by, doc_date)
+  select 'purchase', (select id from suppliers where is_active order by name limit 1),
+         (select id from locations where type = 'warehouse' and is_active limit 1), 'draft', now(), '${staffId}', current_date
+  returning id`).split('\n')[0].trim();
+sql(`insert into purchase_lines (purchase_id, line_no, variant_id, description, qty, rate)
+     select '${waitingId}', 1, pv.id, p.name || ' · ' || pv.variant_name, 6, 0 from product_variants pv join products p on p.id = pv.product_id
+      where pv.id = '${prod[1]}'`);
+
 const SHOTS = [
   ['ghar', '/'],
   ['stock-chadhao', '/stock/add'],
+  ['approval', '/requests'],
+  ['approve', `/purchase/approve?id=${waitingId}`],
   ['kharcha', '/expenses'],
   ['stock', '/stock'],
-  ['item', `/product/${prod[0]}?variant=${prod[1]}`],
-  ['warehouse', '/warehouse'],
+  ['item', `/product/${shown[0]}?variant=${shown[1]}`],
+  ['naya-item', `/admin/item?id=${shown[0]}`],
+  ['kharab', '/kharab'],
   ['ginti', '/stock-check'],
   ['kya-mangwana', '/reorder'],
-  ['parchi', '/parchi'],
+  ['khata', '/khata'],
+  ['khata-supplier', '/khata?tab=supplier'],
   ['bill', `/invoice/${inv}`],
   ['grahak-khata', `/customer/${cust}`],
   ['paisa-aaya', `/payment/edit?direction=in&party=${cust}`],
   ['yaad-dilao', '/reminders'],
   ['hisab', '/hisab'],
+  ['parchi', '/parchi'],
+  ['partner-paisa', '/partner-paisa'],
+  ['reports', '/reports'],
   ['gaadi', `/vehicle/${creta}`],
   ['admin', '/admin'],
   ['staff', '/admin/users'],
-  ['naya-item', '/admin/item'],
-  ['requests', '/requests'],
-  ['partner-kharcha', '/partner-kharcha'],
   ['aur', '/more'],
   ['madad', '/help'],
-  ['grahak-list', '/customers'],
-  ['supplier-list', '/suppliers'],
   ['sync', '/sync'],
 ];
 
@@ -132,18 +153,15 @@ try {
   await page.getByRole('button', { name: /Aage badho/ }).click().catch(() => {});
   await page.waitForTimeout(1500);
 
-  // Kharab Likho and a transfer with a line on them.
-  for (const [name, path, button] of [['kharab', '/kharab-maal', null], ['transfer', '/transfer/edit', null]]) {
-    await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(6000);
-    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
-    await page.waitForTimeout(2500);
-    await page.getByText(/X-tremeVision/i).first().click();
-    await page.waitForTimeout(2000);
-    await page.screenshot({ path: `${out}/${name}.png`, fullPage: true });
-    console.log(`  ${path} with a line → ${name}.png`);
-    void button;
-  }
+  // Kharab Likho with a line on it.
+  await page.goto(base + '/kharab-maal', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(6000);
+  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+  await page.waitForTimeout(2500);
+  await page.getByText(/X-tremeVision/i).locator('visible=true').first().click();
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: `${out}/kharab-likho.png`, fullPage: true });
+  console.log('  /kharab-maal with a line → kharab-likho.png');
 
   // The "+" open: where every job starts.
   await page.goto(base + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -158,6 +176,9 @@ try {
   for (const [id, active, name] of e2eSuppliers) {
     sql(`update suppliers set is_active = ${active === 'true'}, name = '${name.replace(/'/g, "''")}' where id = '${id}'`);
   }
+  if (e2eProducts.length) sql(`update products set is_active = true where id in (${e2eProducts.map((i) => `'${i}'`).join(',')})`);
+  sql(`delete from purchase_lines where purchase_id = '${waitingId}'`);
+  sql(`delete from purchases where id = '${waitingId}'`);
   console.log('page errors:', errs.length ? errs.slice(0, 5) : 'none');
   await browser.close();
 }

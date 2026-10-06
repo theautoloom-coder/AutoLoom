@@ -1,300 +1,340 @@
 [
   {
     "title": "Shuru karne se pehle",
-    "intro": "App kholne se lekar pehli entry tak. Yeh teen page padh lo, baaki sab apne aap samajh aa jayega.",
+    "intro": "AutoLoom wholesale ka app hai: supplier se maal aata hai, godown mein rehta hai, dukaan aur bande ke khaate par ya cash mein bikta hai. Do tarah ke log chalate hain — Partner (maalik) aur Staff (ladke).",
     "pages": [
       {
         "img": "login.png",
         "title": "Login",
-        "what": "App khulte hi yeh screen aati hai. Email aur password wahi daalo jo maalik ne aapke liye banaya hai.",
+        "what": "Email aur password wahi jo maalik ne aapke liye banaya hai.",
         "steps": [
           "EMAIL mein apna email likho — naam nahi, email.",
-          "PASSWORD daalo, phir “Kholo” dabao.",
-          "Password bhool gaye ho to neeche “Password bhool gaye?” par tap karo."
+          "PASSWORD daalo, phir “Kholo” dabao."
         ],
-        "note": "Pehli baar login ke baad app saara maal aur khata phone mein utaar leta hai — ek-do minute lag sakte hain. Uske baad signal na ho tab bhi app poora chalta hai; net aate hi sab apne aap server par chala jaata hai."
+        "note": "Pehli baar login ke baad app saara maal aur khata phone mein utaar leta hai — ek-do minute lagte hain. Uske baad signal na ho tab bhi app chalta hai; net aate hi sab apne aap server par chala jaata hai."
       },
       {
         "img": "ghar.png",
         "title": "Ghar — pehli screen",
-        "what": "Din ka haal ek nazar mein. Upar do bade button, beech mein aaj ke number, neeche aaj kya-kya hua.",
+        "what": "Din ka haal ek nazar mein. Upar “Bill Banao” aur “Stock Chadhao”, beech mein aaj ke number, neeche aaj kya-kya hua.",
         "steps": [
-          "“Bill Banao” — grahak ko maal de rahe ho to yahin se.",
-          "“Stock Chadhao” — supplier se maal aaya to yahin se.",
-          "AAJ KI SALE aur AAJ KA KHARCHA — aaj kitna bika, kitna paisa bahar gaya.",
-          "AAJ KA MUNAFA aur TOTAL STOCK — yeh do sirf maalik aur admin ko dikhte hain.",
-          "Neeche “AAJ KYA HUA” mein har entry time ke saath dikhti hai."
-        ],
-        "note": "Staff ke phone par kharid rate, munafa aur nuksan kahin nahi dikhta — yeh maalik ka hisaab hai. Munafa laal dikhe to iska matlab aaj kharcha sale se zyada hua."
+          "Neeche paanch tab: Ghar · Stock · Khata · Bill (partner ke liye Hisab) · Aur.",
+          "Partner ko aaj ki sale, kharcha, munafa aur stock ki keemat dikhti hai.",
+          "Staff ko aaj ke bill ki ginti dikhti hai — sale ka total, kharid rate aur munafa sirf partner dekhte hain.",
+          "“Approval baaki” dikhe to staff ne maal likha hai — tap karke approve karo."
+        ]
       },
       {
         "img": "plus.png",
         "title": "Laal “+ Nayi entry” — saare kaam yahin se",
-        "what": "Neeche daayein taraf laal button. Dabao to paanch kaam dikhte hain — jo aapka role kar sakta hai, sirf wahi.",
+        "what": "Neeche daayein laal button. Jo aapka role kar sakta hai, sirf wahi kaam dikhte hain.",
         "steps": [
-          "Stock Chadhao — supplier se naya maal aaya.",
-          "Bill Banao — grahak ko maal de rahe ho.",
-          "Kharcha Likho — dukaan ka paisa bahar gaya (chai, transport, bijli).",
-          "Kharab Likho — maal toot gaya, kharab nikla ya gum ho gaya.",
-          "Ginti Karo — shelf par gino, app se farak ho to theek karo."
+          "Stock Chadhao — supplier se maal aaya.",
+          "Bill Banao — maal diya.",
+          "Paisa Aaya — grahak ne udhaar ka paisa diya.",
+          "Kharcha Likho — chai, bhada, transport.",
+          "Kharab Likho — maal toota ya kharab nikla.",
+          "Ginti Karo — godown ka maal gino."
         ]
       }
     ]
   },
   {
     "title": "Roz ka kaam",
-    "intro": "Chaar kaam jo har din hote hain. Inhe theek se karoge to baaki hisaab apne aap sahi rehta hai.",
+    "intro": "Maal aaya, maal gaya, paisa aaya, kharcha hua — inhe theek se likho, baaki hisaab apne aap banta hai.",
     "pages": [
       {
         "img": "stock-chadhao.png",
-        "title": "Stock Chadhao — naya maal",
-        "what": "Supplier se maal aaya. Kitna aaya aur kahan rakha, bas itna likhna hai — stock turant badh jaata hai.",
+        "title": "Stock Chadhao — supplier se maal aaya",
+        "what": "Kis supplier se aaya, kya aaya, kitna aaya. Staff ki entry owner ke approval ke baad hi stock mein judti hai.",
         "steps": [
-          "Supplier chuno. Naya supplier ho to naam likho aur “+ Naya banao” dabao.",
-          "Neeche maal scan karo ya naam likho, list mein se chuno.",
-          "“Kitne aaye” mein ginti daalo. Ek se zyada item ho to sab ek saath daal sakte ho.",
-          "Supplier ke bill ki photo lagani ho to “Bill ki photo” se lagao (zaroori nahi).",
-          "“… pcs chadha do” dabao."
+          "Supplier chuno. Naya ho to naam likho aur “+ Naya banao”.",
+          "Maal scan karo ya naam likho — socket, gaadi sab list mein dikhta hai. “Kitne aaye” gin ke likho.",
+          "Supplier ke bill ki photo laga sakte ho (zaroori nahi).",
+          "Staff: “… pcs owner ko bhejo”. Owner gin ke dekhega, rate bharega, approve karega.",
+          "Partner: kharid rate bhar do (zaroori nahi) aur “… pcs chadha do” — stock turant badhega."
         ],
-        "note": "Staff ko kharid rate nahi bharna — rate maalik baad mein bharta hai. Item list mein nahi mil raha to “admin ko bhejo” dabao; approve hote hi wo item mil jayega."
+        "note": "Approve hone tak wo maal stock mein nahi ginta — na bill par dikhega, na Hisab mein. Item list mein nahi hai to “admin ko bhejo”."
       },
       {
         "img": "bill-bharte-hue.png",
-        "title": "Bill Banao — maal dena",
-        "what": "Grahak ko maal de rahe ho. Grahak chuno, maal daalo, paisa kaise aaya chuno — bas.",
+        "title": "Bill Banao",
+        "what": "“Kaun le raha hai” mein pehle se “Cash Grahak” hota hai — turant paisa dene wala. Khata wali dukaan ya banda ho to uska naam chuno.",
         "steps": [
-          "“Kaun le raha hai” mein grahak chuno. Naya ho to naam likho aur “+ Naya banao” — grahak banke wapas isi bill par aa jaata hai.",
-          "Maal scan karo ya naam likho. Har line par qty aur rate badal sakte ho.",
-          "“Paisa kaise aaya” — Cash, Online / UPI, Udhaar, Card ya Bank.",
-          "“Bill bana do” dabao, phir “Aage badho”.",
-          "Bill ban gaya to WhatsApp par parchi bhej sakte ho."
+          "Grahak chuno. Naya ho to naam likh ke “+ Naya banao” — khata ban ke bill par wapas aa jaata hai.",
+          "Maal scan karo ya naam likho. Qty aur rate dekh lo.",
+          "“Paisa kaise aaya” — Cash, Online / UPI, Card, Bank. Khata wale grahak ke liye “Udhaar” bhi.",
+          "“Bill bana do”. Stock kam ho gaya, udhaar ho to khaate mein chadh gaya."
         ],
-        "note": "Stock kam ho to app pehle poochhta hai “Phir bhi bill banayein?” — haan karoge to stock minus mein chala jayega, baad mein ginti se theek karo. Bina maal ke bill adhoora chhoda to wo apne aap hat jaata hai; maal daal ke chhoda to Bill tab ke “Adhoore bill” mein milega."
+        "note": "Cash Grahak ka udhaar nahi hota — udhaar dena hai to us dukaan ya bande ka khata banao. Stock kam ho to app poochhta hai “Phir bhi bill banayein?”."
       },
       {
         "img": "bill.png",
         "title": "Bana hua bill",
-        "what": "Bill kholne par sab kuch: kitne ka tha, kitna mila, kitna baaki, aur us bill par aage kya karna hai.",
+        "what": "Kitne ka tha, kitna mila, kitna baaki — aur us bill par aage kya karna hai.",
         "steps": [
-          "“Jama laga do” — udhaar ka paisa aaya to yahin se. Paisa likhne ke baad wapas isi bill par aate ho.",
-          "“WhatsApp parchi” — grahak ko bill ki parchi bhejo.",
+          "“Jama laga do” — udhaar ka paisa aaya to yahin se.",
+          "“WhatsApp parchi” — grahak ko parchi bhejo.",
           "“PDF / print” — bill print karo ya PDF share karo.",
-          "“Maal wapas” — grahak maal lauta raha hai. Bill ka maal pehle se bhara aata hai; jitna sach mein aaya utna rakho, kharab ho to “kharab” mark karo."
+          "“Maal wapas” — grahak maal lauta raha hai. Theek hai to stock mein wapas; kharab hai to “Kharab · supplier ko jayega”."
+        ]
+      },
+      {
+        "img": "paisa-aaya.png",
+        "title": "Paisa Aaya",
+        "what": "Grahak ne udhaar ka paisa diya. Rakam aur tareeka likho — purane bill se pehle kat-ta hai.",
+        "steps": [
+          "Grahak chuno; “Poora paisa” dabao to poora baaki bhar jaata hai.",
+          "Kaise aaya — Cash, Online / UPI, Bank, Cheque, Card.",
+          "“Paisa likh do”. Mobile ho to app poochhega “WhatsApp par bhej dein?”."
         ]
       },
       {
         "img": "kharcha.png",
         "title": "Kharcha Likho",
-        "what": "Dukaan ka paisa bahar gaya — chai, transport, petrol, bijli. ₹40 ki chai bhi likho, tabhi din ka cash milega.",
+        "what": "Business ka paisa bahar gaya — chai, bhada, transport, packing. ₹40 ki chai bhi likho, tabhi din ka cash milega.",
         "steps": [
-          "Kitna kharcha hua — rakam daalo.",
-          "Kis cheez ka — chip dabao (Transport, Chai/Pani…).",
-          "Paisa kaise diya aur kisne diya chuno.",
-          "“₹… ka kharcha likh do” dabao."
+          "Kitna, kis cheez ka (chip dabao), kaise diya, kisne diya.",
+          "“₹… ka kharcha likh do”."
         ],
-        "note": "Partner ne apne liye paisa nikala to wo yahan nahi — “Aur” mein “Partner ka paisa likho” mein likho, wo dukaan ka kharcha nahi ginta."
+        "note": "Partner ne apne liye paisa nikala to wo yahan nahi — “Partner ka paisa” mein likho."
       }
     ]
   },
   {
-    "title": "Stock — maal ka hisaab",
-    "intro": "Kahan kitna maal pada hai, kya khatam ho raha hai, kya toota — aur ginti kaise milayein.",
+    "title": "Approval — partner ke liye",
+    "intro": "Staff jo maal likhta hai wo seedha stock mein nahi jaata. Partner gin ke dekhta hai, rate bharta hai, phir approve.",
     "pages": [
       {
-        "img": "stock.png",
-        "title": "Stock tab — saara maal",
-        "what": "Upar har jagah ka maal (AutoLoom, Modern Car, Workshop, Damaged / Returns), neeche saara maal.",
+        "img": "approval.png",
+        "title": "Approval ki list",
+        "what": "“Aur” → “Approval”, ya Stock / Ghar par “Approval baaki”. Staff ka aaya hua maal aur naye item ki request — dono yahan.",
         "steps": [
-          "Upar ke box mein SKU, barcode ya naam se dhoondo.",
-          "“Kam hai” — jo jaldi khatam hone wala hai. “Khatam” — jo bilkul nahi bacha.",
-          "Kisi item par tap karo to uska poora page khulta hai."
+          "“Aaya hua maal — approve karo” mein entry par tap karo.",
+          "“Naye item” mein staff ki bheji item request — dekho, haan ya mana."
         ]
       },
       {
-        "img": "rate-baaki.png",
-        "title": "Rate baaki — maalik ke liye",
-        "what": "Staff maal bina rate ke chadhate hain. Jis maal ka kharid rate abhi tak nahi bhara, wo yahan dikhta hai.",
+        "img": "approve.png",
+        "title": "Approve karna",
+        "what": "Staff ne kya likha, kitna — aur har item ka kharid rate bharne ki jagah.",
         "steps": [
-          "Stock tab mein “Rate baaki” chip dabao (sirf maalik aur admin ko dikhti hai).",
-          "Item par tap karo, phir “Badlo”.",
-          "“Kharid rate” bharo aur “Badlav kar do” dabao."
+          "Qty sahi hai na — dekh lo, zaroorat ho to badal do.",
+          "Har item ka “Kharid rate” bharo. Pichhla rate dikh raha ho to “₹… lagao” dabao.",
+          "“Approve karo — stock chadhao”. Stock badh gaya aur supplier ke khaate mein sahi rakam chadh gayi.",
+          "Kuch galat hai to wajah likh ke “Wapas bhejo” — staff theek karke dobara bhejega."
         ],
-        "note": "Rate bharne se pehle jo maal bik gaya uski cost ₹0 gini jaati hai, aur Hisab mein uska poora daam munafa dikhta hai. Isliye “Rate baaki” jaldi khaali karo."
+        "note": "Rate abhi na pata ho to bina rate bhi approve kar sakte ho — wo item Stock tab ke “Rate baaki” mein dikhega. Jaldi bhar dena, warna uski bikri poora munafa dikhegi."
+      }
+    ]
+  },
+  {
+    "title": "Stock aur maal",
+    "intro": "Godown mein kya, kitna pada hai — aur har item ki poori detail: category, socket, gaadi, saal.",
+    "pages": [
+      {
+        "img": "stock.png",
+        "title": "Stock tab",
+        "what": "Upar Godown aur Kharab maal ke dabbe, neeche saara maal — har item ke saath uski detail (socket, watt) aur kis gaadi mein lagta hai.",
+        "steps": [
+          "SKU, barcode, naam, socket ya gaadi likh ke dhoondo.",
+          "“Kam hai” — jaldi khatam hone wala. “Khatam” — bilkul nahi bacha.",
+          "“Rate baaki” (sirf partner) — jis maal ka kharid rate abhi tak nahi bhara.",
+          "Item par tap karo to uska poora page khulta hai."
+        ],
+        "note": "Kharab maal bechne wale stock mein nahi ginta — bill par sirf godown ka maal aata hai."
+      },
+      {
+        "img": "rate-baaki.png",
+        "title": "Rate baaki",
+        "what": "Bina rate ke aaya maal. Item kholo → “Badlo” → “Kharid rate” bharo → “Badlav kar do”.",
+        "note": "Rate bharne se pehle jo maal bik gaya uski cost ₹0 gini jaati hai, aur Hisab mein uska poora daam munafa dikhta hai."
       },
       {
         "img": "item.png",
         "title": "Item ka page",
-        "what": "Ek item ka sab kuch: kahan kitna pada hai, kis rate par bikta hai, kis gaadi mein lagta hai.",
+        "what": "Upar Spec — category, socket, watt, colour jaisi detail — aur “Kis gaadi mein lagta hai”, saal ke saath. Phir godown mein kitna, kharab mein kitna, rate.",
         "steps": [
-          "“Kahan kitna pada hai” — har jagah ki ginti.",
+          "Gaadi par tap karo to us gaadi ka page khulta hai.",
           "“Aana-jaana ka hisaab” — kab aaya, kab gaya, kisne kiya.",
-          "Maalik ko kharid rate aur margin bhi dikhta hai; staff ko nahi."
+          "Partner ko kharid rate aur kharid ka hisaab bhi dikhta hai; staff ko nahi."
         ]
       },
       {
-        "img": "warehouse.png",
-        "title": "Maal kahan pada hai",
-        "what": "Har jagah ka alag-alag maal. Kis jagah kya pada hai, ek nazar mein."
+        "img": "naya-item.png",
+        "title": "Naya item / item badlo",
+        "what": "Category chuno — uske hisaab se detail ke dabbe khulte hain: bulb mein socket (H4, H7…), watt, colour; mat mein type, colour.",
+        "steps": [
+          "Category, item ka naam, qty, bechne ka rate. Partner kharid rate bhi bhar sakta hai.",
+          "“Detail” mein jo pata ho bharo — socket zaroori hai, baaki chahe to.",
+          "“Kis gaadi mein lagta hai” — company + model chuno, saal se–tak likho, “+ Gaadi jodo”. Kai gaadi jod sakte ho. Har gaadi mein lagta ho to “Sab gaadi”.",
+          "“Item bana do” / “Badlav kar do”. Staff ke liye ye request ban ke partner ke paas jaati hai."
+        ],
+        "note": "Jo detail bharoge wahi stock list, bill ki search aur item ke page par dikhegi — jaise “H4 · 60/55W · Creta 2019–2023”."
       },
       {
-        "img": "kharab.png",
-        "title": "Kharab Likho",
-        "what": "Maal toot gaya, kharab nikla ya gum ho gaya. Stock se nikal do taaki ginti sahi rahe.",
+        "img": "gaadi.png",
+        "title": "Gaadi ka page",
+        "what": "“Aur” → “Dhoondo” se gaadi likho (jaise “creta”). Har model-saal ke bulb socket, us gaadi ka maal, aur socket se lagne wale bulb.",
         "steps": [
-          "Wajah chuno — Kharab, Reject, Nahi mila, Toot gaya…",
-          "Maal scan karo ya naam likho, kitne kharab hain likho.",
-          "Photo lagani ho to lagao (zaroori nahi).",
-          "“… pcs kharab likh do” dabao, phir “Aage badho”."
-        ],
-        "note": "Godown wale bhi Kharab Likho kar sakte hain. Unhe rate ya nuksan nahi dikhta — wo maalik ke Hisab mein apne aap gina jaata hai."
+          "“Model aur bulb” — har saal ke headlight, fog ke socket.",
+          "“Lagne wala maal” — is gaadi se joda hua maal, stock ke saath.",
+          "“Socket se lagne wale bulb” — jo bulb is gaadi ke socket ka hai, chahe gaadi se joda na ho."
+        ]
       },
       {
         "img": "ginti.png",
-        "title": "Ginti Karo — shelf se milana",
-        "what": "Shelf par jitna gina wo likho. App ke stock se farak ho to app theek kar deta hai.",
+        "title": "Ginti Karo",
+        "what": "Godown mein jitna gina wo likho. App ke stock se farak ho to theek ho jaata hai.",
         "steps": [
-          "Maal scan karo ya naam likho.",
-          "“Ginti mein kitna nikla” — jitne gine wo likho. Farak upar dikh jaata hai.",
-          "Farak ki wajah chuno — Ginti galat thi, Kharab, Nahi mila, Aur kuch.",
-          "“… item theek kar do”, phir “Haan, ginti theek kar do”."
-        ]
-      },
-      {
-        "img": "transfer.png",
-        "title": "Maal doosri jagah bhejo",
-        "what": "Godown se dukaan, dukaan se workshop — maal ek jagah se doosri jagah. Bhejte hi wahan chadh jaata hai.",
-        "steps": [
-          "“Se” aur “Tak” chuno.",
-          "Maal scan karo ya naam likho, qty daalo.",
-          "“Bhej do” dabao, phir “Aage badho”."
+          "Maal scan karo ya naam likho, “Ginti mein kitna nikla” likho.",
+          "Farak ki wajah chuno, “… item theek kar do” → “Haan, ginti theek kar do”."
         ]
       },
       {
         "img": "kya-mangwana.png",
         "title": "Kya mangwana hai",
-        "what": "Jo tezi se bik raha hai aur khatam hone wala hai, uski list — supplier ko order dene se pehle dekho."
+        "what": "Jo tezi se bik raha hai aur khatam hone wala hai — supplier ko order dene se pehle dekho."
       }
     ]
   },
   {
-    "title": "Paisa aur khata",
-    "intro": "Kisne kitna dena hai, paisa kab aaya, aur din ke aakhir mein kisko yaad dilana hai.",
+    "title": "Kharab maal → supplier → replacement",
+    "intro": "Toota ya kharab maal fenka nahi jaata: alag rakha jaata hai, supplier ko wapas jaata hai, aur uske badle replacement ya paisa aata hai.",
     "pages": [
       {
-        "img": "parchi.png",
-        "title": "Bill tab — din bhar ki entries",
-        "what": "Aaj ke saare bill, stock, kharcha aur paisa — time ke saath. Kal, 7 din, is mahine ya koi bhi tareekh chuno.",
+        "img": "kharab-likho.png",
+        "title": "Kharab Likho",
+        "what": "Maal toota, kharab nikla, supplier se kharab aaya, ya grahak ne kharab lautaya.",
         "steps": [
-          "Kisi bill par tap karo to wo bill khulta hai.",
-          "Upar “Adhoore bill” dikhe to wo bill poore nahi hue — tap karke poora karo ya “Chhod do”."
-        ]
+          "“Nayi entry” → “Kharab Likho”. Kya hua chuno.",
+          "Maal aur kitne pcs daalo, “… pcs kharab mein daalo”.",
+          "Wo godown se nikal ke “Kharab maal” mein chala jaata hai."
+        ],
+        "note": "“Nahi mila” (gum ho gaya) alag hai — wo stock se hat jaata hai aur nuksan Hisab mein judta hai."
+      },
+      {
+        "img": "kharab.png",
+        "title": "Kharab maal — supplier ko wapas",
+        "what": "“Aur” → “Kharab maal”. Abhi kharab mein kya pada hai, aur kaunsi wapsi supplier ke paas settle hone baaki hai.",
+        "steps": [
+          "Partner: “Supplier ko wapas bhejo” → supplier chuno → maal aur pcs → “Wapsi likh do”. Supplier ke khaate se itna kam ho jaata hai.",
+          "Supplier replacement de: wapsi kholo → “Replacement aaya” → jitna aaya utna → chadha do. Poora aa gaya to wapsi apne aap settle.",
+          "Supplier paisa kaat de (doosre maal mein adjust): wapsi par “Paisa mein adjust karo”.",
+          "Theek nikla to “Theek nikla — godown”; bilkul bekaar to “Fenk do” — tab nuksan Hisab mein judta hai."
+        ],
+        "note": "Kuch replacement, kuch paisa — dono chalta hai. “Supplier ke paas — settle baaki” khaali rakho."
+      }
+    ]
+  },
+  {
+    "title": "Khata",
+    "intro": "Har dukaan, har bande ka apna khata. Kisse kitna lena hai, kisko kitna dena hai.",
+    "pages": [
+      {
+        "img": "khata.png",
+        "title": "Khata tab — grahak",
+        "what": "Upar do dabbe: “Grahak — lena hai” aur “Supplier — dena hai”. Neeche har khata aur uska baaki.",
+        "steps": [
+          "Naam, firm, mobile ya shehar likh ke dhoondo. Dealer, Thok, Retail se chhaanto.",
+          "“Naya grahak” — dukaan ya bande ka naam aur mobile kaafi hai.",
+          "Kisi khaate par tap karo to poora hisaab khulta hai."
+        ],
+        "note": "Cash Grahak yahan nahi dikhta — uska koi khata nahi hota."
+      },
+      {
+        "img": "khata-supplier.png",
+        "title": "Khata tab — supplier",
+        "what": "Saare supplier aur kisko kitna dena hai (rakam sirf partner ko dikhti hai). Supplier kholo to usse aaya maal aur wapsi dikhti hai."
       },
       {
         "img": "grahak-khata.png",
-        "title": "Grahak ka khata",
-        "what": "Ek grahak ka poora hisaab: kitna baaki hai, kab kya liya, kab paisa diya.",
+        "title": "Ek grahak ka khata",
+        "what": "Kitna baaki hai, kab kya liya, kab paisa diya — har line ke baad kitna baaki.",
         "steps": [
-          "“Naya bill” — isi grahak ka bill banao.",
+          "“Naya bill” — isi grahak ka bill.",
           "“Paisa aa gaya” — grahak ne paisa diya.",
-          "“Yaad dilao” — WhatsApp par baaki ki yaad bhejo.",
-          "“Hisaab bhejo” — poora khata WhatsApp par bhejo.",
-          "Neeche khata: + jab udhaar badha, − jab paisa aaya, aur har line ke baad kitna baaki."
-        ]
-      },
-      {
-        "img": "paisa-aaya.png",
-        "title": "Paisa aaya",
-        "what": "Grahak ne paisa diya. Rakam aur tareeka likho — app purane bill se pehle kaatta hai.",
-        "steps": [
-          "Grahak chuno; “Poora paisa” dabao to poora baaki bhar jaata hai.",
-          "Kaise aaya — Cash, Online / UPI, Bank, Cheque, Card.",
-          "UPI ho to ref / UTR aur screenshot laga sakte ho (zaroori nahi).",
-          "“Paisa likh do”, phir “Aage badho”. Grahak ka mobile ho to app poochhega “WhatsApp par bhej dein?”."
+          "“Yaad dilao” — WhatsApp par baaki ki yaad.",
+          "“Hisaab bhejo” — poora khata WhatsApp par."
         ]
       },
       {
         "img": "yaad-dilao.png",
         "title": "Yaad dilao",
-        "what": "Din ke aakhir mein: kisse kitna paisa lena hai, aur WhatsApp par yaad dilana.",
+        "what": "Kisse kitna paisa lena hai, aur WhatsApp par yaad dilana.",
         "steps": [
-          "Upar kul baaki aur kitne grahak. “Aaj bill hua” ya “Der ho gayi” se chhaanto.",
-          "“Sabko bhejo” — har baar dabane par agle grahak ka WhatsApp khulta hai (WhatsApp ek baar mein ek hi chat kholta hai). Button batata hai “Agla bhejo · 2/5”.",
-          "Neeche aaj ke bill — har bill ki parchi alag se bhej sakte ho."
-        ],
-        "note": "Message aisa jaata hai: “AutoLoom ki taraf se yaad dila rahe hain. Aapka baaki: ₹… ”. Iska text Admin mein badal sakte ho."
-      },
-      {
-        "img": "hisab.png",
-        "title": "Hisab — kitna bacha",
-        "what": "Kisi bhi din, hafte ya mahine ka hisaab. Maalik ko poora: sale, maal ki cost, kharcha, kharab, munafa.",
-        "steps": [
-          "Upar Aaj, 7 Din, Is Mahine ya apni tareekh chuno.",
-          "Kisi bhi line par tap karo to uske peeche ki entries khul jaati hain.",
-          "Maal wapas aaya to wo Sale aur cost dono se ghat jaata hai."
-        ],
-        "note": "Hisaab wale staff ko sirf Sale aur Kharcha dikhta hai. Maal ki cost, munafa aur nuksan sirf maalik aur admin dekhte hain."
+          "“Sabko bhejo” — har baar dabane par agle grahak ka WhatsApp khulta hai, message likha hua.",
+          "Ek hi grahak ko bhejna ho to uske aage “Yaad dilao”."
+        ]
       }
     ]
   },
   {
-    "title": "Dhoondna aur gaadi",
-    "intro": "Grahak counter par “Creta 2019 ka mat” bolta hai, SKU nahi. Isliye ek hi box mein sab dhoondho.",
+    "title": "Hisab, partner ka paisa, report — partner ke liye",
+    "intro": "Sale, munafa, partner ki poonji aur har cheez ki PDF.",
     "pages": [
       {
-        "img": "gaadi.png",
-        "title": "Gaadi — kaunsa bulb, kaunsa maal",
-        "what": "“Aur” mein “Dhoondo” se gaadi ka naam likho (jaise “creta”), gaadi kholo.",
+        "img": "hisab.png",
+        "title": "Hisab tab",
+        "what": "Aaj, 7 Din, Is Mahine ya apni tareekh. Sale, maal ki cost, maal par munafa, kharcha, kharab/nuksan aur asli munafa.",
         "steps": [
-          "“Model aur bulb” — har model-saal ke saath headlight, fog ke socket (jaise Low Beam H7, Fog H8).",
-          "Kisi model-saal par tap karo to neeche sirf usi saal ka maal dikhta hai.",
-          "“Lagne wala maal” — is gaadi mein jo maal lagta hai, stock ke saath."
+          "Kisi bhi line par tap karo to uske peeche ki entries khulti hain.",
+          "Upar “Saari entries”, “Report — PDF”, “Partner ka paisa”."
+        ],
+        "note": "Grahak ka wapas kiya maal Sale aur cost dono se ghat jaata hai. Partner ka paisa munafa ya kharcha nahi ginta."
+      },
+      {
+        "img": "parchi.png",
+        "title": "Saari entries",
+        "what": "Din bhar ke bill, aaya maal, kharcha, paisa — time ke saath. Staff ke liye yahi “Bill” tab hai.",
+        "steps": [
+          "Aaj, Kal, 7 din, Is mahine ya koi bhi tareekh.",
+          "“Adhoore bill” dikhe to wo poore nahi hue — tap karke poora karo ya “Chhod do”."
+        ]
+      },
+      {
+        "img": "partner-paisa.png",
+        "title": "Partner ka paisa",
+        "what": "Kis partner ne business mein kab kitna lagaya aur kitna nikala. Upar business mein kul poonji aur har partner ka hisaab.",
+        "steps": [
+          "Partner chuno, “Paisa lagaya” ya “Paisa nikala”.",
+          "Kitna, tareekh, kaise (Cash, UPI, Bank, Cheque), note.",
+          "“… likh do”. Galat entry par tap karke cancel kar sakte ho.",
+          "“PDF” se poora hisaab nikal lo."
+        ]
+      },
+      {
+        "img": "reports.png",
+        "title": "Report — PDF",
+        "what": "Report chuno, din chuno, PDF banao — print karo ya WhatsApp par bhejo.",
+        "steps": [
+          "Sale — har din ke bill, grahak aur item ke hisaab se.",
+          "Party ka khata — grahak ya supplier ka poora hisaab, baaki ke saath.",
+          "Stock — godown aur kharab, aaj tak.",
+          "Munafa, Partner ka paisa, Kharcha.",
+          "Din: Aaj, Kal, 7 din, Is mahine, Pichhla mahina, Is saal (April se), ya apni tareekh."
         ]
       }
     ]
   },
   {
     "title": "Maalik ke kaam",
-    "intro": "Yeh screens sirf maalik aur admin ko dikhti hain.",
+    "intro": "Ye screens sirf partner aur admin ko dikhti hain.",
     "pages": [
       {
         "img": "admin.png",
         "title": "Admin",
-        "what": "Staff, approvals, maal aur dukaan ki settings — sab ek jagah. Approve karne wala kuch ho to sabse upar dikhta hai."
+        "what": "Staff, approvals, maal aur dukaan ki settings — sab ek jagah."
       },
       {
         "img": "staff.png",
         "title": "Staff aur role",
-        "what": "Naya staff banao, role do, band karo. Ek aadmi ke ek se zyada role ho sakte hain.",
+        "what": "Teen role: Partner (maalik — sab kuch), Admin (maalik jaisa), Staff (ladke — maal likhna, bill, paisa, kharcha, kharab, ginti).",
         "steps": [
-          "“+ Naya staff” — naam, email, password aur role.",
-          "Counter — bill aur paisa. Godown — maal lena, transfer, ginti, kharab likhna. Hisaab — khata aur paisa.",
-          "Kharid rate, munafa aur nuksan sirf Maalik aur Admin dekhte hain — kisi aur role ko nahi."
+          "“+ Naya staff” — naam, email, password, role.",
+          "Kisi par tap karke role badlo, band karo, ya naya password do.",
+          "Kharid rate, munafa, nuksan, partner ka paisa aur report sirf Partner aur Admin dekhte hain."
         ]
-      },
-      {
-        "img": "naya-item.png",
-        "title": "Naya item",
-        "what": "Naam, qty aur bechne ka rate — bas itna kaafi hai. Gaadi, colour, kharid rate “Aur detail” mein.",
-        "steps": [
-          "Category chuno ya nayi likho.",
-          "Item ka naam, qty aur bechne ka rate daalo.",
-          "Kharid rate yahin bharo — yahi se bikri ki cost aur munafa gine jaate hain.",
-          "“Item bana do” dabao. Purane item mein badlav ho to “Badlav kar do”."
-        ]
-      },
-      {
-        "img": "requests.png",
-        "title": "Naya maal ki requests",
-        "what": "Staff naya item khud nahi bana sakte — wo “Naya item bhejo” se bhejte hain, aur yahan approve hota hai.",
-        "steps": [
-          "Request kholo, dekho, “Haan” ya “Mana” (mana karo to wajah likho).",
-          "Haan karte hi item ban jaata hai aur staff ko list mein mil jaata hai."
-        ]
-      },
-      {
-        "img": "partner-kharcha.png",
-        "title": "Partner ka paisa",
-        "what": "Partner ne dukaan se paisa nikala — apne liye ya dukaan ke kaam ke liye. Dono alag likhe jaate hain, taaki dukaan ka kharcha aur partner ka nikala paisa mil na jaayein."
       }
     ]
   },
@@ -305,17 +345,7 @@
       {
         "img": "aur.png",
         "title": "Aur",
-        "what": "Jo neeche ke tab mein nahi hai, wo sab yahan: Dhoondo, Yaad dilao, Grahak, Supplier, transfer, ginti, partner ka paisa, aur aapki jagah (kis dukaan/godown par ho)."
-      },
-      {
-        "img": "grahak-list.png",
-        "title": "Grahak",
-        "what": "Saare grahak aur kiska kitna baaki. Dealer, Thok, Retail se chhaanto. Naya grahak yahin se bhi bana sakte ho."
-      },
-      {
-        "img": "supplier-list.png",
-        "title": "Supplier",
-        "what": "Saare supplier. Supplier kholo to usse aaya maal aur unke bill dikhte hain."
+        "what": "Jo tab mein nahi, wo sab: Dhoondo, Yaad dilao, Kharab maal, Ginti, Supplier se aaya maal, Paisa, Partner ka paisa, Report, Approval, settings."
       },
       {
         "img": "sync.png",
@@ -324,8 +354,8 @@
       },
       {
         "img": "madad.png",
-        "title": "Kaise chalayein — app ke andar hi",
-        "what": "Yahi manual app ke andar bhi hai: “Aur” mein “Kaise chalayein”. Kuch samajh na aaye to wahan dekho, ya maalik se poochho."
+        "title": "Kaise chalayein — app ke andar",
+        "what": "Yahi manual app ke andar bhi hai: “Aur” → “Kaise chalayein”. Har kaam ka button seedha wahin se khulta hai."
       }
     ]
   }

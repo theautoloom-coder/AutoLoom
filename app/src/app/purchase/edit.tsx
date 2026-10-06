@@ -271,7 +271,7 @@ export default function PurchaseEdit() {
         {fromKharab ? <Text variant="small" color="textMuted">Kharab maal supplier ko wapas. Supplier ke khaate se iski keemat kam ho jayegi; replacement aaye to wapsi kholke “Replacement aaya” dabao.</Text> : null}
         {isReplacement ? <Text variant="small" color="textMuted">Wapsi {source?.[0]?.doc_no} ke badle aaya maal. Jitna aaya utna rakho — baaki baad mein aa sakta hai.</Text> : null}
 
-        <FormSection title="Supplier">
+        <FormSection title={isReturn ? 'Kisko wapas' : 'Kahan se aaya'}>
           <SelectField
             label="Supplier"
             value={doc.supplier_id}

@@ -278,6 +278,9 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
               label="Mobile"
               value={form.mobile ?? ''}
               onChangeText={(v) => set('mobile', v)}
+              // On the field, not only in a 2-second toast: by the time Save is
+              // pressed this field is scrolled far out of sight.
+              error={form.mobile && !/^\d{10}$/.test(form.mobile.replace(/\D/g, '')) ? '10 ank ka mobile likho' : null}
               keyboardType="phone-pad"
               autoCapitalize="none"
               autoCorrect={false}

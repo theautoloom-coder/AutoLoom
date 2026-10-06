@@ -56,6 +56,30 @@ check('signed in', true);
 const mine = `salesperson_id = '${user}' or created_by = '${user}'`;
 const before = num(`select count(*) from sales_invoices where status = 'posted' and (${mine})`);
 
+/**
+ * Choose the payment mode and post, walking past any warning on the way (a
+ * stock-short "phir bhi bechein?" comes before "Bill bana dein?" once a test
+ * run has emptied the shelf). The final question names the mode; the chip is
+ * pressed again if it does not say the one wanted.
+ */
+async function postBill(page, mode) {
+  for (let i = 0; i < 3; i++) {
+    await page.waitForTimeout(1200);
+    await page.getByText(mode, { exact: true }).first().click();
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /Bill bana do/i }).click();
+    for (let k = 0; k < 3; k++) {
+      await page.waitForTimeout(1200);
+      if (await page.getByText('Bill bana dein?').isVisible().catch(() => false)) break;
+      const go = page.getByRole('button', { name: /Aage badho/ });
+      if (await go.isVisible().catch(() => false)) await go.click();
+    }
+    if (await page.getByText(new RegExp(`· ${mode}\\.`)).first().isVisible().catch(() => false)) break;
+    await page.getByRole('button', { name: /Rehne do/i }).first().click().catch(() => {});
+  }
+  await page.getByRole('button', { name: /Aage badho|Haan/i }).first().click().catch(() => {});
+}
+
 async function bill(mode) {
   await page.goto(base + '/invoice/edit', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(6500);
@@ -67,12 +91,7 @@ async function bill(mode) {
   await page.waitForTimeout(2800);
   await page.getByText(/X-tremeVision/i).first().click();
   await page.waitForTimeout(2500);
-  await page.getByText(mode, { exact: true }).first().click();
-  await page.waitForTimeout(600);
-  if (mode === 'Udhaar') await page.getByText(/din mein paisa dena hai/).first().waitFor({ timeout: 8000 });
-  await page.getByRole('button', { name: /Bill bana do/i }).click();
-  await page.waitForTimeout(2000);
-  await page.getByRole('button', { name: /Aage badho|Haan/i }).first().click().catch(() => {});
+  await postBill(page, mode);
   await page.waitForTimeout(8000);
 }
 

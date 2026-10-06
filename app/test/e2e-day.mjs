@@ -81,6 +81,30 @@ const confirmYes = async (page) => {
   await page.getByRole('button', { name: /Aage badho|Haan/i }).first().click({ timeout: 4000 }).catch(() => {});
 };
 
+/**
+ * Choose the payment mode and post, walking past any warning on the way (a
+ * stock-short "phir bhi bechein?" comes before "Bill bana dein?" once a test
+ * run has emptied the shelf). The final question names the mode; the chip is
+ * pressed again if it does not say the one wanted.
+ */
+async function postBill(page, mode) {
+  for (let i = 0; i < 3; i++) {
+    await page.waitForTimeout(1200);
+    await page.getByText(mode, { exact: true }).first().click();
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /Bill bana do/i }).click();
+    for (let k = 0; k < 3; k++) {
+      await page.waitForTimeout(1200);
+      if (await page.getByText('Bill bana dein?').isVisible().catch(() => false)) break;
+      const go = page.getByRole('button', { name: /Aage badho/ });
+      if (await go.isVisible().catch(() => false)) await go.click();
+    }
+    if (await page.getByText(new RegExp(`· ${mode}\\.`)).first().isVisible().catch(() => false)) break;
+    await page.getByRole('button', { name: /Rehne do/i }).first().click().catch(() => {});
+  }
+  await page.getByRole('button', { name: /Aage badho|Haan/i }).first().click().catch(() => {});
+}
+
 browser = await chromium.launch();
 
 // ---------------------------------------------------------------------------
@@ -97,11 +121,7 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
     await page.waitForTimeout(2500);
     await page.getByText(/X-tremeVision/i).first().click();
     await page.waitForTimeout(2000);
-    await page.getByText('Udhaar', { exact: true }).first().click();
-    // Udhaar shows its due-days line; wait for it rather than racing the chip.
-    await page.getByText(/din mein paisa dena hai/).first().waitFor({ timeout: 8000 });
-    await page.getByRole('button', { name: /Bill bana do/i }).click();
-    await confirmYes(page);
+    await postBill(page, 'Udhaar');
     await page.waitForTimeout(7000);
     const url = page.url();
     check('udhaar bill posted', /\/invoice\/[0-9a-f-]{20,}/.test(url), url.replace(base, ''));

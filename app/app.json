@@ -80,6 +80,15 @@
       },
       "router": {}
     },
-    "owner": "autolooms-team"
+    "owner": "autolooms-team",
+    "runtimeVersion": "1",
+    "updates": {
+      "url": "https://u.expo.dev/d573d28f-ac48-4278-a375-580cb0af6d73",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      },
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

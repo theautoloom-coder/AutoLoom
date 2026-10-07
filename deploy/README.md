@@ -51,6 +51,28 @@ minutes, most of it the bundle. No Caddy reload is needed.
 The APK: `node scripts/ship-apk.mjs` (from `app/`) has the server fetch the
 finished EAS build into `/opt/theautoloom/www/autoloom-download`.
 
+## The phones: over the air, no new APK
+
+A push to `main` updates the web app only. The installed APK (v21 onwards)
+takes its screens and logic from EAS Update, so after an app change also run,
+from `app/`:
+
+```bash
+node scripts/ship-update.mjs "Kya badla, ek line mein"
+```
+
+It exports the Android bundle against production, refuses a bundle that does
+not point at the production Supabase, and publishes it to the `production`
+channel. Each phone picks it up the next time the app opens or comes back to
+the front ("Naya version aa gaya — Abhi lagao"), or on its next launch.
+`node scripts/eas.mjs update:list --branch production` shows what is live.
+
+A new APK is needed only when the native layer changes — a new native module,
+a permission, an Expo SDK upgrade. Then raise `runtimeVersion` in `app.json`
+(so older APKs are not sent code they cannot run) and build with
+`node scripts/build-apk-local.mjs --prebuild`, since the update settings are
+native configuration.
+
 ## On the iPhone
 
 Open `https://app.theautoloom.in` in **Safari** (not Chrome — only Safari

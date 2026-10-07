@@ -15,6 +15,7 @@ import { showToast } from '@/ui/toast';
 import { palette } from '@/ui/theme';
 import { useAppFonts } from '@/ui/fonts';
 import { AnimatedSplash } from '@/ui/splash';
+import { AppUpdates } from '@/ui/app-updates';
 import { InstallPrompt } from '@/ui/install-prompt';
 import { ToastHost } from '@/ui/toast';
 
@@ -197,6 +198,7 @@ export default function RootLayout() {
               </Stack>
               <ToastHost />
               <InstallPrompt />
+              <AppUpdates />
             </AuthGate>
             {splashDone ? null : <AnimatedSplash onDone={() => setSplashDone(true)} />}
           </ThemeProvider>

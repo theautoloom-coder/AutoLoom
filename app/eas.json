@@ -15,7 +15,8 @@
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jenV4anpra2JvZXRla2ZocWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NzgzNzUsImV4cCI6MjEwNTA1NDM3NX0.3-L5sJWmbx6NePoIDIj_dxEK3LHEKgcU8DgBrHeOsoQ",
         "EXPO_PUBLIC_POWERSYNC_URL": "https://6aa94f588453e7cf8337416e.powersync.journeyapps.com"
       },
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production"
     }
   },
   "submit": {

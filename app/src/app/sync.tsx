@@ -1,9 +1,11 @@
+import Constants from 'expo-constants';
 import { useQuery, useStatus } from '@powersync/react';
 import React, { useState } from 'react';
 
 import { useSession } from '@/lib/session';
 import { describeSyncError, useSystem } from '@/lib/system';
 import { Badge, Button, Card, Divider, KV, Screen, SectionTitle, Text } from '@/ui';
+import { runningVersion } from '@/ui/app-updates';
 
 export default function SyncScreen() {
   const status = useStatus();
@@ -43,6 +45,7 @@ export default function SyncScreen() {
       <Card>
         <KV k="Net" v={<Badge tone={status.connected ? 'ok' : 'warn'}>{status.connected ? 'Juda hua' : 'Offline'}</Badge>} />
         <KV k="Kaun chala raha hai" v={session?.user.email ?? '—'} />
+        <KV k="App ka version" v={runningVersion(Constants.expoConfig?.version ?? '1.0.0')} />
         <KV k="Aakhri sync" v={status.lastSyncedAt ? status.lastSyncedAt.toLocaleString('en-IN') : 'Kabhi nahi'} />
         <KV k="Aa raha hai" v={status.dataFlowStatus.downloading ? 'Haan' : 'Nahi'} />
         <KV k="Ja raha hai" v={status.dataFlowStatus.uploading ? 'Haan' : 'Nahi'} />

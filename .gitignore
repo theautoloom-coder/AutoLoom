@@ -28,6 +28,8 @@ app/dist-local/
 # purely so a screenshot is of the code that exists rather than of whatever
 # was last served.
 app/dist-check/
+# dist-update/ is the Android bundle scripts/ship-update.mjs exports and publishes.
+app/dist-update/
 
 # The manual's intermediate HTML. The PDF beside it is the deliverable and is
 # kept; the HTML is rebuilt from scripts/build-manual.mjs every time.

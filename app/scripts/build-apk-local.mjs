@@ -67,6 +67,19 @@ if (process.argv.includes('--prebuild') || !fs.existsSync(androidDir)) {
   execSync('npx expo prebuild --platform android --clean', { cwd: appDir, env, stdio: ['ignore', 'ignore', 'inherit'] });
 }
 
+// ---- memory for gradle ----
+// Prebuild writes -Xmx2048m with a 512m Metaspace. A full native build from a
+// fresh android/ (every module compiled, expo-updates added on 7 Oct 2026)
+// ran out of Metaspace, then hung for an hour instead of failing. Raised here
+// so every prebuild gets it back.
+const propsPath = path.join(androidDir, 'gradle.properties');
+const props = fs.readFileSync(propsPath, 'utf8');
+const jvm = 'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1536m -XX:+HeapDumpOnOutOfMemoryError';
+if (!props.includes(jvm)) {
+  fs.writeFileSync(propsPath, props.replace(/^org\.gradle\.jvmargs=.*$/m, jvm), 'utf8');
+  console.log('▸ gradle memory raised');
+}
+
 // ---- signing + version, patched into the generated project ----
 const gradlePath = path.join(androidDir, 'app/build.gradle');
 let gradle = fs.readFileSync(gradlePath, 'utf8');

@@ -52,11 +52,14 @@ export default function MoreScreen() {
   // an admin needs to know what is waiting on them, a staff member needs to
   // know what came back for correction.
   // Stock entries waiting on the owner count as much as new-item requests.
-  const { data: reqRows } = useQuery<{ pending: number; mine_back: number }>(
+  const { data: reqRows } = useQuery<{ pending: number; mine_back: number; mine_waiting: number }>(
     `SELECT
        (SELECT COUNT(*) FROM change_requests WHERE status = 'pending')
      + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL) AS pending,
-       (SELECT COUNT(*) FROM change_requests WHERE status = 'rejected' AND submitted_by = ?1) AS mine_back`,
+       (SELECT COUNT(*) FROM change_requests WHERE status = 'rejected' AND submitted_by = ?1)
+     + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NULL AND submitted_by = ?1) AS mine_back,
+       (SELECT COUNT(*) FROM change_requests WHERE status = 'pending' AND submitted_by = ?1)
+     + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL AND submitted_by = ?1) AS mine_waiting`,
     [actor.userId ?? ''],
   );
   const { data: kharabRows } = useQuery<{ items: number }>(
@@ -66,6 +69,7 @@ export default function MoreScreen() {
   const kharabItems = kharabRows?.[0]?.items ?? 0;
   const pendingReq = reqRows?.[0]?.pending ?? 0;
   const myRejected = reqRows?.[0]?.mine_back ?? 0;
+  const myWaiting = reqRows?.[0]?.mine_waiting ?? 0;
 
   const [dailyReminder, setDailyReminder] = useState(false);
   useEffect(() => {
@@ -191,9 +195,13 @@ export default function MoreScreen() {
           <ListRow
             left={<IconBadge name="paper-plane-outline" accent="violet" />}
             title="Maine kya bheja"
-            subtitle={myRejected > 0 ? `${myRejected} wapas aayi hai — theek karke dobara bhejo` : 'Aaya hua maal aur naye item — owner ke haan ka intezaar'}
+            subtitle={myRejected > 0
+              ? `${myRejected} wapas aayi hai — theek karke dobara bhejo`
+              : myWaiting > 0
+              ? `${myWaiting} review mein — approve hone tak badal sakte ho`
+              : 'Aaya hua maal aur naye item — owner ke haan ka intezaar'}
             onPress={() => router.push('/requests')}
-            right={myRejected > 0 ? <Badge tone="danger">{String(myRejected)}</Badge> : undefined}
+            right={myRejected > 0 ? <Badge tone="danger">{String(myRejected)}</Badge> : myWaiting > 0 ? <Badge tone="warn">{String(myWaiting)}</Badge> : undefined}
           />
         ) : null}
       </Card>

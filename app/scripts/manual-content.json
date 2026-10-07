@@ -52,9 +52,10 @@
           "Maal scan karo ya naam likho — socket, gaadi sab list mein dikhta hai. “Kitne aaye” gin ke likho.",
           "Supplier ke bill ki photo laga sakte ho (zaroori nahi).",
           "Staff: “… pcs owner ko bhejo”. Owner gin ke dekhega, rate bharega, approve karega.",
-          "Partner: kharid rate bhar do (zaroori nahi) aur “… pcs chadha do” — stock turant badhega."
+          "Partner: kharid rate bhar do (zaroori nahi) aur “… pcs chadha do” — stock turant badhega.",
+          "Staff: galti dikhi to “Aur” → “Maine kya bheja” → “Review mein” wali entry kholo, theek karo, “Ho gaya” — approve hone tak badal sakte ho."
         ],
-        "note": "Approve hone tak wo maal stock mein nahi ginta — na bill par dikhega, na Hisab mein. Item list mein nahi hai to “admin ko bhejo”."
+        "note": "Approve hone tak wo maal stock mein nahi ginta — na bill par dikhega, na Hisab mein. Approve ya mana hone ke baad entry sirf partner badal sakta hai; “Maine kya bheja” mein dikhta hai kya hua aur kyun."
       },
       {
         "img": "bill-bharte-hue.png",
@@ -122,7 +123,8 @@
           "Qty sahi hai na — dekh lo, zaroorat ho to badal do.",
           "Har item ka “Kharid rate” bharo. Pichhla rate dikh raha ho to “₹… lagao” dabao.",
           "“Approve karo — stock chadhao”. Stock badh gaya aur supplier ke khaate mein sahi rakam chadh gayi.",
-          "Kuch galat hai to wajah likh ke “Wapas bhejo” — staff theek karke dobara bhejega."
+          "Kuch galat hai to wajah likh ke “Wapas bhejo” — staff theek karke dobara bhejega. Bilkul nahi lena to wajah likh ke “Mana karo”.",
+          "“Badla gaya” dikhe to staff ne bhejne ke baad badla hai — jo screen par hai wahi taaza hai."
         ],
         "note": "Rate abhi na pata ho to bina rate bhi approve kar sakte ho — wo item Stock tab ke “Rate baaki” mein dikhega. Jaldi bhar dena, warna uski bikri poora munafa dikhegi."
       }

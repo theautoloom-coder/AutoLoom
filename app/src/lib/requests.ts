@@ -133,6 +133,8 @@ export type ChangeRequest = {
   reviewed_at: string | null;
   location_id: string | null;
   applied_product_id: string | null;
+  /** Set when the submitter changed it while it was still waiting. */
+  revised_at?: string | null;
 };
 
 export function parseProposal(req: Pick<ChangeRequest, 'payload'>): ItemProposal | null {

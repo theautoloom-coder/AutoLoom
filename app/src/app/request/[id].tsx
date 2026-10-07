@@ -145,6 +145,19 @@ export default function RequestReview() {
           </Card>
         ) : null}
 
+        {mine && req.status === 'pending' ? (
+          <Card spine="warn">
+            <Text variant="heading">Owner ke review mein hai</Text>
+            <Text variant="small" color="textMuted">Approve hone tak badal sakte ho — naam, detail, gaadi, rate. Owner ko naya wala dikhega.</Text>
+            <Button title="Badlo" onPress={() => router.push(`/admin/item?request=${req.id}`)} />
+          </Card>
+        ) : null}
+        {isReviewer && req.status === 'pending' && req.revised_at ? (
+          <Card spine="accent">
+            <Text variant="small" color="danger">Bhejne ke baad badli gayi — {stamp(req.revised_at)}. Neeche jo hai wahi taaza hai.</Text>
+          </Card>
+        ) : null}
+
         <SectionTitle>Kya maanga hai</SectionTitle>
         <Card>
           <KV k="Category" v={family?.name ?? '—'} />
@@ -170,7 +183,8 @@ export default function RequestReview() {
         <Card>
           <KV k="Bheja" v={`${req.submitter ?? 'Staff'} · ${stamp(req.submitted_at)}`} />
           {req.note ? <KV k="Unka note" v={req.note} /> : null}
-          {req.revision > 1 ? <KV k="Kitni baar" v={`${req.revision} baar bheji gayi`} /> : null}
+          {req.revision > 1 ? <KV k="Kitni baar" v={`${req.revision} baar bheji / badli gayi`} /> : null}
+          {req.revised_at ? <KV k="Aakhri badlav" v={stamp(req.revised_at)} /> : null}
           {req.reviewed_at ? <KV k="Dekha" v={`${req.reviewer ?? '—'} · ${stamp(req.reviewed_at)}`} /> : null}
         </Card>
 

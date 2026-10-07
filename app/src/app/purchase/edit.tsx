@@ -14,6 +14,12 @@
  * only then does stock go up and the supplier's khata get the amount. Returns
  * are the owner's to write: they take money off a supplier's khata.
  *
+ * While it waits, the staff member who wrote it can still change it (owner,
+ * 7 Oct 2026): the entry stays in the queue, every change is stamped
+ * revised_at, and the owner sees "bhejne ke baad badla". Someone else's entry,
+ * or one already approved or refused, is read-only to staff — the server
+ * enforces the same (migration 20261007140000).
+ *
  * The shop keeps GST off, so the form is qty and rate. The draft is saved to
  * the phone as you go, so a half-written entry survives closing the app.
  */
@@ -39,6 +45,7 @@ type Purchase = {
   id: string; doc_type: 'purchase' | 'debit_note'; status: string; supplier_id: string | null; doc_date: string;
   location_id: string | null; other_charges: number; notes: string | null; against_purchase_id: string | null;
   submitted_at: string | null; submitted_by: string | null; supplier_invoice_no: string | null;
+  created_by: string | null; revised_at: string | null;
 };
 type Line = DraftLine & { purchase_id: string; line_no: number; sku: string | null; last_cost: number; here: number };
 type SourceLine = DraftLine & { line_no: number; done: number };
@@ -65,7 +72,7 @@ export default function PurchaseEdit() {
       WHERE l.purchase_id = ? ORDER BY l.line_no`, [id ?? '']);
   const { data: suppliers } = useQuery<{ id: string; name: string }>('SELECT id, name FROM suppliers WHERE is_active = 1 ORDER BY name');
   const { data: kharabLoc } = useQuery<{ id: string }>("SELECT id FROM locations WHERE type = 'damaged' AND is_active = 1 ORDER BY sort_order LIMIT 1");
-  const { data: submitter } = useQuery<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ?', [doc?.submitted_by ?? '']);
+  const { data: submitter } = useQuery<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ?', [doc?.submitted_by ?? doc?.created_by ?? '']);
 
   // Whatever this entry is copied from: the receipt being returned against,
   // or the return being replaced. `done` is what has already gone back / come back.
@@ -126,8 +133,24 @@ export default function PurchaseEdit() {
   const totals = useMemo(() => totalLines(lines ?? [], false, doc?.other_charges ?? 0, true), [lines, doc?.other_charges]);
   const supplier = suppliers?.find((s) => s.id === doc?.supplier_id) ?? null;
 
-  const patch = (p: Record<string, string | number | boolean | null>) => id ? updateRow(db, 'purchases', id, p) : Promise.resolve();
-  const patchLine = (lineId: string, p: Record<string, string | number | null>) => updateRow(db, 'purchase_lines', lineId, p);
+  // A staff member's change to an entry already with the owner is stamped, so
+  // the owner can see it moved after it reached the queue.
+  const stamp = async () => {
+    if (!approver && id && doc?.submitted_at) await updateRow(db, 'purchases', id, { revised_at: new Date().toISOString() });
+  };
+  const patch = async (p: Record<string, string | number | boolean | null>) => {
+    if (!id) return;
+    await updateRow(db, 'purchases', id, p);
+    if (!('submitted_at' in p)) await stamp();
+  };
+  const patchLine = async (lineId: string, p: Record<string, string | number | null>) => {
+    await updateRow(db, 'purchase_lines', lineId, p);
+    await stamp();
+  };
+  const removeLine = async (lineId: string) => {
+    await deleteRow(db, 'purchase_lines', lineId);
+    await stamp();
+  };
 
   async function addSupplier(name: string) {
     const sid = await insertRow(db, 'suppliers', {
@@ -146,6 +169,7 @@ export default function PurchaseEdit() {
       // A return goes back at what the maal cost; a receipt starts at the last buy rate.
       rate: showCost ? (doc?.doc_type === 'debit_note' ? v.avg_cost || v.last_purchase_cost : v.last_purchase_cost || v.avg_cost) || 0 : 0,
     });
+    await stamp();
   }
 
   function problems(): string | null {
@@ -200,7 +224,7 @@ export default function PurchaseEdit() {
     if (!id) return;
     const bad = problems();
     if (bad) { notify(bad, 'danger'); return; }
-    await patch({ submitted_at: new Date().toISOString(), submitted_by: actor.userId });
+    await patch({ submitted_at: new Date().toISOString(), submitted_by: actor.userId, revised_at: null });
     notify('Owner ko bhej diya. Approve hote hi stock mein chadh jayega.', 'ok');
     router.back();
   }
@@ -211,6 +235,18 @@ export default function PurchaseEdit() {
     if (!backNote.trim()) { notify('Wajah likho — kya theek karna hai.', 'danger'); return; }
     await patch({ submitted_at: null, notes: [doc.notes, `Owner: ${backNote.trim()}`].filter(Boolean).join(' · ') });
     notify('Wapas bhej diya.', 'ok');
+    router.back();
+  }
+
+  /** Owner: refuse it. Kept, marked refused with the reason, so the staff member sees why. */
+  async function refuse() {
+    if (!id) return;
+    if (!backNote.trim()) { notify('Mana karne ki wajah likho.', 'danger'); return; }
+    if (!(await confirm('Ye entry mana kar dein?', 'Stock nahi badhega. Staff ko wajah ke saath “Mana kiya” dikhega.'))) return;
+    await updateRow(db, 'purchases', id, {
+      status: 'cancelled', cancel_reason: backNote.trim(), cancelled_at: new Date().toISOString(), cancelled_by: actor.userId,
+    });
+    notify('Mana kar diya.', 'ok');
     router.back();
   }
 
@@ -233,8 +269,12 @@ export default function PurchaseEdit() {
   const isReturn = doc.doc_type === 'debit_note';
   const isReplacement = !isReturn && source?.[0]?.doc_type === 'debit_note';
   const waiting = !!doc.submitted_at;
-  // A staff member cannot touch an entry once it is with the owner.
-  const locked = waiting && !approver;
+  // Staff may change their own entry, in the queue or not; someone else's is
+  // read-only to them. The server holds the same line.
+  const mine = doc.created_by === actor.userId || doc.submitted_by === actor.userId;
+  const locked = !approver && !mine;
+  const revisedAfterSend = !!doc.revised_at && !!doc.submitted_at && doc.revised_at > doc.submitted_at;
+  const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
   const fromKharab = isReturn && !doc.against_purchase_id;
   const title = isReturn ? 'Supplier ko wapsi' : isReplacement ? 'Replacement aaya' : 'Maal aaya';
 
@@ -253,12 +293,24 @@ export default function PurchaseEdit() {
             <Text variant="small" color="textMuted">
               Gin ke dekho qty sahi hai na, har item ka kharid rate bharo, phir approve karo. Tab stock badhega.
             </Text>
+            {revisedAfterSend ? (
+              <Text variant="small" color="danger">Bhejne ke baad badla — {when(doc.revised_at!)}. Neeche jo hai wahi taaza hai.</Text>
+            ) : null}
+          </Card>
+        ) : null}
+        {waiting && !approver && mine ? (
+          <Card spine="warn">
+            <Text variant="heading">Owner ke review mein hai</Text>
+            <Text variant="small" color="textMuted">
+              Approve hone tak abhi bhi badal sakte ho — qty, maal, supplier, note. Jo badloge wo owner ko turant dikhega.
+            </Text>
+            {doc.revised_at ? <Text variant="small" color="textFaint">Aakhri badlav: {when(doc.revised_at)}</Text> : null}
           </Card>
         ) : null}
         {locked ? (
           <Card spine="warn">
-            <Text variant="heading">Owner ke approval ka intezaar</Text>
-            <Text variant="small" color="textMuted">Approve hote hi stock mein chadh jayega. Kuch badalna hai to “Wapas lo” dabao.</Text>
+            <Text variant="heading">Ye entry {submitter?.[0]?.full_name ?? 'kisi aur'} ki hai</Text>
+            <Text variant="small" color="textMuted">Sirf wo ya owner ise badal sakta hai.</Text>
           </Card>
         ) : null}
         {!waiting && doc.notes?.includes('Owner:') && !approver ? (
@@ -304,7 +356,7 @@ export default function PurchaseEdit() {
             key={l.id}
             title={l.description}
             subtitle={`${l.sku ?? ''} · ${fromKharab ? 'kharab mein' : 'godown mein'} ${l.here}`}
-            onRemove={locked ? undefined : () => deleteRow(db, 'purchase_lines', l.id)}>
+            onRemove={locked ? undefined : () => removeLine(l.id)}>
             <Row gap={12} wrap>
               <View style={{ flex: 1, minWidth: 90 }}>
                 <NumberField label={isReturn ? 'Kitne wapas' : 'Kitne aaye'} value={l.qty} onChange={(v) => patchLine(l.id, { qty: v ?? 0 })} decimals={0} editable={!locked} />
@@ -356,10 +408,10 @@ export default function PurchaseEdit() {
             />
             {waiting ? (
               <Card style={{ gap: space.sm }}>
-                <Input label="Wapas bhejne ki wajah" value={backNote} onChangeText={setBackNote} placeholder="Qty galat hai, dobara gino" />
+                <Input label="Wapas bhejne ya mana karne ki wajah" value={backNote} onChangeText={setBackNote} placeholder="Qty galat hai, dobara gino" />
                 <Row gap={space.sm}>
-                  <Button title="Wapas bhejo" tone="secondary" onPress={sendBack} style={{ flex: 1 }} />
-                  <Button title="Hata do" tone="danger" onPress={discard} />
+                  <Button title="Wapas bhejo — theek karke bheje" tone="secondary" onPress={sendBack} style={{ flex: 1 }} />
+                  <Button title="Mana karo" tone="danger" onPress={refuse} />
                 </Row>
               </Card>
             ) : (
@@ -368,8 +420,16 @@ export default function PurchaseEdit() {
           </>
         ) : isReturn ? (
           <Empty title="Supplier ko wapsi owner likhta hai" hint="Kharab maal “Kharab Likho” se alag rakh do — owner supplier ko bhejega." />
-        ) : locked ? (
-          <Button title="Wapas lo — badlav karna hai" tone="secondary" onPress={() => patch({ submitted_at: null })} />
+        ) : locked ? null : waiting ? (
+          <View style={{ gap: space.sm }}>
+            {/* An entry left empty or with a zero would sit in the owner's queue
+                unapprovable; say so here, where it can still be fixed. */}
+            <Button title="Ho gaya" size="lg" full onPress={() => { const bad = problems(); if (bad) { notify(bad, 'danger'); return; } router.back(); }} />
+            <Row gap={space.sm}>
+              <Button title="Queue se wapas lo" tone="secondary" onPress={() => patch({ submitted_at: null, revised_at: null })} style={{ flex: 1 }} />
+              <Button title="Hata do" tone="danger" onPress={discard} />
+            </Row>
+          </View>
         ) : (
           <Row gap={space.sm}>
             <Button title="Owner ko bhejo" size="lg" onPress={submit} style={{ flex: 1 }} />

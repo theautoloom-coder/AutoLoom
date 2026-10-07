@@ -310,7 +310,7 @@ export default function ItemForm() {
         if (!actor.userId) { notify('Session purana ho gaya. Dobara sign in karo.', 'danger'); return; }
         if (requestId) {
           await resubmitRequest(db, requestId, proposal, note);
-          notify('Dobara bhej diya. Owner dekhega.', 'ok');
+          notify(request?.status === 'pending' ? 'Badlav owner tak pahunch gaya.' : 'Dobara bhej diya. Owner dekhega.', 'ok');
         } else {
           await submitRequest(db, proposal, { actor, locationId, note });
           notify('Owner ko bhej diya. Approve hote hi item ban jayega.', 'ok');
@@ -527,7 +527,7 @@ export default function ItemForm() {
             value={note}
             onChangeText={setNote}
             placeholder="Kyu chahiye, ya kya badla — ek line"
-            hint={requestId ? 'Pichli baar wapas aayi thi — yahan likho ki ab kya theek kiya.' : 'Owner yahi padhega jab approve karega.'}
+            hint={requestId && request?.status === 'rejected' ? 'Pichli baar wapas aayi thi — yahan likho ki ab kya theek kiya.' : 'Owner yahi padhega jab approve karega.'}
             multiline
           />
         ) : null}
@@ -537,7 +537,7 @@ export default function ItemForm() {
         {missing ? <Text variant="small" color="textFaint">{missing}</Text> : null}
         <Row gap={space.sm}>
           <Button
-            title={canEdit ? (isNew ? 'Item bana do' : 'Badlav kar do') : (requestId ? 'Dobara bhejo' : 'Owner ko bhejo')}
+            title={canEdit ? (isNew ? 'Item bana do' : 'Badlav kar do') : (requestId ? (request?.status === 'pending' ? 'Badlav bhejo' : 'Dobara bhejo') : 'Owner ko bhejo')}
             size="lg" onPress={save} loading={saving} disabled={!!missing} style={{ flex: 1 }}
           />
           <Button title="Rehne do" tone="secondary" onPress={() => router.back()} />

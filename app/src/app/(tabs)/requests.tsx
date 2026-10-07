@@ -22,15 +22,16 @@ import { Badge, Button, Card, Divider, Empty, ListRow, Screen, SectionTitle, Tex
 
 type Row = ChangeRequest & { submitter: string | null };
 type Entry = {
-  id: string; doc_date: string; submitted_at: string | null; notes: string | null;
-  supplier: string | null; submitter: string | null; items: number; qty: number;
+  id: string; status: string; doc_no: string | null; doc_date: string; submitted_at: string | null; revised_at: string | null;
+  notes: string | null; cancel_reason: string | null; decided_at: string | null;
+  supplier: string | null; submitter: string | null; decider: string | null; items: number; qty: number;
 };
 
 const when = (iso: string) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? ''
-    : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    : d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 };
 
 function title(req: ChangeRequest): string {
@@ -59,20 +60,31 @@ export default function RequestsScreen() {
 
   // Stock entries from staff: the approver sees all of them, staff their own.
   // submitted_at set = waiting; cleared = sent back for a fix.
+  // Everything a staff member sent, wherever it is now: waiting (and still
+  // theirs to change), back with them, or decided in the last 30 days —
+  // approved or refused, with who decided and why.
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
   const { data: entryRows } = useQuery<Entry>(
-    `SELECT p.id, p.doc_date, p.submitted_at, p.notes, s.name AS supplier, pr.full_name AS submitter,
+    `SELECT p.id, p.status, p.doc_no, p.doc_date, p.submitted_at, p.revised_at, p.notes, p.cancel_reason,
+            COALESCE(p.posted_at, p.cancelled_at) AS decided_at,
+            s.name AS supplier, pr.full_name AS submitter, dp.full_name AS decider,
             (SELECT COUNT(*) FROM purchase_lines l WHERE l.purchase_id = p.id) AS items,
             (SELECT COALESCE(SUM(l.qty), 0) FROM purchase_lines l WHERE l.purchase_id = p.id) AS qty
        FROM purchases p
        LEFT JOIN suppliers s ON s.id = p.supplier_id
        LEFT JOIN profiles pr ON pr.id = p.submitted_by
-      WHERE p.status = 'draft' AND p.doc_type = 'purchase' AND p.submitted_by IS NOT NULL
+       LEFT JOIN profiles dp ON dp.id = COALESCE(p.approved_by, p.cancelled_by)
+      WHERE p.doc_type = 'purchase' AND p.submitted_by IS NOT NULL
         AND (?1 = 1 OR p.submitted_by = ?2)
-      ORDER BY COALESCE(p.submitted_at, p.updated_at) DESC`,
-    [approver ? 1 : 0, me],
+        AND (p.status = 'draft' OR COALESCE(p.posted_at, p.cancelled_at, p.updated_at) >= ?3)
+      ORDER BY COALESCE(p.posted_at, p.cancelled_at, p.submitted_at, p.updated_at) DESC`,
+    [approver ? 1 : 0, me, since],
   );
-  const waiting = (entryRows ?? []).filter((e) => e.submitted_at);
-  const sentBack = (entryRows ?? []).filter((e) => !e.submitted_at);
+  const drafts = (entryRows ?? []).filter((e) => e.status === 'draft');
+  const waiting = drafts.filter((e) => e.submitted_at);
+  const sentBack = drafts.filter((e) => !e.submitted_at);
+  const decidedEntries = (entryRows ?? []).filter((e) => e.status !== 'draft').slice(0, 30);
+  const revised = (e: Entry) => !!e.revised_at && !!e.submitted_at && e.revised_at > e.submitted_at;
 
   // A reviewer sees the whole queue; everyone else sees only their own.
   const { data: rows } = useQuery<Row>(
@@ -107,7 +119,7 @@ export default function RequestsScreen() {
             does not know about, and a bill for them would show short. */}
         {sentBack.length > 0 ? (
           <>
-            <SectionTitle>{approver ? 'Maal — wapas bheja hua' : 'Maal wapas aaya — theek karke bhejo'}</SectionTitle>
+            <SectionTitle>{approver ? 'Maal — staff ke paas wapas' : 'Maal — abhi bheja nahi ya wapas aaya'}</SectionTitle>
             {sentBack.map((e) => (
               <Card key={e.id} keyline={!approver} spine="accent">
                 <Text variant="rowTitle">{e.supplier ?? 'Supplier'} · {e.qty} pcs</Text>
@@ -119,7 +131,10 @@ export default function RequestsScreen() {
           </>
         ) : null}
 
-        <SectionTitle>{approver ? `Aaya hua maal — approve karo ${waiting.length || ''}` : `Mera aaya hua maal ${waiting.length || ''}`}</SectionTitle>
+        <SectionTitle>{approver ? `Aaya hua maal — approve karo ${waiting.length || ''}` : `Review mein ${waiting.length || ''}`}</SectionTitle>
+        {!approver && waiting.length > 0 ? (
+          <Text variant="small" color="textMuted">Approve hone tak inhe badal sakte ho — kholo, qty ya maal theek karo. Owner ko turant dikhega.</Text>
+        ) : null}
         {waiting.length === 0 ? (
           <Empty
             title={approver ? 'Koi maal approval ke liye nahi' : 'Kuch baaki nahi'}
@@ -134,14 +149,43 @@ export default function RequestsScreen() {
                 {i > 0 ? <Divider /> : null}
                 <ListRow
                   title={`${e.supplier ?? 'Supplier'} · ${e.qty} pcs`}
-                  subtitle={[approver ? e.submitter : null, `${e.items} item`, e.doc_date].filter(Boolean).join('  ·  ')}
-                  right={<Badge tone="warn">{approver ? 'Approve karo' : 'Intezaar'}</Badge>}
+                  subtitle={[approver ? e.submitter : null, `${e.items} item`, e.doc_date, revised(e) ? `badla ${when(e.revised_at!)}` : null].filter(Boolean).join('  ·  ')}
+                  right={
+                    revised(e) && approver
+                      ? <Badge tone="danger">Badla gaya</Badge>
+                      : <Badge tone="warn">{approver ? 'Approve karo' : 'Badal sakte ho'}</Badge>
+                  }
                   onPress={() => router.push(`/purchase/approve?id=${e.id}`)}
                 />
               </React.Fragment>
             ))}
           </Card>
         )}
+
+        {decidedEntries.length > 0 ? (
+          <>
+            <SectionTitle>{approver ? 'Haal ke faisle (30 din)' : 'Faisla ho gaya (30 din)'}</SectionTitle>
+            <Card style={{ gap: 0 }}>
+              {decidedEntries.map((e, i) => (
+                <React.Fragment key={e.id}>
+                  {i > 0 ? <Divider /> : null}
+                  <ListRow
+                    title={`${e.supplier ?? 'Supplier'} · ${e.qty} pcs`}
+                    subtitle={[
+                      approver ? e.submitter : null,
+                      e.status === 'posted'
+                        ? `${e.decider ?? 'Owner'} ne approve kiya${e.doc_no ? ` · ${e.doc_no}` : ''}`
+                        : `${e.decider ?? 'Owner'} ne mana kiya: ${e.cancel_reason ?? '—'}`,
+                      e.decided_at ? when(e.decided_at) : e.doc_date,
+                    ].filter(Boolean).join('  ·  ')}
+                    right={e.status === 'posted' ? <Badge tone="ok">Approve</Badge> : <Badge tone="danger">Mana kiya</Badge>}
+                    onPress={() => router.push(`/purchase/${e.id}`)}
+                  />
+                </React.Fragment>
+              ))}
+            </Card>
+          </>
+        ) : null}
 
         {/* The submitter's rejections come first: they are the only items here
             that need someone to do something today. */}

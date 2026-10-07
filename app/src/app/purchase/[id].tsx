@@ -131,7 +131,11 @@ export default function PurchaseDetail() {
             {p.submitter ? <Text variant="small" color="textFaint">{p.submitter} ne likha{p.approver ? ` · ${p.approver} ne approve kiya` : ''}</Text> : null}
           </View>
         </Row>
-        {p.status === 'cancelled' ? <Card tone="alt"><Text color="danger">Cancel hua: {p.cancel_reason}</Text></Card> : null}
+        {p.status === 'cancelled' ? (
+          <Card tone="alt">
+            <Text color="danger">{p.doc_no ? 'Cancel hua' : 'Owner ne mana kiya'}: {p.cancel_reason}</Text>
+          </Card>
+        ) : null}
 
         {showCost ? (
           <Card tone="navy">

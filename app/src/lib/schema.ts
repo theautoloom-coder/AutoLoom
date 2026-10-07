@@ -75,6 +75,7 @@ export const change_requests = new Table(
     location_id: column.text,
     created_at: column.text,
     updated_at: column.text,
+    revised_at: column.text,
   },
   {}
 );
@@ -601,6 +602,7 @@ export const purchases = new Table(
     settled_at: column.text,
     settled_by: column.text,
     settle_note: column.text,
+    revised_at: column.text,
   },
   { indexes: { supplier: ['supplier_id'], date: ['doc_date'] } }
 );

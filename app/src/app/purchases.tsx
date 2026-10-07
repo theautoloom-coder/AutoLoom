@@ -56,11 +56,11 @@ export default function PurchasesScreen() {
                   <Badge tone="warn">approval baaki</Badge>
                 ) : showCost ? (
                   <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'draft' ? 'neutral' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>
-                    {p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : p.paid_total >= p.grand_total ? 'chuka diya' : 'dena baaki'}
+                    {p.status === 'cancelled' ? (p.doc_no ? 'cancel' : 'mana kiya') : p.status === 'draft' ? 'adhoora' : p.paid_total >= p.grand_total ? 'chuka diya' : 'dena baaki'}
                   </Badge>
                 ) : (
                   <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'draft' ? 'neutral' : 'ok'}>
-                    {p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : 'stock mein'}
+                    {p.status === 'cancelled' ? (p.doc_no ? 'cancel' : 'mana kiya') : p.status === 'draft' ? 'adhoora' : 'stock mein'}
                   </Badge>
                 )}
               </View>

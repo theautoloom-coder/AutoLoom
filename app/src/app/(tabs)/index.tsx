@@ -39,7 +39,7 @@ function greeting(): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { can, profile } = useSession();
+  const { can, profile, actor } = useSession();
   const today = toDateString();
 
   // The two halves of this screen are two queries, so they wait separately.
@@ -59,9 +59,16 @@ export default function HomeScreen() {
   const showCost = can('catalog.view_cost');
   const seeTotals = can('reports.view');
   const approver = can('purchase.approve');
-  const { data: waitingRows } = useQuery<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL`);
+  const { data: waitingRows } = useQuery<{ n: number; mine: number; back: number }>(
+    `SELECT (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL) AS n,
+            (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL AND submitted_by = ?1)
+          + (SELECT COUNT(*) FROM change_requests WHERE status = 'pending' AND submitted_by = ?1) AS mine,
+            (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NULL AND submitted_by = ?1)
+          + (SELECT COUNT(*) FROM change_requests WHERE status = 'rejected' AND submitted_by = ?1) AS back`,
+    [actor.userId ?? '']);
   const waiting = waitingRows?.[0]?.n ?? 0;
+  const myWaiting = waitingRows?.[0]?.mine ?? 0;
+  const myBack = waitingRows?.[0]?.back ?? 0;
   // Same count the Grid below renders, so the grey tiles and the real ones
   // occupy the same rows and nothing reflows underneath them.
   const tileCount = 3 + (showProfit ? 1 : 0) + (showCost ? 1 : 0);
@@ -128,6 +135,13 @@ export default function HomeScreen() {
           )}
           {seeTotals ? (
             <StatTile label="Aaj ka kharcha" value={formatINR(spent)} sub="business ka" icon="wallet-outline" accent="amber" onPress={() => router.push('/expenses')} />
+          ) : null}
+          {/* A staff member's own queue: what is with the owner, what came back. */}
+          {!approver && myBack > 0 ? (
+            <StatTile label="Wapas aaya" value={String(myBack)} sub="theek karke dobara bhejo" icon="return-down-back-outline" accent="rose" tone="danger" onPress={() => router.push('/requests')} />
+          ) : null}
+          {!approver && myWaiting > 0 ? (
+            <StatTile label="Review mein" value={String(myWaiting)} sub="approve tak badal sakte ho" icon="hourglass-outline" accent="amber" onPress={() => router.push('/requests')} />
           ) : null}
           {approver && waiting > 0 ? (
             <StatTile label="Approval baaki" value={String(waiting)} sub="staff ka maal — rate bharo" icon="checkmark-done-outline" accent="rose" tone="danger" onPress={() => router.push('/requests')} />

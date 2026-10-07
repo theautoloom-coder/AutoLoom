@@ -120,6 +120,23 @@ let entryId = '';
     check('stock did not move before approval', godownQty() === before, `${before} → ${godownQty()}`);
   });
 
+  // Owner, 7 Oct 2026: staff see what they sent and can fix it while it waits.
+  await step('staff fix their entry while it is in review', async () => {
+    if (!entryId) throw new Error('no staff entry');
+    await go(page, '/requests', 6000);
+    check('"Review mein" lists the staff entry', await visible(page, `${SUPPLIER} · 3 pcs`));
+    await page.getByText(`${SUPPLIER} · 3 pcs`).locator('visible=true').first().click();
+    await page.waitForTimeout(5000);
+    check('entry opens editable, still in review', await visible(page, 'Owner ke review mein hai'));
+    await page.getByLabel('Kitne aaye').locator('visible=true').first().fill('5');
+    await page.waitForTimeout(1500);
+    await page.getByRole('button', { name: 'Ho gaya' }).click();
+    await page.waitForTimeout(8000);
+    check('the change reached the server', num(`select coalesce(sum(qty),0) from purchase_lines where purchase_id = '${entryId}'`) === 5);
+    check('still waiting for the owner', sql(`select (submitted_at is not null)::text from purchases where id = '${entryId}'`) === 'true');
+    check('the change is stamped for the owner', sql(`select coalesce(revised_at::text,'') from purchases where id = '${entryId}'`) !== '');
+  });
+
   await step('staff puts kharab maal aside', async () => {
     const g0 = godownQty(); const k0 = kharabQty();
     await go(page, '/kharab-maal', 6000);
@@ -185,9 +202,11 @@ let entryId = '';
     if (!entryId) throw new Error('no staff entry to approve');
     const before = godownQty();
     await go(page, '/requests', 6000);
-    check('approval queue shows the entry', await visible(page, `${SUPPLIER} · 3 pcs`));
-    await page.getByText(`${SUPPLIER} · 3 pcs`).first().click();
+    check('approval queue shows the entry', await visible(page, `${SUPPLIER} · 5 pcs`));
+    check('owner sees it was changed after sending', await visible(page, 'Badla gaya'));
+    await page.getByText(`${SUPPLIER} · 5 pcs`).first().click();
     await page.waitForTimeout(5000);
+    check('approve screen says it changed after sending', await page.getByText(/Bhejne ke baad badla/).first().isVisible().catch(() => false));
     await page.getByLabel('Kharid rate').first().fill('1500');
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: /Approve karo/i }).click();
@@ -195,8 +214,8 @@ let entryId = '';
     await page.waitForTimeout(9000);
     check('entry is posted', sql(`select status from purchases where id = '${entryId}'`) === 'posted');
     check('the approver is recorded', sql(`select coalesce(approved_by::text,'') from purchases where id = '${entryId}'`) !== '');
-    check('supplier khata got the amount', num(`select grand_total from purchases where id = '${entryId}'`) === 4500);
-    check('stock went up on approval', godownQty() === before + 3, `${before} → ${godownQty()}`);
+    check('supplier khata got the amount', num(`select grand_total from purchases where id = '${entryId}'`) === 7500);
+    check('stock went up on approval', godownQty() === before + 5, `${before} → ${godownQty()}`);
   });
 
   let dn = '';

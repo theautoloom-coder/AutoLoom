@@ -23,11 +23,14 @@ declare
   variant uuid;
   pid     uuid := gen_random_uuid();
   tid     uuid := gen_random_uuid();
+  rid     uuid := gen_random_uuid();
+  other   uuid;
   pass    int := 0;
   fail    int := 0;
   ok      boolean;
 begin
   select id into owner from public.profiles where role = 'owner' limit 1;
+  select id into other from public.profiles where role = 'staff' and id <> staff limit 1;
   select id into sup from public.suppliers limit 1;
   select id into godown from public.locations where type = 'warehouse' and is_active limit 1;
   select id into kharab from public.locations where type = 'damaged' limit 1;
@@ -82,6 +85,49 @@ begin
     raise notice 'PASS  staff cannot move maal anywhere else'; pass := pass + 1;
   end;
 
+  -- 5b. While it waits, its writer may still change it.
+  update public.purchase_lines set qty = 4 where purchase_id = pid;
+  update public.purchases set revised_at = now(), notes = 'ek aur mila' where id = pid;
+  if (select qty from public.purchase_lines where purchase_id = pid) = 4 then
+    raise notice 'PASS  staff can fix their own entry while in review'; pass := pass + 1;
+  else
+    raise notice 'FAIL  staff edit in review did not land'; fail := fail + 1;
+  end if;
+
+  -- 5c. ...but cannot refuse it or approve it.
+  begin
+    update public.purchases set status = 'cancelled', cancel_reason = 'x' where id = pid;
+    raise notice 'FAIL  staff refused their own entry'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  staff cannot refuse an entry'; pass := pass + 1;
+  end;
+
+  -- 5d. A second staff member cannot touch it.
+  perform set_config('request.jwt.claims', json_build_object('sub', other, 'role', 'authenticated')::text, true);
+  begin
+    update public.purchase_lines set qty = 99 where purchase_id = pid;
+    raise notice 'FAIL  another staff member changed the entry'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  another staff member cannot change it'; pass := pass + 1;
+  end;
+  begin
+    delete from public.purchases where id = pid;
+    raise notice 'FAIL  another staff member deleted the entry'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  another staff member cannot delete it'; pass := pass + 1;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', staff, 'role', 'authenticated')::text, true);
+
+  -- 5e. A new-item request changed while pending is a new revision.
+  insert into public.change_requests (id, kind, status, payload, submitted_by, submitted_at, revision)
+  values (rid, 'new_item', 'pending', '{"name":"Test bulb","price":100}', staff, now(), 1);
+  update public.change_requests set payload = '{"name":"Test bulb H4","price":120}' where id = rid;
+  if (select revision = 2 and revised_at is not null from public.change_requests where id = rid) then
+    raise notice 'PASS  editing a pending request counts as a revision'; pass := pass + 1;
+  else
+    raise notice 'FAIL  pending request edit not marked'; fail := fail + 1;
+  end if;
+
   -- 7. The owner approves it.
   perform set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
   update public.purchases set status = 'posted', doc_no = 'TEST/1', approved_by = owner where id = pid;
@@ -91,6 +137,17 @@ begin
   else
     raise notice 'FAIL  owner approval did not post'; fail := fail + 1;
   end if;
+
+  -- 7b. Once approved, its writer can no longer change it.
+  perform set_config('request.jwt.claims', json_build_object('sub', staff, 'role', 'authenticated')::text, true);
+  begin
+    update public.purchase_lines set qty = 1 where purchase_id = pid;
+    raise notice 'FAIL  staff changed an approved entry'; fail := fail + 1;
+  exception when others then
+    -- Either guard may answer first: the posted-lines one or the staff one.
+    raise notice 'PASS  an approved entry is locked for staff'; pass := pass + 1;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
 
   -- 8. ...and writes partner money.
   insert into public.payments (direction, party_type, party_id, amount, mode, status)

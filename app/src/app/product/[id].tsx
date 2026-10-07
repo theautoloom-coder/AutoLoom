@@ -175,7 +175,7 @@ export default function ProductScreen() {
             <Text variant="display" style={{ marginTop: space.xs, flex: 1 }}>
               {product.name}
             </Text>
-            {can('catalog.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/admin/item?id=${product.id}`)} /> : null}
+            {can('catalog.edit') ? <Button title="Badlo" tone="secondary" size="sm" onPress={() => router.push(`/admin/item?id=${product.id}${variant ? `&variant=${variant.id}` : ''}` as never)} /> : null}
           </Row>
           {product.description ? (
             <Text variant="small" color="textMuted">
@@ -185,7 +185,15 @@ export default function ProductScreen() {
         </View>
 
         {/* Variants */}
-        <SectionTitle>Kism · {variants?.length ?? 0}</SectionTitle>
+        <SectionTitle
+          right={can('catalog.edit') || can('purchase.create') ? (
+            // Same item for another car or colour: a new kism, never a new item.
+            // Staff send it as a request; the owner adds it straight away.
+            <Button title={can('catalog.edit') ? '+ Nayi gaadi / kism' : 'Nayi gaadi / kism maango'} size="sm" tone="secondary"
+              onPress={() => router.push(`/admin/item?product=${product.id}` as never)} />
+          ) : undefined}>
+          Kism · {variants?.length ?? 0}
+        </SectionTitle>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.xs }}>
           {(variants ?? []).map((v) => (
             <Chip key={v.id} label={`${v.variant_name} · ${v.qty}`} selected={v.id === variant?.id} onPress={() => setSelectedId(v.id)} />

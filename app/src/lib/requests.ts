@@ -15,7 +15,7 @@
  */
 import { slug, uniqueSku, uuidv7 } from '@domain';
 
-import { insertRow, searchText, type Actor } from './writes';
+import { insertRow, searchText, updateRow, type Actor } from './writes';
 
 /** A database handle or an open write transaction — both expose execute/getAll. */
 type Writable = Parameters<typeof insertRow>[0];
@@ -46,6 +46,13 @@ export type ItemProposal = {
   fits?: ProposalFit[];
   /** Goes on every car (sold by spec, not by car). */
   universal?: boolean;
+  /**
+   * Set when this is a new kism of an item that already exists — the same mat
+   * for another car, the same bulb in another socket. The item (name,
+   * category, shared specs) is not created again; only a variant is added.
+   */
+  product_id?: string | null;
+  product_name?: string | null;
 };
 
 /**
@@ -66,16 +73,24 @@ export type ProposalSpec = {
   text?: string | null;
   number?: number | null;
   bool?: boolean | null;
+  /** New kism only: the value is the item's own, so it is not repeated on the kism. */
+  inherited?: boolean;
 };
 
-export type ProposalFit = { model_id: string; year_from?: number | null; year_to?: number | null; label?: string };
+/** One car a kism fits. `label` is the short form shown in names: "Creta 2019–2023". */
+export type ProposalFit = { model_id: string; year_from?: number | null; year_to?: number | null; label?: string; make?: string };
 
-/** "H4 · 60/55 W" from the specs that name a variant, else the typed type/colour. */
-export function variantNameOf(p: Pick<ItemProposal, 'specs' | 'type' | 'colour'>): string {
+/**
+ * A kism's name: the cars it fits, then the specs that name it — "Creta
+ * 2019–2023 · 7D · Black", "H4 · 60/55 W". The car comes first because two
+ * kisms of one mat differ by the car, and the bill line has to say which.
+ */
+export function variantNameOf(p: Pick<ItemProposal, 'specs' | 'type' | 'colour' | 'fits' | 'universal'>): string {
+  const cars = p.universal ? [] : (p.fits ?? []).map((f) => f.label?.trim()).filter(Boolean).slice(0, 2) as string[];
   const named = (p.specs ?? []).filter((s) => (s.axis || s.in_name) && s.display.trim())
     .sort((a, b) => a.sort - b.sort).map((s) => s.display.trim());
   const typed = [p.type?.trim(), p.colour?.trim()].filter(Boolean) as string[];
-  return [...named, ...typed].join(' · ') || 'Standard';
+  return [...cars, ...named, ...typed].join(' · ') || 'Standard';
 }
 
 /** The proposal's cars, folding in the old single-car fields. */
@@ -87,19 +102,32 @@ export function fitsOf(p: ItemProposal): ProposalFit[] {
 }
 
 /**
- * Write an item's specs and cars. Replaces whatever was there, so the same
- * call serves a new item and an edit. Spec rows on a variant axis (a bulb's
- * socket) sit on the variant; the rest describe the product.
+ * Write one kism's specs and cars, and — unless it is a new kism of an item
+ * that already exists — the item's shared specs.
+ *
+ *   · axis specs (a bulb's socket, a mat's colour) belong to the kism;
+ *   · the rest describe the item and are shared by every kism of it; a new
+ *     kism keeps only the values that differ from the item's own;
+ *   · cars belong to the kism, so two kisms of one mat fit different cars.
+ *
+ * Only this kism's rows (and the item's shared ones, in 'item' scope) are
+ * replaced. It used to delete every spec and car of the whole product, which
+ * on an item with several kisms wiped the others' details.
  */
 export async function writeSpecsAndFits(
   tx: Writable, productId: string, variantId: string, p: ItemProposal, actor?: Actor,
+  opts: { scope?: 'item' | 'kism'; onlyKism?: boolean } = {},
 ): Promise<void> {
-  await tx.execute('DELETE FROM spec_values WHERE product_id = ?', [productId]);
+  const scope = opts.scope ?? 'item';
+  if (scope === 'item') await tx.execute('DELETE FROM spec_values WHERE product_id = ? AND variant_id IS NULL', [productId]);
+  await tx.execute('DELETE FROM spec_values WHERE variant_id = ?', [variantId]);
   for (const sp of p.specs ?? []) {
     if (!sp.display.trim()) continue;
+    if (scope === 'kism' && !sp.axis && sp.inherited) continue;
+    const onKism = sp.axis || scope === 'kism';
     await insertRow(tx, 'spec_values', {
       product_id: productId,
-      variant_id: sp.axis ? variantId : null,
+      variant_id: onKism ? variantId : null,
       spec_definition_id: sp.def_id,
       option_id: sp.option_id ?? null,
       option_ids: sp.option_ids ?? null,
@@ -109,11 +137,14 @@ export async function writeSpecsAndFits(
       display_value: sp.display.trim(),
     });
   }
-  await tx.execute('DELETE FROM product_fitments WHERE product_id = ?', [productId]);
+  await tx.execute('DELETE FROM product_fitments WHERE variant_id = ?', [variantId]);
+  // An item with one kism may still carry cars written at item level by an
+  // older build; they are this kism's, so they move onto it.
+  if (opts.onlyKism) await tx.execute('DELETE FROM product_fitments WHERE product_id = ? AND variant_id IS NULL', [productId]);
   if (p.universal) return;
   for (const f of fitsOf(p)) {
     await insertRow(tx, 'product_fitments', {
-      product_id: productId, variant_id: null, model_id: f.model_id,
+      product_id: productId, variant_id: variantId, model_id: f.model_id,
       year_from: f.year_from ?? null, year_to: f.year_to ?? null,
     }, actor);
   }
@@ -190,6 +221,8 @@ export async function applyItemProposal(
 ): Promise<{ productId: string; variantId: string }> {
   const { actor, locationId, takenSkus } = opts;
 
+  if (p.product_id) return addKism(tx, p, opts);
+
   // A proposal may name a category that does not exist yet. Creating it here
   // means it is made by the approver, who is allowed to, instead of by the
   // staff member, whose insert the server would refuse and PowerSync would
@@ -218,7 +251,7 @@ export async function applyItemProposal(
   // The server rebuilds search text from the spec and car rows once they
   // sync; this copy makes the item findable on this phone straight away.
   const text = searchText(p.name, p.family_name, p.type, p.colour, p.car_text, p.year_text,
-    ...(p.specs ?? []).map((s) => s.display), ...fits.map((f) => f.label ?? ''));
+    ...(p.specs ?? []).map((s) => s.display), ...fits.flatMap((f) => [f.make ?? '', f.label ?? '']));
 
   const productId = uuidv7();
   await insertRow(tx, 'products', {
@@ -230,7 +263,7 @@ export async function applyItemProposal(
     is_active: true,
   }, actor);
 
-  const base = [opts.skuPrefix || 'ITM', slug(p.name, 6), slug(p.colour ?? '', 4)].filter(Boolean).join('-');
+  const base = [opts.skuPrefix || 'ITM', slug(p.name, 6), slug(fits[0]?.label ?? '', 6), slug(p.colour ?? '', 4)].filter(Boolean).join('-');
   const variantId = uuidv7();
   await insertRow(tx, 'product_variants', {
     id: variantId,
@@ -252,7 +285,7 @@ export async function applyItemProposal(
     is_active: true,
   }, actor);
 
-  await writeSpecsAndFits(tx, productId, variantId, p, actor);
+  await writeSpecsAndFits(tx, productId, variantId, p, actor, { scope: 'item' });
 
   if ((p.qty ?? 0) > 0 && locationId) {
     await insertRow(tx, 'stock_movements', {
@@ -266,6 +299,71 @@ export async function applyItemProposal(
     }, actor);
   }
 
+  return { productId, variantId };
+}
+
+/**
+ * A new kism of an item that already exists: the same mat for another car,
+ * the same bulb in another socket. The item is not made again — one variant
+ * with its own SKU, rate, stock, cars and the specs where it differs.
+ */
+async function addKism(
+  tx: Writable,
+  p: ItemProposal,
+  opts: { actor?: Actor; locationId?: string | null; takenSkus: Set<string>; skuPrefix?: string | null },
+): Promise<{ productId: string; variantId: string }> {
+  const { actor, locationId, takenSkus } = opts;
+  const productId = p.product_id!;
+  const found = await tx.execute(
+    `SELECT p.name, p.search_text, f.sku_prefix,
+            (SELECT COUNT(*) FROM product_variants v WHERE v.product_id = p.id) AS kisms
+       FROM products p LEFT JOIN product_families f ON f.id = p.family_id WHERE p.id = ?`, [productId]);
+  const item = found.rows?._array?.[0] as { name: string; search_text: string | null; sku_prefix: string | null; kisms: number } | undefined;
+  if (!item) throw new Error('Ye item is phone par nahi mila — sync hone do, phir dobara karo.');
+
+  const fits = fitsOf(p);
+  const variantName = variantNameOf(p);
+  const base = [item.sku_prefix || opts.skuPrefix || 'ITM', slug(item.name, 6), slug(fits[0]?.label ?? '', 6), slug(p.colour ?? '', 4)]
+    .filter(Boolean).join('-');
+  const variantId = uuidv7();
+  await insertRow(tx, 'product_variants', {
+    id: variantId,
+    product_id: productId,
+    variant_name: variantName,
+    sku: uniqueSku(base, takenSkus),
+    retail_price: p.price,
+    dealer_price: p.price,
+    min_stock: 0,
+    reorder_level: 0,
+    reorder_qty: 0,
+    pack_size: p.pack_size ?? 1,
+    pack_label: p.pack_label?.trim() || null,
+    warranty_months: p.warranty_months ?? 0,
+    last_purchase_cost: p.cost ?? 0,
+    avg_cost: p.cost ?? 0,
+    search_text: searchText(item.search_text ?? item.name, base, variantName,
+      ...(p.specs ?? []).map((s) => s.display), ...fits.flatMap((f) => [f.make ?? '', f.label ?? ''])),
+    sort_order: Number(item.kisms) || 0,
+    is_active: true,
+  }, actor);
+
+  // A kism made for particular cars means the item is no longer "every car".
+  if (fits.length && !p.universal) {
+    await updateRow(tx, 'products', productId, { is_universal_fit: false });
+  }
+  await writeSpecsAndFits(tx, productId, variantId, p, actor, { scope: 'kism' });
+
+  if ((p.qty ?? 0) > 0 && locationId) {
+    await insertRow(tx, 'stock_movements', {
+      variant_id: variantId,
+      location_id: locationId,
+      qty: p.qty,
+      movement_type: 'opening',
+      unit_cost: p.cost ?? 0,
+      occurred_at: new Date().toISOString(),
+      note: 'Opening stock',
+    }, actor);
+  }
   return { productId, variantId };
 }
 

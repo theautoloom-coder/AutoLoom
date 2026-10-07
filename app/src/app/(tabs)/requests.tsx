@@ -37,6 +37,11 @@ const when = (iso: string) => {
 function title(req: ChangeRequest): string {
   const p = parseProposal(req);
   if (!p) return 'Request';
+  // A kism request names the item it belongs to and what is new about it.
+  if (p.product_id) {
+    const what = [...(p.fits ?? []).map((f) => f.label), p.colour].filter(Boolean).join(', ');
+    return `${p.product_name ?? p.name} · nayi kism${what ? ` (${what})` : ''}`;
+  }
   return [p.name, p.colour].filter(Boolean).join(' · ') || 'Naya item';
 }
 

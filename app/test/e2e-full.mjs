@@ -85,6 +85,14 @@ console.log('\n▸ Kharcha Likho');
 // ---------------------------------------------------------------------------
 console.log('\n▸ Bill Banao');
 {
+  // e2e-day's ginti sets this item to 3 and later bills take it below zero;
+  // a bill on an empty shelf stops on "Stock kam hai". Keep the shelf stocked.
+  sql(`insert into stock_movements (variant_id, location_id, qty, movement_type, unit_cost, note)
+       select pv.id, (select id from locations where code = 'MAIN'), 20, 'opening', coalesce(nullif(pv.avg_cost, 0), 1400), 'e2e top-up'
+         from product_variants pv join products p on p.id = pv.product_id
+        where p.name ilike '%X-tremeVision%' and pv.search_text ilike '%h4%'
+          and coalesce((select sum(m.qty) from stock_movements m join locations l on l.id = m.location_id
+                         where m.variant_id = pv.id and l.type <> 'damaged'), 0) < 5`);
   const before = num("select count(*) from sales_invoices where status='posted'");
   await go('/invoice/edit', 6500);
   // A new bill opens on the cash customer (Walk-in) already.

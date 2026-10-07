@@ -162,6 +162,7 @@ export default function RequestReview() {
         <Card>
           <KV k="Category" v={family?.name ?? '—'} />
           <KV k="Item" v={p?.name ?? '—'} />
+          {p?.product_id ? <KV k="Kya hai" v="Is item ki nayi kism — item pehle se hai" /> : null}
           {(p?.specs ?? []).length
             ? (p?.specs ?? []).map((sp) => <KV key={sp.def_id} k={sp.name} v={sp.display} />)
             : (<>

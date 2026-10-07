@@ -107,6 +107,7 @@ const TOPICS: Topic[] = [
       'Category chuno — Bulb, Mats, Seat cover… Uske hisaab se detail ke box khulte hain: bulb mein socket (H4, H7…), watt, colour; mat mein type, colour.',
       'Gaadi chuno — company, model, aur kis saal se kis saal tak. Har gaadi mein lagne wala ho to “Sab gaadi” chuno.',
       'Bechne ka rate aur kharid rate bharo, phir “Item bana do”.',
+      'Wahi item doosri gaadi ya colour ke liye? Naya mat banao — item kholo → “+ Nayi gaadi / kism”, sirf gaadi, saal, colour chuno. Naam likhte hi “Ye item pehle se hai?” bhi dikhega.',
     ],
     note: 'Jo detail bharoge wahi stock list, bill ki search aur item ke page par dikhegi — “H4 · 60/55W · Creta 2019–2023”. Search mein socket ya gaadi likh ke bhi item mil jaata hai.',
     go: { label: 'Naya item', href: '/admin/item' },

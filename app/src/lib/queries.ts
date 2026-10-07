@@ -43,7 +43,7 @@ export const SPECS_OF = (p: string, pv: string) => `
 
 /** Which cars an item goes on: "Creta 2019–2023, Venue 2020+". */
 export const FITS_OF = (p: string, pv: string) => `
-  (SELECT CASE WHEN ${p}.is_universal_fit = 1 THEN 'Sab gaadi' ELSE GROUP_CONCAT(label, ', ') END FROM (
+  (SELECT COALESCE(GROUP_CONCAT(label, ', '), CASE WHEN ${p}.is_universal_fit = 1 THEN 'Sab gaadi' END) FROM (
      SELECT vm.name || COALESCE(' ' || COALESCE(pf.year_from, g.year_from)
               || CASE WHEN COALESCE(pf.year_to, g.year_to) IS NULL THEN '+'
                       WHEN COALESCE(pf.year_to, g.year_to) = COALESCE(pf.year_from, g.year_from) THEN ''

@@ -12,6 +12,12 @@
  *   · Gaadi is a list: company + model, each with the years it fits, or "Sab
  *     gaadi" for things sold by spec rather than by car.
  *
+ * One item, many kisms (owner, 7 Oct 2026): "ek baar ABC mat ban gaya to
+ * doosri gaadi ke liye wapas na banana pade". An item that exists is never
+ * made again — `?product=<id>` adds a kism to it (another car, another colour)
+ * with only what differs, and typing a name that already exists offers that.
+ * Editing (`?id=&variant=`) changes one kism plus the item's shared details.
+ *
  * Underneath it writes the rows the rest of the app reads — product, one
  * variant, spec_values, product_fitments, opening stock — in one transaction.
  * The variant's name is built from the specs that name it ("H4 · 60/55 W"),
@@ -32,7 +38,7 @@ import {
 } from '@/lib/requests';
 import { insertRow, searchText, updateRow } from '@/lib/writes';
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
-import { Button, Chip, Input, Row, Screen, Text } from '@/ui';
+import { Button, Card, Chip, Input, Row, Screen, Text } from '@/ui';
 import { Disclosure, FormSection, NumberField, SelectField, notify } from '@/ui/forms';
 import { PhotoPicker } from '@/ui/photo';
 import { space } from '@/ui/theme';
@@ -42,6 +48,8 @@ type Model = { id: string; name: string; make_name: string };
 type Gen = { id: string; model_id: string; name: string; year_from: number | null; year_to: number | null };
 type Def = { id: string; code: string; name: string; data_type: string; unit: string | null; is_required: number; is_variant_axis: number; show_in_variant_name: number; sort_order: number };
 type Opt = { id: string; spec_definition_id: string; value: string };
+type SpecRow = { product_id: string; spec_definition_id: string; variant_id: string | null; option_id: string | null; option_ids: string | null; value_text: string | null; value_number: number | null; value_bool: number | null };
+type Base = { id: string; name: string; family_id: string; family_name: string | null; kisms: number; first_kism: string | null; spec_count: number; fit_count: number };
 type Existing = {
   id: string; name: string; family_id: string; variant_id: string; variant_name: string; sku: string; is_universal_fit: number;
   retail_price: number; dealer_price: number | null; avg_cost: number; pack_size: number; pack_label: string | null; warranty_months: number;
@@ -52,8 +60,17 @@ type SpecVal = { option_id?: string | null; option_ids?: string[]; text?: string
 const yearsLabel = (f: { year_from?: number | null; year_to?: number | null }) =>
   f.year_from ? ` ${f.year_from}${f.year_to ? (f.year_to === f.year_from ? '' : `–${f.year_to}`) : '+'}` : '';
 
+const toVal = (r: SpecRow): SpecVal => ({
+  option_id: r.option_id, option_ids: r.option_ids ? r.option_ids.split(',').filter(Boolean) : undefined,
+  text: r.value_text ?? undefined, number: r.value_number, bool: r.value_bool == null ? null : !!r.value_bool,
+});
+/** Two spec values that say the same thing, however they were stored. */
+const sameVal = (a?: SpecVal, b?: SpecVal) => JSON.stringify([a?.option_id ?? null, [...(a?.option_ids ?? [])].sort(), (a?.text ?? '').trim(), a?.number ?? null, a?.bool ?? null])
+  === JSON.stringify([b?.option_id ?? null, [...(b?.option_ids ?? [])].sort(), (b?.text ?? '').trim(), b?.number ?? null, b?.bool ?? null]);
+
 export default function ItemForm() {
-  const { id, request: requestId, name: nameParam, back } = useLocalSearchParams<{ id?: string; request?: string; name?: string; back?: string }>();
+  const { id, variant: variantParam, product: productParam, request: requestId, name: nameParam, back } =
+    useLocalSearchParams<{ id?: string; variant?: string; product?: string; request?: string; name?: string; back?: string }>();
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
@@ -63,22 +80,52 @@ export default function ItemForm() {
   const { data: families } = useQuery<Family>('SELECT id, name, sku_prefix FROM product_families WHERE is_active = 1 ORDER BY sort_order, name');
   const { data: models } = useQuery<Model>(
     'SELECT vm.id, vm.name, mk.name AS make_name FROM vehicle_models vm JOIN vehicle_makes mk ON mk.id = vm.make_id WHERE vm.is_active = 1 ORDER BY mk.name, vm.name');
+  // Editing: the kism asked for (?variant=), else the item's first.
   const { data: rows } = useQuery<Existing>(
     `SELECT p.id, p.name, p.family_id, p.is_universal_fit, pv.id AS variant_id, pv.variant_name, pv.sku, pv.retail_price, pv.dealer_price,
             pv.avg_cost, pv.pack_size, pv.pack_label, pv.warranty_months
-       FROM products p JOIN product_variants pv ON pv.product_id = p.id WHERE p.id = ? ORDER BY pv.sort_order LIMIT 1`,
-    [id ?? '']);
+       FROM products p JOIN product_variants pv ON pv.product_id = p.id
+      WHERE p.id = ?1 AND (?2 = '' OR pv.id = ?2) ORDER BY pv.sort_order LIMIT 1`,
+    [id ?? '', variantParam ?? '']);
   const existing = rows?.[0] ?? null;
-  const { data: oldSpecs } = useQuery<{ spec_definition_id: string; option_id: string | null; option_ids: string | null; value_text: string | null; value_number: number | null; value_bool: number | null }>(
-    'SELECT spec_definition_id, option_id, option_ids, value_text, value_number, value_bool FROM spec_values WHERE product_id = ?', [id ?? '']);
-  const { data: oldFits } = useQuery<{ model_id: string; year_from: number | null; year_to: number | null; gen_from: number | null; gen_to: number | null }>(
-    `SELECT pf.model_id, pf.year_from, pf.year_to, g.year_from AS gen_from, g.year_to AS gen_to
-       FROM product_fitments pf LEFT JOIN vehicle_generations g ON g.id = pf.generation_id WHERE pf.product_id = ?`, [id ?? '']);
 
-  // Reopening a rejected proposal: the same form, prefilled with what was sent
-  // last time, so the submitter fixes the one thing instead of retyping it all.
+  // Reopening a proposal: the same form, prefilled with what was sent, so the
+  // submitter fixes the one thing instead of retyping it all.
   const { data: reqRows } = useQuery<ChangeRequest>('SELECT * FROM change_requests WHERE id = ? LIMIT 1', [requestId ?? '']);
   const request = requestId ? (reqRows?.[0] ?? null) : null;
+  const proposalOfRequest = request ? parseProposal(request) : null;
+
+  // A new kism of an item that exists: from ?product=, or a request for one.
+  const kismOf = !id ? (productParam || proposalOfRequest?.product_id || null) : null;
+  const { data: baseRows } = useQuery<Base>(
+    `SELECT p.id, p.name, p.family_id, f.name AS family_name,
+            (SELECT COUNT(*) FROM product_variants v WHERE v.product_id = p.id AND v.is_active = 1) AS kisms,
+            (SELECT v.id FROM product_variants v WHERE v.product_id = p.id AND v.is_active = 1 ORDER BY v.sort_order LIMIT 1) AS first_kism,
+            (SELECT COUNT(*) FROM spec_values sv WHERE sv.product_id = p.id) AS spec_count,
+            (SELECT COUNT(*) FROM product_fitments pf WHERE pf.product_id = p.id) AS fit_count
+       FROM products p LEFT JOIN product_families f ON f.id = p.family_id WHERE p.id = ?`, [kismOf ?? id ?? '']);
+  const base = baseRows?.[0] ?? null;
+
+  // Every spec and car row of the item; each mode takes the ones it needs.
+  const itemId = id ?? kismOf ?? '';
+  const { data: specRows } = useQuery<SpecRow>(
+    'SELECT product_id, spec_definition_id, variant_id, option_id, option_ids, value_text, value_number, value_bool FROM spec_values WHERE product_id = ?', [itemId]);
+  const { data: fitRows } = useQuery<{ product_id: string; variant_id: string | null; model_id: string; year_from: number | null; year_to: number | null; gen_from: number | null; gen_to: number | null }>(
+    `SELECT pf.product_id, pf.variant_id, pf.model_id, pf.year_from, pf.year_to, g.year_from AS gen_from, g.year_to AS gen_to
+       FROM product_fitments pf LEFT JOIN vehicle_generations g ON g.id = pf.generation_id WHERE pf.product_id = ?`, [itemId]);
+  // The item's own (shared) values — what a new kism starts from.
+  // PowerSync answers [] while a query is still running, and on this screen
+  // the item can change under it (new item → "Isi mein nayi kism"). The rows
+  // are only taken once there are as many as the item has, and all its own.
+  const itemReady = !!base && base.id === itemId
+    && !!specRows && specRows.length === base.spec_count && specRows.every((r) => r.product_id === itemId)
+    && !!fitRows && fitRows.length === base.fit_count && fitRows.every((r) => r.product_id === itemId);
+  const baseVals = useMemo(() => {
+    const m: Record<string, SpecVal> = {};
+    for (const r of specRows ?? []) if (!r.variant_id) m[r.spec_definition_id] = toVal(r);
+    return m;
+  }, [specRows]);
+
   const canEdit = can('catalog.edit');
 
   const [familyId, setFamilyId] = useState<string | null>(null);
@@ -122,10 +169,15 @@ export default function ItemForm() {
   const { data: gens } = useQuery<Gen>(
     'SELECT id, model_id, name, year_from, year_to FROM vehicle_generations WHERE model_id = ? ORDER BY year_from', [pickModel ?? '']);
 
-  // Load the existing item once its rows arrive.
+  // Load the kism being edited once its rows arrive: the item's shared
+  // values, with this kism's own laid over them.
   const [loadedId, setLoadedId] = useState<string | null>(null);
-  if (existing && oldSpecs && oldFits && loadedId !== existing.id) {
-    setLoadedId(existing.id);
+  if (existing && itemReady && specRows && fitRows && loadedId !== existing.variant_id) {
+    setLoadedId(existing.variant_id);
+    const oldSpecs = (specRows ?? []).filter((r) => !r.variant_id || r.variant_id === existing.variant_id)
+      .sort((a, b) => (a.variant_id ? 1 : 0) - (b.variant_id ? 1 : 0));
+    const own = fitRows.filter((f) => f.variant_id === existing.variant_id);
+    const oldFits = own.length ? own : fitRows.filter((f) => !f.variant_id);
     setFamilyId(existing.family_id);
     setName(existing.name);
     setPrice(existing.retail_price);
@@ -134,12 +186,7 @@ export default function ItemForm() {
     setPackLabel(existing.pack_label ?? '');
     setWarrantyMonths(existing.warranty_months || null);
     const sv: Record<string, SpecVal> = {};
-    for (const r of oldSpecs) {
-      sv[r.spec_definition_id] = {
-        option_id: r.option_id, option_ids: r.option_ids ? r.option_ids.split(',').filter(Boolean) : undefined,
-        text: r.value_text ?? undefined, number: r.value_number, bool: r.value_bool == null ? null : !!r.value_bool,
-      };
-    }
+    for (const r of oldSpecs) sv[r.spec_definition_id] = toVal(r);
     setSpecVals(sv);
     // An item with no specs yet keeps its typed name parts in Type / Colour.
     if (oldSpecs.length === 0) {
@@ -151,9 +198,23 @@ export default function ItemForm() {
     setUniversal(!!existing.is_universal_fit && oldFits.length === 0);
   }
 
+  // A new kism starts from the item and its first kism — the same socket, the
+  // same mat type — so only what is different (the car, a colour) is changed.
+  const [loadedKism, setLoadedKism] = useState<string | null>(null);
+  if (kismOf && !requestId && base && itemReady && specRows && loadedKism !== kismOf) {
+    setLoadedKism(kismOf);
+    setFamilyId(base.family_id);
+    setName(base.name);
+    const sv: Record<string, SpecVal> = {};
+    for (const r of specRows) if (r.variant_id && r.variant_id === base.first_kism) sv[r.spec_definition_id] = toVal(r);
+    setSpecVals({ ...sv, ...baseVals });
+  }
+
   // Load a reopened request once its row arrives.
   const [loadedReq, setLoadedReq] = useState<string | null>(null);
-  if (request && loadedReq !== request.id) {
+  // A kism request also waits for its item's own rows: the item fills in
+  // whatever the request did not change.
+  if (request && loadedReq !== request.id && (!proposalOfRequest?.product_id || itemReady)) {
     setLoadedReq(request.id);
     const p = parseProposal(request);
     if (p) {
@@ -166,7 +227,8 @@ export default function ItemForm() {
       for (const s of p.specs ?? []) {
         sv[s.def_id] = { option_id: s.option_id, option_ids: s.option_ids?.split(',').filter(Boolean), text: s.text ?? undefined, number: s.number, bool: s.bool };
       }
-      setSpecVals(sv);
+      // A kism request carries only what differs; the item's own fills the rest.
+      setSpecVals(p.product_id ? { ...baseVals, ...sv } : sv);
       setFits(fitsOf(p));
       setUniversal(!!p.universal);
       setQty(p.qty ?? null);
@@ -211,6 +273,20 @@ export default function ItemForm() {
     setFamilyId(newId);
   }
 
+  // Typing a name that already exists offers that item, so it is not made
+  // twice — a second car or colour is a new kism of it, not a new item.
+  const nameTokens = name.trim().toLowerCase().split(/\s+/).filter((t) => t.length >= 2).slice(0, 4);
+  const lookFor = isNew && !kismOf && name.trim().length >= 3;
+  const { data: twins } = useQuery<{ id: string; name: string; family: string | null; kisms: number }>(
+    `SELECT p.id, p.name, f.name AS family,
+            (SELECT COUNT(*) FROM product_variants v WHERE v.product_id = p.id AND v.is_active = 1) AS kisms
+       FROM products p LEFT JOIN product_families f ON f.id = p.family_id
+      WHERE p.is_active = 1 AND ?1 = 1 ${nameTokens.map((_, i) => `AND lower(p.name) LIKE ?${i + 2}`).join(' ')}
+      ORDER BY p.name LIMIT 5`,
+    [lookFor ? 1 : 0, ...nameTokens.map((t) => `%${t}%`)]);
+  const asKism = (pid: string) =>
+    router.replace(`/admin/item?product=${pid}${back ? `&back=${encodeURIComponent(back)}` : ''}` as never);
+
   async function addCar(text: string): Promise<void> {
     // A model typed here lands under an "Other" make; the vehicle list can
     // tidy it later. Staff cannot write vehicles, so for them it is refused.
@@ -227,7 +303,8 @@ export default function ItemForm() {
   function addFit() {
     if (!pickModel) { notify('Pehle gaadi chuno.'); return; }
     if (yearFrom && yearTo && yearTo < yearFrom) { notify('“Tak” wala saal “Se” se pehle nahi ho sakta.'); return; }
-    const f: ProposalFit = { model_id: pickModel, year_from: yearFrom, year_to: yearTo };
+    const m = models?.find((x) => x.id === pickModel);
+    const f: ProposalFit = { model_id: pickModel, year_from: yearFrom, year_to: yearTo, label: `${m?.name ?? ''}${yearsLabel({ year_from: yearFrom, year_to: yearTo })}`.trim(), make: m?.make_name };
     setFits((prev) => [...prev.filter((x) => !(x.model_id === f.model_id && x.year_from === f.year_from && x.year_to === f.year_to)), f]);
     setUniversal(false);
     setPickModel(null);
@@ -255,6 +332,7 @@ export default function ItemForm() {
         text: d.data_type === 'text' || d.data_type === 'multiselect' ? display || null : null,
         number: d.data_type === 'number' ? v.number ?? null : null,
         bool: d.data_type === 'boolean' ? v.bool ?? null : null,
+        inherited: !!kismOf && sameVal(v, baseVals[d.id]),
       };
     }).filter((s) => s.display);
   }
@@ -262,12 +340,17 @@ export default function ItemForm() {
   function buildProposal(): ItemProposal {
     const fam = families?.find((f) => f.id === familyId);
     return {
-      family_id: familyId,
-      family_name: fam?.name ?? (newFamilyName.trim() || null),
-      name, type, colour,
+      family_id: kismOf ? base?.family_id ?? familyId : familyId,
+      family_name: kismOf ? base?.family_name ?? fam?.name ?? null : fam?.name ?? (newFamilyName.trim() || null),
+      name: kismOf ? base?.name ?? name : name, type, colour,
       specs: builtSpecs(),
-      fits: universal ? [] : fits.map((f) => ({ ...f, label: `${modelLabel(f.model_id)}${yearsLabel(f)}` })),
-      universal,
+      fits: universal ? [] : fits.map((f) => {
+        const m = models?.find((x) => x.id === f.model_id);
+        return { ...f, label: `${m?.name ?? ''}${yearsLabel(f)}`.trim(), make: m?.make_name };
+      }),
+      universal: kismOf ? false : universal,
+      product_id: kismOf,
+      product_name: kismOf ? base?.name ?? null : null,
       qty, price, cost,
       pack_size: packSize, pack_label: packLabel, warranty_months: warrantyMonths,
     };
@@ -290,6 +373,7 @@ export default function ItemForm() {
   // An item made before specs existed can still be edited (a new price) without
   // first being made to fill them; a new item has to say what it is.
   const keySpecId = isNew ? (defs ?? []).find((d) => d.is_required && d.is_variant_axis)?.id ?? null : null;
+  const kismCount = base?.kisms ?? 0;
   const mustFill = (d: Def) => d.id === keySpecId;
   function missingRequired(): string | null {
     const filled = new Set(builtSpecs().map((s) => s.def_id));
@@ -340,13 +424,18 @@ export default function ItemForm() {
               ? { avg_cost: cost, last_purchase_cost: cost }
               : {}),
           });
-          await writeSpecsAndFits(tx, existing.id, existing.variant_id, proposal, actor);
+          await writeSpecsAndFits(tx, existing.id, existing.variant_id, proposal, actor, { scope: 'item', onlyKism: kismCount <= 1 });
         });
       } else {
         // The same function an approval runs, so a hand-typed item and an
         // approved one are the same rows.
         const made = await db.writeTransaction(async (tx) =>
           applyItemProposal(tx, proposal, { actor, locationId, takenSkus, skuPrefix: fam?.sku_prefix }));
+        if (kismOf && !back) {
+          router.replace(`/product/${made.productId}?variant=${made.variantId}` as never);
+          notify('Nayi kism ban gayi.', 'ok');
+          return;
+        }
 
         // The photo could not be uploaded earlier because the item did not
         // exist yet. Do it now — and if it fails, the item is still saved.
@@ -378,9 +467,43 @@ export default function ItemForm() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isNew ? 'Naya item' : 'Item badlo' }} />
+      <Stack.Screen options={{ title: kismOf ? 'Nayi kism' : isNew ? 'Naya item' : 'Item badlo' }} />
       <Screen>
-        <Text variant="display">{isNew ? 'Naya item' : 'Item badlo'}</Text>
+        <Text variant="display">{kismOf ? 'Nayi kism' : isNew ? 'Naya item' : 'Item badlo'}</Text>
+
+        {kismOf ? (
+          <Card spine="accent">
+            <Text variant="heading">{base?.name ?? 'Item'}</Text>
+            <Text variant="small" color="textMuted">
+              {[base?.family_name, base ? `abhi ${base.kisms} kism` : null].filter(Boolean).join(' · ')}
+            </Text>
+            <Text variant="small" color="textMuted">
+              Isi item ki nayi kism — sirf gaadi, saal, colour jaisi jo cheez alag hai wo chuno. Naam, category aur baaki detail wahi rahegi.
+            </Text>
+          </Card>
+        ) : null}
+        {!isNew && kismCount > 1 ? (
+          <Card spine="warn">
+            <Text variant="small" color="textMuted">
+              Is item ki {kismCount} kism hain — yahan “{existing?.variant_name}” badal rahe ho. Naam, category aur common detail sab kism par lagegi; gaadi aur rate sirf isi kism ka.
+            </Text>
+          </Card>
+        ) : null}
+        {lookFor && (twins ?? []).length > 0 ? (
+          <Card spine="warn" style={{ gap: space.xs }}>
+            <Text variant="heading">Ye item pehle se hai?</Text>
+            <Text variant="small" color="textMuted">Doosri gaadi ya colour ke liye naya item mat banao — usi mein nayi kism jodo.</Text>
+            {(twins ?? []).map((t) => (
+              <Row key={t.id} style={{ justifyContent: 'space-between' }} gap={space.sm}>
+                <View style={{ flex: 1 }}>
+                  <Text>{t.name}</Text>
+                  <Text variant="small" color="textFaint">{[t.family, `${t.kisms} kism`].filter(Boolean).join(' · ')}</Text>
+                </View>
+                <Button title="Isi mein nayi kism" size="sm" tone="secondary" onPress={() => asKism(t.id)} />
+              </Row>
+            ))}
+          </Card>
+        ) : null}
 
         <FormSection title="Maal" hint="Category, naam, qty aur rate.">
           <PhotoPicker
@@ -392,6 +515,7 @@ export default function ItemForm() {
             onPickLocal={setPendingPhoto}
             canEdit={canEdit}
           />
+          {kismOf ? null : (<>
           <SelectField
             label="Category"
             value={familyId}
@@ -402,6 +526,7 @@ export default function ItemForm() {
             hint={!canEdit && newFamilyName ? `Nayi category "${newFamilyName}" — owner approve karega` : undefined}
           />
           <Input label="Item ka naam" value={name} onChangeText={setName} placeholder="Philips Ultinon LED" autoCapitalize="words" />
+          </>)}
           <Row gap={12}>
             <View style={{ flex: 1 }}>
               <NumberField label="Qty" value={qty} onChange={setQty} decimals={0} placeholder="10" hint={isNew ? undefined : 'Stock yahan se nahi badalta'} editable={isNew} />
@@ -476,7 +601,7 @@ export default function ItemForm() {
         {/* Which cars: a list, each car with its own years. */}
         <FormSection title="Kis gaadi mein lagta hai" hint="Company + model chuno, saal likho, “Gaadi jodo”. Har gaadi mein lagta ho to “Sab gaadi”.">
           <Row gap={space.xs} wrap>
-            <Chip label="Sab gaadi" selected={universal} onPress={() => { setUniversal(!universal); if (!universal) setFits([]); }} />
+            {kismOf ? null : <Chip label="Sab gaadi" selected={universal} onPress={() => { setUniversal(!universal); if (!universal) setFits([]); }} />}
             {fits.map((f, i) => (
               <Chip key={`${f.model_id}-${i}`} label={`${modelLabel(f.model_id)}${yearsLabel(f)}  ✕`} selected
                 onPress={() => setFits((prev) => prev.filter((_, j) => j !== i))} />

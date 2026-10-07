@@ -296,11 +296,40 @@ let entryId = '';
     check('item reached the server', !!pid);
     check('socket stored as a spec', sql(`select string_agg(display_value, ',') from spec_values where product_id = '${pid}'`).includes('H4'));
     check('car stored with its years', sql(`select year_from || '-' || year_to from product_fitments where product_id = '${pid}'`) === '2019-2023');
-    check('variant named by its socket', sql(`select variant_name from product_variants where product_id = '${pid}'`).startsWith('H4'));
+    // A kism is named by its car, then its socket: "Creta 2019–2023 · H4".
+    check('kism named by its car and socket', /^Creta 2019–2023 · H4/.test(sql(`select variant_name from product_variants where product_id = '${pid}'`)));
     await go(page, '/stock', 5000);
     await page.getByPlaceholder('SKU, barcode ya naam dhoondo').fill(tag);
     await page.waitForTimeout(2500);
     check('stock list shows the car and years', await page.getByText(/Creta 2019–2023/).first().isVisible().catch(() => false));
+  });
+
+  // Owner, 7 Oct 2026: an item made once is not made again for another car.
+  await step('the same item for another car is a new kism, not a new item', async () => {
+    const pid = sql(`select id from products where name = '${tag}'`);
+    if (!pid) throw new Error('no bulb item from the step before');
+    await go(page, '/admin/item', 6000);
+    await page.getByLabel('Item ka naam').fill(tag);
+    await page.waitForTimeout(2500);
+    check('typing an existing name offers that item', await visible(page, 'Ye item pehle se hai?'));
+    await page.getByRole('button', { name: 'Isi mein nayi kism' }).locator('visible=true').first().click();
+    await page.waitForTimeout(6000);
+    check('the kism form opens on the same item', await visible(page, 'Nayi kism') && await visible(page, tag));
+    await page.getByLabel('Bechne ka rate').fill('1099');
+    await pickFrom(page, 'Creta, Swift, Nexon…', 'Swift', 'Maruti Suzuki Swift');
+    await page.getByLabel('Saal se').fill('2018');
+    await page.getByRole('button', { name: /Gaadi jodo/i }).click();
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /Item bana do/i }).click();
+    await page.waitForTimeout(10000);
+    check('still one item', num(`select count(*) from products where name = '${tag}'`) === 1);
+    check('the item now has two kisms', num(`select count(*) from product_variants where product_id = '${pid}'`) === 2);
+    check('the new kism fits its own car', num(`select count(*) from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
+                                                  where pf.product_id = '${pid}' and vm.name = 'Swift' and pf.variant_id is not null`) === 1);
+    check('the first kism kept its car', num(`select count(*) from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
+                                                where pf.product_id = '${pid}' and vm.name = 'Creta'`) === 1);
+    check('the new kism kept the socket', sql(`select string_agg(sv.display_value, ',') from spec_values sv join product_variants pv on pv.id = sv.variant_id
+                                                 where pv.product_id = '${pid}' and pv.variant_name like 'Swift%'`).includes('H4'));
   });
 
   await step('every new screen opens clean', async () => {

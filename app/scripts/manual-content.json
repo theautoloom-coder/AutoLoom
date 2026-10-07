@@ -170,7 +170,8 @@
           "Category, item ka naam, qty, bechne ka rate. Partner kharid rate bhi bhar sakta hai.",
           "“Detail” mein jo pata ho bharo — socket zaroori hai, baaki chahe to.",
           "“Kis gaadi mein lagta hai” — company + model chuno, saal se–tak likho, “+ Gaadi jodo”. Kai gaadi jod sakte ho. Har gaadi mein lagta ho to “Sab gaadi”.",
-          "“Item bana do” / “Badlav kar do”. Staff ke liye ye request ban ke partner ke paas jaati hai."
+          "“Item bana do” / “Badlav kar do”. Staff ke liye ye request ban ke partner ke paas jaati hai.",
+          "Wahi item doosri gaadi ya colour ke liye? Naya item mat banao — item ke page par “+ Nayi gaadi / kism”: naam, category aur detail wahi rehti hai, sirf gaadi, saal, colour chuno. Naya naam likhte hi “Ye item pehle se hai?” bhi dikhta hai."
         ],
         "note": "Jo detail bharoge wahi stock list, bill ki search aur item ke page par dikhegi — jaise “H4 · 60/55W · Creta 2019–2023”."
       },

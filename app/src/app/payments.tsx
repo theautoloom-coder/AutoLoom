@@ -20,10 +20,14 @@ export default function PaymentsScreen() {
   const { db } = useSystem();
   const { can, actor } = useSession();
   const [dir, setDir] = useState<'all' | 'in' | 'out'>('all');
+  // Money paid to a supplier is the price of the maal — partners only. Staff
+  // see the money that came in from grahak and nothing else.
+  const seeOut = can('payment.pay_supplier');
   const { data: rows } = useQuery<P>(`
     SELECT p.*, COALESCE(c.name, s.name) AS party_name
     FROM payments p LEFT JOIN customers c ON c.id = p.party_id AND p.party_type = 'customer' LEFT JOIN suppliers s ON s.id = p.party_id AND p.party_type = 'supplier'
-    WHERE p.party_type <> 'partner' AND (?1 = 'all' OR p.direction = ?1) ORDER BY p.payment_date DESC, p.created_at DESC LIMIT 300`, [dir]);
+    WHERE p.party_type <> 'partner' AND (?2 = 1 OR p.direction = 'in') AND (?1 = 'all' OR p.direction = ?1)
+    ORDER BY p.payment_date DESC, p.created_at DESC LIMIT 300`, [dir, seeOut ? 1 : 0]);
 
   async function reverse(p: P) {
     const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Reason (e.g. cheque bounced, entered twice)') : 'Reversed';
@@ -41,7 +45,7 @@ export default function PaymentsScreen() {
         </Row>
       </Row>
       <Row gap={space.xs}>
-        {(['all', 'in', 'out'] as const).map((d) => <Chip key={d} label={d === 'all' ? 'Sab' : d === 'in' ? 'Aaya' : 'Diya'} selected={dir === d} onPress={() => setDir(d)} />)}
+        {(seeOut ? (['all', 'in', 'out'] as const) : (['all'] as const)).map((d) => <Chip key={d} label={d === 'all' ? 'Sab' : d === 'in' ? 'Aaya' : 'Diya'} selected={dir === d} onPress={() => setDir(d)} />)}
       </Row>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {(rows ?? []).map((p) => (

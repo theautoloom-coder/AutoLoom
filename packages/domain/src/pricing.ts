@@ -90,7 +90,7 @@ export function checkPrice(
     return {
       ok: false,
       severity: 'cost',
-      message: `Below cost. This SKU costs ₹${round(cost)}.`,
+      message: `Kharid se kam rate — ye ₹${round(cost)} ka padta hai.`,
       needsApproval: true,
     };
   }
@@ -99,7 +99,7 @@ export function checkPrice(
     return {
       ok: false,
       severity: 'floor',
-      message: `Below permitted selling price of ₹${round(floor)}.`,
+      message: `Isse kam nahi bechna — kam se kam ₹${round(floor)}.`,
       needsApproval: true,
     };
   }
@@ -111,7 +111,7 @@ export function checkPrice(
       return {
         ok: true,
         severity: 'margin',
-        message: `Thin margin: ${m.pct}% (₹${m.amount} per unit).`,
+        message: `Bahut kam bachta hai: ${m.pct}% (₹${m.amount} ek par).`,
         needsApproval: false,
       };
     }

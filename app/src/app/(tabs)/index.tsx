@@ -48,7 +48,9 @@ export default function HomeScreen() {
   // stitched out of five tables.
   const { data: kpiRows, isLoading: kpiLoading } = useQuery<Record<string, number>>(DASHBOARD_TODAY.sql, [today]);
   const k = kpiRows?.[0];
-  const { data: feed, isLoading: feedLoading } = useQuery<Feed>(TODAY_FEED.sql, [today]);
+  const { data: feedRows, isLoading: feedLoading } = useQuery<Feed>(TODAY_FEED.sql, [today]);
+  // Money paid out to a supplier is the price of the maal — partners only.
+  const feed = (feedRows ?? []).filter((f) => can('payment.pay_supplier') || !(f.kind === 'payment' && f.who === 'Paisa diya'));
 
   // Munafa and what the stock cost are the owner's numbers (owner's call,
   // 6 Oct 2026). reports.view used to open them, and the Hisaab role holds

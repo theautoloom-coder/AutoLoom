@@ -29,6 +29,8 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 
+import type { Permission } from '@domain';
+
 import { useSession } from '@/lib/session';
 import { Button, Card, IconBadge, Row, Screen, SectionTitle, Text } from '@/ui';
 import { Disclosure } from '@/ui/forms';
@@ -44,6 +46,8 @@ type Topic = {
   note?: string;
   /** Where the job is actually done. */
   go?: { label: string; href: string };
+  /** Shown only to those who hold this — partner topics stay off a staff phone. */
+  need?: Permission;
 };
 
 const TOPICS: Topic[] = [
@@ -79,6 +83,7 @@ const TOPICS: Topic[] = [
   },
   {
     q: 'Approval — staff ka maal kaise approve karein? (owner)',
+    need: 'purchase.approve',
     icon: 'checkmark-done-outline',
     accent: 'rose',
     steps: [
@@ -190,6 +195,7 @@ const TOPICS: Topic[] = [
   },
   {
     q: 'Partner ka paisa — kisne kitna lagaya, kitna nikala (owner)',
+    need: 'partner.capital',
     icon: 'briefcase-outline',
     accent: 'rose',
     steps: [
@@ -203,6 +209,7 @@ const TOPICS: Topic[] = [
   },
   {
     q: 'Sale aur munafa kaise dekhein? (owner)',
+    need: 'reports.view_margin',
     icon: 'stats-chart-outline',
     accent: 'violet',
     steps: [
@@ -216,6 +223,7 @@ const TOPICS: Topic[] = [
   },
   {
     q: 'Report ki PDF kaise nikalein? (owner)',
+    need: 'reports.view',
     icon: 'document-text-outline',
     accent: 'blue',
     steps: [
@@ -239,6 +247,7 @@ const TOPICS: Topic[] = [
   },
   {
     q: 'Staff ka password bhool gaye?',
+    need: 'admin.users',
     icon: 'key-outline',
     accent: 'amber',
     steps: [
@@ -272,7 +281,7 @@ export default function HelpScreen() {
       </Card>
 
       <SectionTitle>Roz ke kaam</SectionTitle>
-      {TOPICS.map((t) => (
+      {TOPICS.filter((t) => !t.need || can(t.need)).map((t) => (
         <Disclosure key={t.q} title={t.q} titleVariant="heading">
           <Row gap={space.md} align="flex-start">
             <IconBadge name={t.icon as never} accent={t.accent} />

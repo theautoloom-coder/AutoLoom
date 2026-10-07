@@ -466,7 +466,7 @@ export const TODAY_FEED = {
        WHERE p.doc_type='purchase' AND p.status='posted' AND p.doc_date = ?1
       UNION ALL
       SELECT 'expense', e.id, e.created_at, COALESCE(e.category, 'Kharcha'), e.amount, NULL
-        FROM expenses e WHERE e.expense_date = ?1
+        FROM expenses e WHERE e.expense_date = ?1 AND COALESCE(e.is_personal, 0) = 0
       UNION ALL
       SELECT 'payment', pm.id, pm.created_at,
              CASE WHEN pm.direction='in' THEN 'Paisa aaya' ELSE 'Paisa diya' END,

@@ -264,8 +264,8 @@ export default function MoreScreen() {
             {canMoney ? (
               <ListRow
                 left={<IconBadge name="cash-outline" accent="green" />}
-                title="Paisa aaya, paisa diya"
-                subtitle="Grahak se aaya aur supplier ko diya — rasid ke saath"
+                title={can('payment.pay_supplier') ? 'Paisa aaya, paisa diya' : 'Paisa aaya'}
+                subtitle={can('payment.pay_supplier') ? 'Grahak se aaya aur supplier ko diya — rasid ke saath' : 'Grahak se aaya paisa — rasid ke saath'}
                 onPress={() => router.push('/payments')}
               />
             ) : null}

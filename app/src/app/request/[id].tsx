@@ -159,7 +159,7 @@ export default function RequestReview() {
           <Divider />
           <KV k="Qty" v={String(p?.qty ?? 0)} mono />
           <KV k="Bechne ka rate" v={p?.price != null ? `₹${p.price}` : '—'} mono />
-          <KV k="Kharid rate" v={p?.cost != null ? `₹${p.cost}` : '—'} mono />
+          {can('catalog.view_cost') ? <KV k="Kharid rate" v={p?.cost != null ? `₹${p.cost}` : '—'} mono /> : null}
           {p?.pack_size && p.pack_size > 1 ? (
             <KV k="Set mein" v={`${p.pack_size} ${p.pack_label || 'pcs'}`} mono />
           ) : null}

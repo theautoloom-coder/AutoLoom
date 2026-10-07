@@ -77,7 +77,9 @@ async function pickItem(page, q = 'H4') {
   await page.waitForTimeout(1800);
 }
 
-const H4 = sql(`select pv.id from product_variants pv join products p on p.id = pv.product_id where p.name ilike '%X-tremeVision%' limit 1`);
+// The same item pickItem() clicks: the first X-tremeVision the "H4" search lists.
+const H4 = sql(`select pv.id from product_variants pv join products p on p.id = pv.product_id
+                 where p.name ilike '%X-tremeVision%' and pv.search_text ilike '%h4%' order by p.name, pv.sort_order, pv.variant_name limit 1`);
 const SUPPLIER = sql(`select name from suppliers where is_active and name not ilike 'e2e%' order by name limit 1`);
 const STAFF = 'sales@autoloom.local';
 const OWNER = 'owner@autoloom.local';
@@ -138,6 +140,25 @@ let entryId = '';
     check('no Udhaar chip for the cash customer', !(await visible(page, 'Udhaar')));
     await page.getByRole('button', { name: /Chhod do/i }).click().catch(() => {});
     await yes(page);
+  });
+
+  // Owner, 7 Oct 2026: staff never see the partners' money, munafa, margin,
+  // buy rates or the business's totals — anywhere a staff phone can reach.
+  await step('staff see no business money', async () => {
+    await go(page, '/parchi');
+    // The totals card: partners see Sale and Kharcha there, staff see Entry and Bill.
+    check('Bill tab has no sale total', !(await visible(page, 'Sale')) && await visible(page, 'Bill'));
+    await go(page, '/payments');
+    check('payments list has no money paid to suppliers', !(await visible(page, 'Diya')) && !(await page.getByText(/^−₹/).first().isVisible().catch(() => false)));
+    const sid = sql(`select id from suppliers where is_active and name not ilike 'e2e%' order by name limit 1`);
+    await go(page, `/supplier/${sid}`);
+    check('supplier page shows no balance or bill amounts', !(await page.getByText(/Inhe dena|dena baaki|chuka diya/i).first().isVisible().catch(() => false)));
+    await go(page, '/purchases');
+    check('supplier entries show no amount', !(await page.getByText(/₹/).first().isVisible().catch(() => false)));
+    await go(page, '/help');
+    check('help has no partner-only topics', !(await page.getByText(/\(owner\)/).first().isVisible().catch(() => false)));
+    await go(page, '/admin/users');
+    check('staff list is not open to staff', await visible(page, 'Ye sirf partner aur admin dekh sakte hain.'));
   });
 
   await step('reports are the partners\'', async () => {

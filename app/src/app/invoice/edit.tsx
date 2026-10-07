@@ -203,13 +203,21 @@ export default function InvoiceEdit() {
     });
   }
 
+  // The cost and margin warnings name the buy rate and the margin. Staff are
+  // warned without either — those are the partners' numbers (owner, 7 Oct 2026).
+  const priceWarning = (c: { severity: string; message: string | null }) =>
+    can('catalog.view_cost') ? c.message
+      : c.severity === 'cost' ? 'Is rate par nuksan hai — rate badhao.'
+      : c.severity === 'margin' ? null
+      : c.message;
+
   async function setRate(l: Line, rate: number | null) {
     const r = rate ?? 0;
     const check = checkPrice(r, l, {});
     let approvedBy: string | null = null;
     if (check.needsApproval) {
       if (can('sale.override_price')) approvedBy = profile?.id ?? null;
-      else notify(`${check.message} Owner ya admin se approve karwao.`);
+      else notify(`${priceWarning(check)} Owner ya admin se approve karwao.`);
     }
     await updateRow(db, 'sales_invoice_lines', l.id, { rate: r, price_source: Math.abs(r - (l.list_price ?? -1)) < 0.005 ? l.price_source : 'manual', override_approved_by: approvedBy });
   }
@@ -229,7 +237,7 @@ export default function InvoiceEdit() {
       if (l.qty <= 0) { notify(`${l.description}: qty zero se zyada honi chahiye.`); return; }
       if (l.rate <= 0 && doc.doc_type === 'invoice') { notify(`${l.description}: rate daalo.`); return; }
       const check = needsFloorCheck(l) ? checkPrice(l.rate, l, {}) : null;
-      if (check?.needsApproval && !l.override_approved_by) { notify(`${l.description}: ${check.message} Owner ya admin se approve karwao.`); return; }
+      if (check?.needsApproval && !l.override_approved_by) { notify(`${l.description}: ${priceWarning(check)} Owner ya admin se approve karwao.`); return; }
       if (doc.doc_type === 'invoice' && !negativeOk && l.qty > l.here) { notify(`${l.description}: yahan sirf ${l.here} pade hain.`); return; }
       if (doc.doc_type === 'credit_note') {
         const ol = originalLines?.find((x) => x.id === l.against_line_id);
@@ -348,7 +356,7 @@ export default function InvoiceEdit() {
               right={l.price_source && l.price_source !== 'manual' ? <Badge tone={l.price_source === 'last' ? 'info' : 'accent'}>{sourceLabel[l.price_source] ?? l.price_source}</Badge> : l.override_approved_by ? <Badge tone="warn">rate manzoor</Badge> : null}>
               <Row gap={12} wrap>
                 <View style={{ flex: 1, minWidth: 90 }}><NumberField label={`Qty${l.unit_code ? ` (${l.unit_code})` : ''}`} value={l.qty} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { qty: v ?? 0 })} decimals={3} error={!isCN && !negativeOk && l.qty > l.here ? `Yahan sirf ${l.here} pade hain` : null} /></View>
-                <View style={{ flex: 1.2, minWidth: 120 }}><NumberField label="Rate" value={l.rate} onChange={(v) => setRate(l, v)} error={check.severity === 'floor' || check.severity === 'cost' ? check.message : null} hint={l.list_price != null && Math.abs(l.rate - l.list_price) > 0.005 ? `Pehle ${formatINR(l.list_price)} tha` : undefined} /></View>
+                <View style={{ flex: 1.2, minWidth: 120 }}><NumberField label="Rate" value={l.rate} onChange={(v) => setRate(l, v)} error={check.severity === 'floor' || check.severity === 'cost' ? priceWarning(check) : null} hint={l.list_price != null && Math.abs(l.rate - l.list_price) > 0.005 ? `Pehle ${formatINR(l.list_price)} tha` : undefined} /></View>
                 <View style={{ flex: 1, minWidth: 90 }}><NumberField label="Chhoot %" value={l.discount_pct} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { discount_pct: v ?? 0 })} /></View>
                 {gst ? <View style={{ flex: 1, minWidth: 80 }}><NumberField label="GST %" value={l.tax_rate_pct} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { tax_rate_pct: v ?? 0 })} /></View> : null}
               </Row>

@@ -97,7 +97,7 @@ const RANGE_FEED = `
     SELECT 'expense', e.id, e.created_at, e.expense_date,
            COALESCE(e.category, 'Kharcha'), e.amount, NULL, NULL,
            COALESCE(e.note, e.paid_to), 0
-      FROM expenses e WHERE e.expense_date >= ?1 AND e.expense_date <= ?2
+      FROM expenses e WHERE e.expense_date >= ?1 AND e.expense_date <= ?2 AND COALESCE(e.is_personal, 0) = 0
     UNION ALL
     SELECT 'payment', pm.id, pm.created_at, pm.payment_date,
            CASE WHEN pm.direction = 'in' THEN 'Paisa aaya' ELSE 'Paisa diya' END,
@@ -179,6 +179,10 @@ export default function ParchiScreen() {
   const { can } = useSession();
   // What a purchase cost is the owner's number; staff see the maal, not the rate.
   const showCost = can('catalog.view_cost');
+  // The business's totals and the money paid to suppliers are the partners'
+  // (owner, 7 Oct 2026). Staff see each entry, not the sum of the day.
+  const seeTotals = can('reports.view');
+  const seeOut = can('payment.pay_supplier');
   const today = toDateString();
   const [range, setRange] = useState<RangeKey>('aaj');
   const [custom, setCustom] = useState(today);
@@ -210,20 +214,24 @@ export default function ParchiScreen() {
   const { data: rows, isLoading } = useQuery<Entry>(RANGE_FEED, [from, to]);
   const { data: drafts } = useQuery<Draft>(DRAFTS);
 
-  const list = rows ?? [];
+  // Money that went out to a supplier is the price of the maal.
+  const shown = useMemo(
+    () => (rows ?? []).filter((e) => seeOut || !(e.kind === 'payment' && e.who === 'Paisa diya')),
+    [rows, seeOut]);
+  const list = shown;
   const multiDay = from !== to;
 
   // The list already arrives sorted by day, so grouping is one pass and the
   // groups come out newest-first without a second sort.
   const groups = useMemo(() => {
     const out: { day: string; entries: Entry[] }[] = [];
-    for (const e of rows ?? []) {
+    for (const e of shown) {
       const last = out[out.length - 1];
       if (last && last.day === e.on_date) last.entries.push(e);
       else out.push({ day: e.on_date, entries: [e] });
     }
     return out;
-  }, [rows]);
+  }, [shown]);
 
   const saleTotal = list.reduce((s, e) => (e.kind === 'sale' ? s + Number(e.amount ?? 0) : s), 0);
   const kharchaTotal = list.reduce((s, e) => (e.kind === 'expense' ? s + Number(e.amount ?? 0) : s), 0);
@@ -308,20 +316,29 @@ export default function ParchiScreen() {
                 is about to contradict it. */}
             {isLoading ? <Bar width={34} /> : <Text variant="heading" mono>{list.length}</Text>}
           </View>
-          <View>
-            <Text variant="small" color="textMuted">Sale</Text>
-            {isLoading ? <Bar width={82} /> : <Text variant="heading" mono>{formatINR(saleTotal)}</Text>}
-          </View>
-          <View>
-            <Text variant="small" color="textMuted">Kharcha</Text>
-            {isLoading ? (
-              <Bar width={70} />
-            ) : (
-              <Text variant="heading" mono color={kharchaTotal > 0 ? 'warn' : 'text'}>
-                {formatINR(kharchaTotal)}
-              </Text>
-            )}
-          </View>
+          {seeTotals ? (
+            <>
+              <View>
+                <Text variant="small" color="textMuted">Sale</Text>
+                {isLoading ? <Bar width={82} /> : <Text variant="heading" mono>{formatINR(saleTotal)}</Text>}
+              </View>
+              <View>
+                <Text variant="small" color="textMuted">Kharcha</Text>
+                {isLoading ? (
+                  <Bar width={70} />
+                ) : (
+                  <Text variant="heading" mono color={kharchaTotal > 0 ? 'warn' : 'text'}>
+                    {formatINR(kharchaTotal)}
+                  </Text>
+                )}
+              </View>
+            </>
+          ) : (
+            <View>
+              <Text variant="small" color="textMuted">Bill</Text>
+              {isLoading ? <Bar width={34} /> : <Text variant="heading" mono>{list.filter((e) => e.kind === 'sale').length}</Text>}
+            </View>
+          )}
         </Row>
       </Card>
 

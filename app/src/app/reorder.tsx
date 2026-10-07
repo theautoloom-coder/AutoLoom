@@ -72,7 +72,8 @@ export default function ReorderScreen() {
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
         <Text variant="display">Kya mangwana hai</Text>
-        <Button title="CSV" tone="secondary" size="sm" onPress={exportCsv} disabled={!visible.length} />
+        {/* The CSV carries each supplier's last rate — a buy rate, partners only. */}
+        {can('catalog.view_cost') ? <Button title="CSV" tone="secondary" size="sm" onPress={exportCsv} disabled={!visible.length} /> : null}
       </Row>
       <Text variant="small" color="textMuted">Jo tezi se bik raha hai aur khatam hone wala hai. Roz ki bikri dekh ke bataya hai ki kitna mangwana chahiye.</Text>
       {/* Two questions, two blocks, each label above its own chips. They used

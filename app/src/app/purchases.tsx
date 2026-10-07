@@ -16,8 +16,11 @@ export default function PurchasesScreen() {
   const router = useRouter();
   const { can } = useSession();
   const [filter, setFilter] = useState<'all' | 'draft' | 'unpaid' | 'returns'>('all');
-  const { data: rows } = useQuery<P>(`
-    SELECT p.id, p.doc_type, p.doc_no, p.doc_date, p.supplier_invoice_no, p.grand_total, p.paid_total, p.status, s.name AS supplier_name, l.name AS location_name,
+  // A supplier bill's amount is what the maal cost: partners only. Staff see
+  // what came, from whom, and whether it is still waiting for approval.
+  const showCost = can('catalog.view_cost');
+  const { data: rows } = useQuery<P & { submitted_at: string | null }>(`
+    SELECT p.id, p.doc_type, p.doc_no, p.doc_date, p.supplier_invoice_no, p.grand_total, p.paid_total, p.status, p.submitted_at, s.name AS supplier_name, l.name AS location_name,
            (SELECT COUNT(*) FROM purchase_lines pl WHERE pl.purchase_id = p.id) AS lines
     FROM purchases p JOIN suppliers s ON s.id = p.supplier_id JOIN locations l ON l.id = p.location_id
     ORDER BY p.status = 'draft' DESC, p.doc_date DESC, p.created_at DESC LIMIT 200`);
@@ -28,11 +31,11 @@ export default function PurchasesScreen() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display">Supplier ke bill</Text>
+        <Text variant="display">Supplier se aaya maal</Text>
         {can('purchase.create') ? <Button title="Maal aaya" onPress={() => router.push('/stock/add')} /> : null}
       </Row>
       <Row gap={space.xs} wrap>
-        {(['all', 'draft', 'unpaid', 'returns'] as const).map((f) => <Chip key={f} label={({ all: 'Sab', draft: 'Adhoore', unpaid: 'Dena baaki', returns: 'Wapsi' } as const)[f]} selected={filter === f} onPress={() => setFilter(f)} />)}
+        {(showCost ? (['all', 'draft', 'unpaid', 'returns'] as const) : (['all', 'draft', 'returns'] as const)).map((f) => <Chip key={f} label={({ all: 'Sab', draft: 'Adhoore', unpaid: 'Dena baaki', returns: 'Wapsi' } as const)[f]} selected={filter === f} onPress={() => setFilter(f)} />)}
       </Row>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {visible.map((p) => (
@@ -48,10 +51,18 @@ export default function PurchasesScreen() {
             onPress={() => router.push(p.status === 'draft' ? `/purchase/edit?id=${p.id}` : `/purchase/${p.id}`)}
             right={
               <View style={{ alignItems: 'flex-end' }}>
-                <Text mono>{formatINR(p.grand_total)}</Text>
-                <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'draft' ? 'neutral' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>
-                  {p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : p.paid_total >= p.grand_total ? 'chuka diya' : 'dena baaki'}
-                </Badge>
+                {showCost ? <Text mono>{formatINR(p.grand_total)}</Text> : null}
+                {p.status === 'draft' && p.submitted_at ? (
+                  <Badge tone="warn">approval baaki</Badge>
+                ) : showCost ? (
+                  <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'draft' ? 'neutral' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>
+                    {p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : p.paid_total >= p.grand_total ? 'chuka diya' : 'dena baaki'}
+                  </Badge>
+                ) : (
+                  <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'draft' ? 'neutral' : 'ok'}>
+                    {p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : 'stock mein'}
+                  </Badge>
+                )}
               </View>
             }
           />

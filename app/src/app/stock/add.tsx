@@ -71,7 +71,7 @@ export default function StockChadhao() {
   const pre = preRows?.[0];
   if (pre && !seeded) {
     setSeeded(true);
-    setLines([{ variantId: pre.id, label: `${pre.product_name} · ${pre.variant_name}`, sku: pre.sku, qty: 1, rate: pre.last_purchase_cost || pre.avg_cost || 0 }]);
+    setLines([{ variantId: pre.id, label: `${pre.product_name} · ${pre.variant_name}`, sku: pre.sku, qty: 1, rate: showCost ? pre.last_purchase_cost || pre.avg_cost || 0 : 0 }]);
   }
 
   async function addSupplier(name: string) {

@@ -126,6 +126,10 @@ export default function UsersScreen() {
 
   const allPerms = [...new Set((perms ?? []).map((p) => p.permission))].sort();
 
+  if (!editable) {
+    return <Screen><Text variant="display">Staff</Text><Text color="textMuted">Ye sirf partner aur admin dekh sakte hain.</Text></Screen>;
+  }
+
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between' }} align="flex-start">

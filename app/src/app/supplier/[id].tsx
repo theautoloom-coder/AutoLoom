@@ -34,7 +34,9 @@ export default function SupplierScreen() {
     SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, SUM(pl.qty) AS qty, MAX(pl.rate) AS last_rate, MAX(pu.doc_date) AS last_date
     FROM purchase_lines pl JOIN purchases pu ON pu.id = pl.purchase_id AND pu.status = 'posted' AND pu.doc_type = 'purchase' AND pu.supplier_id = ?
     JOIN product_variants pv ON pv.id = pl.variant_id JOIN products p ON p.id = pv.product_id GROUP BY pv.id ORDER BY qty DESC LIMIT 20`, [id]);
-  const showMoney = can('purchase.create') || can('reports.view') || can('payment.pay_supplier');
+  // What a supplier is owed is what the maal cost — the partners' number.
+  // Staff record stock from a supplier but never see the amounts (owner, 7 Oct 2026).
+  const showMoney = can('catalog.view_cost') || can('payment.pay_supplier');
 
   if (!s) return <Screen><Empty art="search" title="Ye supplier is phone par nahi mila" /></Screen>;
 

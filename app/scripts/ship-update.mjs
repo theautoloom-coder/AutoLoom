@@ -69,5 +69,5 @@ console.log(`  ok — ${bundles.length} bundle(s), production backend`);
 
 console.log('▸ publish to channel "production"');
 const msg = message.replace(/"/g, "'");
-run(`npx --yes eas-cli@latest update --channel production --platform android --skip-bundler --input-dir dist-update --message "${msg}" --non-interactive`);
+run(`npx --yes eas-cli@latest update --channel production --environment production --platform android --skip-bundler --input-dir dist-update --message "${msg}" --non-interactive`);
 console.log('✓ published — phones pick it up the next time the app opens or comes to the front');

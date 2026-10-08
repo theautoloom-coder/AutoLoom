@@ -54,6 +54,21 @@ for f in index.html manifest.json sw.js apple-touch-icon.png @powersync/worker.j
   [ -f "dist/$f" ] || { echo "✗ dist/$f missing — aborting"; exit 1; }
 done
 
+# Cloudflare Pages, which serves app.theautoloom.in since 8 Oct 2026, never
+# uploads a folder named node_modules — and Expo files the icon fonts and the
+# router's images under dist/assets/node_modules/. On the web every icon came
+# back as index.html ("OTS parsing error"), an empty box, and the failed font
+# load surfaced as an uncaught "NetworkError". Move them out of that name and
+# point the bundle at the new place.
+if [ -d dist/assets/node_modules ]; then
+  mv dist/assets/node_modules dist/assets/nm
+  grep -rlF '/assets/node_modules/' dist --include='*.js' --include='*.css' --include='*.html' --include='*.json' |
+    while IFS= read -r f; do sed -i 's|/assets/node_modules/|/assets/nm/|g' "$f"; done
+fi
+if [ -d dist/assets/node_modules ] || grep -rqF '/assets/node_modules/' dist --include='*.js'; then
+  echo "✗ assets still under node_modules — Cloudflare Pages would drop them; aborting"; exit 1
+fi
+
 # And prove the bundle really talks to production. Shipping a build that points
 # at 127.0.0.1 would look completely fine here and be dead on every phone.
 entry_js=$(grep -o '_expo/static/js/web/[A-Za-z0-9._-]*\.js' dist/index.html | sed 's|^|dist/|')

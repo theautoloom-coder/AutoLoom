@@ -19,6 +19,7 @@ type P = {
   location_name: string; location_type: string; other_charges: number; grand_total: number; paid_total: number; status: string;
   notes: string | null; cancel_reason: string | null; against_no: string | null; against_type: string | null; against_purchase_id: string | null;
   sname: string; settled_at: string | null; settle_note: string | null; submitter: string | null; approver: string | null;
+  corrects_purchase_id: string | null; corrects_no: string | null;
 };
 type L = { id: string; description: string; qty: number; unit_code: string | null; rate: number; line_total: number; variant_id: string; sku: string; product_id: string };
 type Pay = { id: string; doc_no: string; payment_date: string; amount: number; mode: string };
@@ -43,14 +44,20 @@ export default function PurchaseDetail() {
   const { data: rows } = useQuery<P>(`
     SELECT p.*, l.name AS location_name, l.type AS location_type, s.name AS sname,
            o.doc_no AS against_no, o.doc_type AS against_type,
-           sb.full_name AS submitter, ab.full_name AS approver
+           sb.full_name AS submitter, ab.full_name AS approver, c.doc_no AS corrects_no
       FROM purchases p
       JOIN locations l ON l.id = p.location_id
       JOIN suppliers s ON s.id = p.supplier_id
       LEFT JOIN purchases o ON o.id = p.against_purchase_id
       LEFT JOIN profiles sb ON sb.id = p.submitted_by
       LEFT JOIN profiles ab ON ab.id = p.approved_by
+      LEFT JOIN purchases c ON c.id = p.corrects_purchase_id
      WHERE p.id = ?`, [id]);
+  // Corrections of this entry: one waiting, or the one that took its place.
+  const { data: fixes } = useQuery<{ id: string; status: string; doc_no: string | null; submitted_at: string | null }>(
+    `SELECT id, status, doc_no, submitted_at FROM purchases WHERE corrects_purchase_id = ? AND status <> 'cancelled' ORDER BY created_at DESC`, [id]);
+  const fixWaiting = (fixes ?? []).find((f) => f.status === 'draft') ?? null;
+  const fixedBy = (fixes ?? []).find((f) => f.status === 'posted') ?? null;
   const p = rows?.[0];
   const { data: lines } = useQuery<L>('SELECT pl.*, pv.sku, pv.product_id FROM purchase_lines pl JOIN product_variants pv ON pv.id = pl.variant_id WHERE pl.purchase_id = ? ORDER BY pl.line_no', [id]);
   const { data: payments } = useQuery<Pay>(`SELECT py.id, py.doc_no, py.payment_date, pa.amount, py.mode FROM payment_allocations pa JOIN payments py ON py.id = pa.payment_id WHERE pa.doc_id = ? AND py.status = 'posted' ORDER BY py.payment_date`, [id]);
@@ -111,6 +118,10 @@ export default function PurchaseDetail() {
   const isReplacement = !isReturn && p.against_type === 'debit_note';
   const due = p.grand_total - p.paid_total;
   const pcs = (lines ?? []).reduce((a, l) => a + l.qty, 0);
+  // Once some of it has gone back to the supplier the entry cannot be
+  // rewritten — the return points at its lines. Stock theek karo still can.
+  const wentBack = (linked ?? []).some((r) => r.doc_type === 'debit_note' && r.status === 'posted');
+  const canFix = p.status === 'posted' && !isReturn && !wentBack && can('purchase.create');
 
   return (
     <>
@@ -122,6 +133,7 @@ export default function PurchaseDetail() {
               <Badge tone={p.status === 'cancelled' ? 'danger' : p.status === 'posted' ? 'ok' : 'neutral'}>{statusLabel(p.status)}</Badge>
               {isReturn ? <Badge tone="info">{p.against_no ? `${p.against_no} ki wapsi` : 'kharab maal ki wapsi'}</Badge> : null}
               {isReplacement ? <Badge tone="info">{`${p.against_no} ka replacement`}</Badge> : null}
+              {p.corrects_no ? <Badge tone="info">{`${p.corrects_no} ka sudhaar`}</Badge> : null}
               {isReturn && p.status === 'posted' ? (
                 p.settled_at ? <Badge tone="ok">settle ho gayi</Badge> : <Badge tone="warn">settle baaki</Badge>
               ) : null}
@@ -132,9 +144,33 @@ export default function PurchaseDetail() {
           </View>
         </Row>
         {p.status === 'cancelled' ? (
-          <Card tone="alt">
+          <Card tone="alt" style={{ gap: space.xs }}>
             <Text color="danger">{p.doc_no ? 'Cancel hua' : 'Owner ne mana kiya'}: {p.cancel_reason}</Text>
+            {fixedBy ? <Button title={`Iski jagah ${fixedBy.doc_no ?? 'nayi entry'} — kholo`} tone="secondary" size="sm" onPress={() => router.push(`/purchase/${fixedBy.id}`)} /> : null}
           </Card>
+        ) : null}
+
+        {/* Owner, 8 Oct 2026: an approved entry that turns out wrong is put
+            right by a correction — staff send it, the owner approves it. */}
+        {fixWaiting ? (
+          <Card spine="warn" style={{ gap: space.xs }}>
+            <Text variant="heading">Sudhaar {fixWaiting.submitted_at ? 'owner ke review mein hai' : 'adhoora pada hai'}</Text>
+            <Text variant="small" color="textMuted">Approve hote hi ye entry cancel hokar sudhaari hui entry lagegi — stock aur supplier ka khata dono theek.</Text>
+            <Button title={approver && fixWaiting.submitted_at ? 'Sudhaar dekho aur approve karo' : 'Sudhaar kholo'} size="sm"
+              onPress={() => router.push(`/purchase/edit?id=${fixWaiting.id}`)} />
+          </Card>
+        ) : canFix ? (
+          <Card style={{ gap: space.xs }}>
+            <Text variant="small" color="textMuted">
+              {approver
+                ? 'Qty, kism ya koi line galat chadhi? Sudhaaro — purani entry cancel hokar sahi wali lagegi, stock aur khata dono theek.'
+                : 'Qty, kism ya koi line galat chadhi? Sudhaar bhejo — owner approve karega tab stock theek hoga.'}
+            </Text>
+            <Button title={approver ? 'Entry sudhaaro' : 'Galti hai — sudhaar bhejo'} tone="secondary" size="sm"
+              onPress={() => router.push(`/purchase/edit?correct=${p.id}`)} />
+          </Card>
+        ) : p.status === 'posted' && !isReturn && wentBack && can('purchase.create') ? (
+          <Text variant="small" color="textFaint">Is entry ka kuch maal supplier ko wapas ja chuka hai — ab ise sudhaar nahi sakte. Stock galat ho to item ke page par “Stock theek karo”.</Text>
         ) : null}
 
         {showCost ? (

@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Transaction } from '@powersync/react-native';
 
 import {
-  allocateDocNo, cancelInvoice, cancelPayment, cancelPurchase, closeAudit, closeJobCard, dispatchTransfer, postAdjustment, postInvoice, postPayment, postPurchase, receiveTransfer, returnStillOpen, snapshotAudit,
+  allocateDocNo, cancelInvoice, cancelPayment, cancelPurchase, closeAudit, closeJobCard, dispatchTransfer, postAdjustment, postCorrection, postInvoice, postPayment, postPurchase, receiveTransfer, returnStillOpen, snapshotAudit,
 } from '../src/lib/posting';
 import { insertRow, type Actor } from '../src/lib/writes';
 import { createDb, many, one, row, type FakeDb } from './harness';
@@ -333,6 +333,68 @@ describe('payments', () => {
     expect(no).toBe('PAY/26-27/0001');
     expect(balance('supplier', ID.sup)).toBe(0);
     expect(one<{ paid_total: number }>(db, 'SELECT paid_total FROM purchases WHERE id = ?', pid).paid_total).toBe(1180);
+  });
+});
+
+// Owner, 8 Oct 2026: an approved entry that was wrong is put right by a
+// correction, approved like any entry.
+describe('correcting an approved stock entry', () => {
+  async function correction(of: string, lines: Array<{ variant: string; qty: number; rate: number }>) {
+    const cid = await draftPurchase(lines);
+    db.raw.prepare('UPDATE purchases SET corrects_purchase_id = ? WHERE id = ?').run(of, cid);
+    return cid;
+  }
+
+  it('cancels the old entry and posts the new one: stock and supplier khata as corrected', async () => {
+    const pid = await draftPurchase([{ variant: ID.h4, qty: 10, rate: 100 }]);
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, pid, actor));
+    expect(stock(ID.h4, ID.main)).toBe(30);
+    expect(balance('supplier', ID.sup)).toBe(1180);
+
+    // Two too many H4, and one H7 that was left out.
+    const cid = await correction(pid, [{ variant: ID.h4, qty: 8, rate: 100 }, { variant: ID.h7, qty: 1, rate: 100 }]);
+    const no = await db.writeTransaction((tx) => postCorrection(tx as unknown as Transaction, cid, actor));
+
+    expect(no).toBe('PUR/26-27/0002');
+    expect(one<{ status: string }>(db, 'SELECT status FROM purchases WHERE id = ?', pid).status).toBe('cancelled');
+    expect(one<{ status: string; notes: string }>(db, 'SELECT status, notes FROM purchases WHERE id = ?', cid))
+      .toEqual({ status: 'posted', notes: 'PUR/26-27/0001 ka sudhaar' });
+    expect(stock(ID.h4, ID.main)).toBe(28);
+    expect(stock(ID.h7, ID.main)).toBe(1);
+    expect(balance('supplier', ID.sup)).toBe(1062);
+  });
+
+  it('payments matched to the old entry move to the corrected one', async () => {
+    const pid = await draftPurchase([{ variant: ID.h4, qty: 10, rate: 100 }]);
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, pid, actor));
+    await db.writeTransaction((tx) => postPayment(tx as unknown as Transaction, { direction: 'out', party_id: ID.sup, amount: 1180, mode: 'bank', payment_date: '2026-09-20' }, actor));
+    expect(one<{ paid_total: number }>(db, 'SELECT paid_total FROM purchases WHERE id = ?', pid).paid_total).toBe(1180);
+
+    const cid = await correction(pid, [{ variant: ID.h4, qty: 8, rate: 100 }]);
+    await db.writeTransaction((tx) => postCorrection(tx as unknown as Transaction, cid, actor));
+
+    // Only as much as the corrected entry is worth; the rest is an advance.
+    expect(one<{ paid_total: number }>(db, 'SELECT paid_total FROM purchases WHERE id = ?', cid).paid_total).toBe(944);
+    expect(one<{ paid_total: number }>(db, 'SELECT paid_total FROM purchases WHERE id = ?', pid).paid_total).toBe(0);
+    expect(many(db, 'SELECT doc_id, amount FROM payment_allocations')).toEqual([{ doc_id: cid, amount: 944 }]);
+    expect(balance('supplier', ID.sup)).toBe(-236);
+  });
+
+  it('refuses once the old entry has gone back to the supplier, or was already corrected', async () => {
+    const pid = await draftPurchase([{ variant: ID.h4, qty: 10, rate: 100 }]);
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, pid, actor));
+    const first = await correction(pid, [{ variant: ID.h4, qty: 9, rate: 100 }]);
+    const second = await correction(pid, [{ variant: ID.h4, qty: 7, rate: 100 }]);
+    await db.writeTransaction((tx) => postCorrection(tx as unknown as Transaction, first, actor));
+    await expect(db.writeTransaction((tx) => postCorrection(tx as unknown as Transaction, second, actor))).rejects.toThrow(/purana/);
+
+    const other = await draftPurchase([{ variant: ID.h4, qty: 5, rate: 100 }]);
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, other, actor));
+    const dn = await insertRow(asTx(db), 'purchases', { doc_type: 'debit_note', doc_date: '2026-09-16', supplier_id: ID.sup, location_id: ID.main, is_interstate: true, other_charges: 0, status: 'draft', against_purchase_id: other }, actor);
+    await insertRow(asTx(db), 'purchase_lines', { purchase_id: dn, line_no: 1, variant_id: ID.h4, description: 'x', qty: 1, rate: 100, discount_pct: 0, discount_amt: 0, tax_rate_pct: 18 });
+    await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, dn, actor));
+    const late = await correction(other, [{ variant: ID.h4, qty: 4, rate: 100 }]);
+    await expect(db.writeTransaction((tx) => postCorrection(tx as unknown as Transaction, late, actor))).rejects.toThrow(/wapas/);
   });
 });
 

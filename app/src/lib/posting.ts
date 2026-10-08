@@ -23,7 +23,7 @@ import {
 } from '@domain';
 
 import { payModeLabel } from './words';
-import { insertRow, updateRow, type Actor } from './writes';
+import { deleteRow, insertRow, updateRow, type Actor } from './writes';
 
 type DocType = 'sales_invoice' | 'credit_note' | 'purchase' | 'debit_note' | 'payment_in' | 'payment_out' | 'stock_adjustment' | 'stock_transfer' | 'stock_audit' | 'job_card';
 
@@ -263,6 +263,61 @@ export async function cancelPurchase(tx: Transaction, purchaseId: string, reason
   await updateRow(tx, 'purchases', purchaseId, { status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: actor.userId, cancel_reason: reason });
 }
 
+/**
+ * A wrong stock entry put right (owner, 8 Oct 2026): the correction is a new
+ * entry carrying `corrects_purchase_id`. Posting it cancels the old one —
+ * stock back out, supplier khata back — and posts the new one, in the same
+ * transaction, so there is never a moment with both or neither.
+ *
+ * Supplier payments already matched to the old entry move to the new one
+ * (up to its total), or the old one could not be cancelled at all — every
+ * entry the supplier has been paid against would be uncorrectable. The
+ * allocation row goes first and the paid_total patch after it: the server's
+ * allocation trigger moves paid_total too, and the patch then lands on the
+ * value the trigger left, not on top of it.
+ */
+export async function postCorrection(tx: Transaction, correctionId: string, actor: Actor): Promise<string> {
+  const c = await one<{ id: string; status: string; doc_type: string; corrects_purchase_id: string | null }>(
+    tx, 'SELECT id, status, doc_type, corrects_purchase_id FROM purchases WHERE id = ?', [correctionId]);
+  if (!c?.corrects_purchase_id) throw new Error('Ye sudhaar nahi hai');
+  if (c.status !== 'draft') throw new Error('Ye sudhaar pehle hi ho chuka hai');
+  const o = await one<{ id: string; status: string; doc_type: string; doc_no: string; paid_total: number }>(
+    tx, 'SELECT id, status, doc_type, doc_no, paid_total FROM purchases WHERE id = ?', [c.corrects_purchase_id]);
+  if (!o || o.status !== 'posted' || o.doc_type !== 'purchase') {
+    throw new Error('Jo entry sudhaarni thi wo ab badal chuki hai — ye sudhaar purana ho gaya.');
+  }
+  const returns = await one<{ n: number }>(
+    tx, `SELECT COUNT(*) AS n FROM purchases WHERE against_purchase_id = ? AND doc_type = 'debit_note' AND status = 'posted'`, [o.id]);
+  if ((returns?.n ?? 0) > 0) {
+    throw new Error(`${o.doc_no} ka maal supplier ko wapas ja chuka hai — ise sudhaar nahi sakte. “Stock theek karo” se karo.`);
+  }
+
+  const allocs = await all<{ id: string; payment_id: string; amount: number }>(
+    tx, `SELECT id, payment_id, amount FROM payment_allocations WHERE doc_id = ? AND doc_type = 'purchase'`, [o.id]);
+  for (const a of allocs) await deleteRow(tx, 'payment_allocations', a.id);
+  if (allocs.length) await updateRow(tx, 'purchases', o.id, { paid_total: 0 });
+
+  await cancelPurchase(tx, o.id, 'Sudhaar — nayi entry ne jagah li', actor);
+  const cNotes = (await one<{ notes: string | null }>(tx, 'SELECT notes FROM purchases WHERE id = ?', [c.id]))?.notes ?? null;
+  if (!cNotes?.includes(o.doc_no)) {
+    await updateRow(tx, 'purchases', c.id, { notes: [`${o.doc_no} ka sudhaar`, cNotes].filter(Boolean).join(' · ') });
+  }
+  const docNo = await postPurchase(tx, c.id, actor);
+
+  const fresh = await one<{ grand_total: number }>(tx, 'SELECT grand_total FROM purchases WHERE id = ?', [c.id]);
+  let room = fresh?.grand_total ?? 0;
+  let paid = 0;
+  for (const a of allocs) {
+    const amount = round(Math.min(a.amount, room));
+    if (amount <= 0) break;
+    await insertRow(tx, 'payment_allocations', { payment_id: a.payment_id, doc_type: 'purchase', doc_id: c.id, amount });
+    room = round(room - amount);
+    paid = round(paid + amount);
+  }
+  if (paid) await updateRow(tx, 'purchases', c.id, { paid_total: paid });
+  return docNo;
+}
+
 /** Reversal rows that exactly negate every movement of a document. */
 export async function reverseMovements(tx: Transaction, refType: string, refId: string, actor: Actor): Promise<void> {
   const moves = await all<{ id: string; variant_id: string; location_id: string; qty: number; unit_cost: number; ref_line_id: string | null }>(
@@ -449,8 +504,12 @@ export async function cancelPayment(tx: Transaction, paymentId: string, reason: 
   const allocs = await all<{ id: string; doc_type: string; doc_id: string; amount: number }>(tx, 'SELECT * FROM payment_allocations WHERE payment_id = ?', [paymentId]);
   for (const al of allocs) {
     const table = al.doc_type === 'sales_invoice' || al.doc_type === 'credit_note' ? 'sales_invoices' : 'purchases';
-    await tx.execute(`UPDATE ${table} SET paid_total = COALESCE(paid_total, 0) - ?, updated_at = ? WHERE id = ?`, [al.amount, new Date().toISOString(), al.doc_id]);
+    // The allocation first, the paid_total after. The server's allocation
+    // trigger takes the amount off paid_total itself; uploaded the other way
+    // round, the bill's new paid_total landed first and the trigger then took
+    // the amount off a second time.
     await tx.execute('DELETE FROM payment_allocations WHERE id = ?', [al.id]);
+    await tx.execute(`UPDATE ${table} SET paid_total = COALESCE(paid_total, 0) - ?, updated_at = ? WHERE id = ?`, [al.amount, new Date().toISOString(), al.doc_id]);
   }
   await insertRow(tx, 'ledger_entries', {
     party_type: p.party_type, party_id: p.party_id, entry_date: toDateString(), doc_type: 'cancel_reversal', doc_id: paymentId, doc_no: p.doc_no,

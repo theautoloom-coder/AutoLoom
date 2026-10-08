@@ -1,5 +1,13 @@
 /**
- * GINTI KARO — godown mein jitna maal sach mein hai, wahi app mein ho jaaye.
+ * STOCK THEEK KARO — godown mein jitna maal sach mein hai, wahi app mein ho
+ * jaaye: a shelf count, a piece broken or gone, or maal that went in wrong.
+ *
+ * Owner, 8 Oct 2026: "current stock mein kuch upar niche karna hai to user
+ * request bhej sake, main approve kar saku". A staff member's correction is
+ * sent to the owner and the stock moves only when it is approved (on the
+ * server too: only stock.adjust may post, migration 20261009100000). The
+ * owner's own goes in at once. Until then a staff ginti changed the stock on
+ * the spot.
  *
  * This replaces the old two-screen audit (open an audit, snapshot a count
  * sheet, come back later and close it). Counting a shelf is one job done
@@ -23,7 +31,7 @@
  * rather than a quantity that quietly evaporated.
  */
 import { useQuery } from '@powersync/react';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useRef, useState } from 'react';
 import { View, type TextInput } from 'react-native';
 
@@ -46,8 +54,10 @@ import { DateField } from '@/ui/date-field';
  */
 const REASONS = [
   { key: 'count', label: 'Ginti galat thi', code: 'counting_error' },
+  { key: 'wrong', label: 'Galat chadha tha', code: 'wrong_entry' },
   { key: 'kharab', label: 'Kharab', code: 'damage' },
   { key: 'missing', label: 'Nahi mila', code: 'missing' },
+  { key: 'found', label: 'Mil gaya', code: 'found' },
   { key: 'other', label: 'Aur kuch', code: 'other' },
 ] as const;
 
@@ -57,6 +67,9 @@ export default function GintiKaro() {
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
+  // Staff ask; the owner's goes in at once.
+  const direct = can('stock.adjust');
+  const { variant: variantParam } = useLocalSearchParams<{ variant?: string }>();
 
   const [rows, setRows] = useState<Row_[]>([]);
   const [date, setDate] = useState(toDateString());
@@ -88,6 +101,13 @@ export default function GintiKaro() {
       }];
     });
   }
+
+  // Opened from a kism's own page ("Stock theek karo"): that kism is the first line.
+  const { data: preRows } = useQuery<PickedVariant>(
+    `SELECT pv.id, pv.sku, pv.variant_name, pv.avg_cost, pv.last_purchase_cost, p.name AS product_name
+       FROM product_variants pv JOIN products p ON p.id = pv.product_id WHERE pv.id = ?`, [variantParam ?? '']);
+  const [seeded, setSeeded] = useState(false);
+  if (preRows?.[0] && !seeded) { setSeeded(true); add(preRows[0]); }
 
   const patch = (id: string, p: Partial<Row_>) => setRows((prev) => prev.map((r) => (r.variantId === id ? { ...r, ...p } : r)));
   const drop = (id: string) => setRows((prev) => prev.filter((r) => r.variantId !== id));
@@ -137,8 +157,11 @@ export default function GintiKaro() {
           // A physical count of the shelf. Each line carries its own reason;
           // this is only the fallback for a line that has none.
           reason: 'audit',
-          notes: ['Ginti', note.trim() || null].filter(Boolean).join(' — '),
+          notes: ['Stock theek', note.trim() || null].filter(Boolean).join(' — '),
           status: 'draft',
+          // A staff member's waits for the owner.
+          submitted_at: direct ? null : new Date().toISOString(),
+          submitted_by: direct ? null : actor.userId,
         }, actor);
 
         for (const c of changes) {
@@ -152,13 +175,17 @@ export default function GintiKaro() {
             // The allowed code, never the Hinglish label: postAdjustment reads
             // this to decide whether the movement is a 'damage'.
             reason_code: c.reason.code,
-            note: `${c.reason.label} · gine ${c.actual}, app mein ${c.system}`,
+            note: `${c.reason.label} · asal ${c.actual}, app mein ${c.system}`,
+            system_qty: c.system,
+            counted_qty: c.actual,
           });
         }
-        await postAdjustment(tx, id, actor);
+        if (direct) await postAdjustment(tx, id, actor);
       });
 
-      notify(`Ginti theek ho gayi — ${changes.length} item ka stock badal diya.`, 'ok');
+      notify(direct
+        ? `Stock theek ho gaya — ${changes.length} item ka stock badal diya.`
+        : `Owner ko bhej diya — approve hote hi ${changes.length} item ka stock theek ho jayega.`, 'ok');
       router.back();
     } catch (e) {
       notify(`Ginti theek nahi hui: ${String((e as Error).message ?? e)}. Ginti waise ki waise padi hai — dobara koshish karo.`, 'danger');
@@ -175,9 +202,9 @@ export default function GintiKaro() {
   if (!can('stock.count') && !can('stock.adjust')) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Ginti Karo' }} />
+        <Stack.Screen options={{ title: 'Stock theek karo' }} />
         <Screen>
-          <Text variant="display">Ginti Karo</Text>
+          <Text variant="display">Stock theek karo</Text>
           <Empty title="Iski permission nahi hai" hint="Admin se stock badalne ka haq maango." />
         </Screen>
       </>
@@ -187,12 +214,14 @@ export default function GintiKaro() {
   if (step === 'confirm') {
     return (
       <>
-        <Stack.Screen options={{ title: 'Ginti Karo' }} />
+        <Stack.Screen options={{ title: 'Stock theek karo' }} />
         <Screen>
           <View>
             <Text variant="display">Ek baar dekh lo</Text>
             <Text variant="small" color="textMuted">
-              Yeh {changes.length} item badlenge. Baaki sab waise hi rahenge.
+              {direct
+                ? `Yeh ${changes.length} item badlenge. Baaki sab waise hi rahenge.`
+                : `Yeh ${changes.length} item owner ko jayenge. Approve hone par hi stock badlega.`}
             </Text>
           </View>
 
@@ -229,7 +258,7 @@ export default function GintiKaro() {
               while this screen sat open can empty the list, and pressing a
               live button on an empty list is how a no-op document gets made. */}
           <Button
-            title="Haan, ginti theek kar do"
+            title={direct ? 'Haan, stock theek kar do' : 'Haan, owner ko bhejo'}
             size="lg"
             full
             onPress={apply}
@@ -247,9 +276,10 @@ export default function GintiKaro() {
       <Stack.Screen options={{ title: 'Ginti Karo' }} />
       <Screen>
         <View>
-          <Text variant="display">Ginti Karo</Text>
+          <Text variant="display">Stock theek karo</Text>
           <Text variant="small" color="textMuted">
-            Shelf par ginti karo aur jo nikla wo yahan bharo — app ka stock ussi ke hisab se theek ho jayega.
+            Shelf par jitna sach mein hai wo likho — ginti ho, toota ya galat chadha maal.
+            {direct ? ' App ka stock ussi ke hisab se theek ho jayega.' : ' Owner approve karega, tab stock badlega.'}
           </Text>
         </View>
 
@@ -276,7 +306,7 @@ export default function GintiKaro() {
                 </Row>
 
                 <Input
-                  label="Ginti mein kitna nikla"
+                  label="Asal mein kitna hai"
                   value={c.actual === null ? '' : String(c.actual)}
                   onChangeText={(v) => patch(c.variantId, { actual: v.replace(/[^0-9]/g, '') })}
                   keyboardType="number-pad"
@@ -312,7 +342,7 @@ export default function GintiKaro() {
         )}
 
         <Card style={{ gap: space.md }}>
-          <DateField label="Ginti kab hui" value={date} onChange={setDate} />
+          <DateField label="Kab gina" value={date} onChange={setDate} />
           <Input
             ref={noteRef}
             label="Note"
@@ -340,7 +370,7 @@ export default function GintiKaro() {
         ) : null}
 
         <Button
-          title={changes.length ? `${changes.length} item theek kar do` : 'Ginti theek kar do'}
+          title={changes.length ? `${changes.length} item theek kar do` : 'Stock theek kar do'}
           size="lg"
           full
           onPress={review}

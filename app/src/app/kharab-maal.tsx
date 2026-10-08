@@ -130,10 +130,15 @@ export default function KharabLikho() {
     const kharabId = kharabLoc?.[0]?.id;
     if (reason.aside && !kharabId) { notify('“Kharab maal” ki jagah nahi mili. Sync hone do, phir dobara karo.', 'danger'); return; }
 
+    // Pieces gone for good take stock away: a staff member's waits for the
+    // owner (8 Oct 2026). Setting kharab maal aside moves it, nothing is lost.
+    const direct = can('stock.adjust');
     const ok = await confirm(
-      reason.aside ? `${totalQty} pcs kharab mein daal dein?` : `${totalQty} pcs nahi mile — stock se hata dein?`,
+      reason.aside ? `${totalQty} pcs kharab mein daal dein?` : direct ? `${totalQty} pcs nahi mile — stock se hata dein?` : `${totalQty} pcs nahi mile — owner ko bhejein?`,
       reason.aside
         ? `${reason.label}. Godown se nikal ke “Kharab maal” mein chala jayega — wahan se supplier ko wapas jayega.`
+        : !direct
+        ? 'Owner approve karega, tab stock se hatega.'
         : showCost
         ? `${formatINR(totalLoss)} ka nuksan hisab mein judega. Stock abhi kam ho jayega.`
         : 'Stock abhi kam ho jayega.'
@@ -178,6 +183,8 @@ export default function KharabLikho() {
           reason: reason.code,
           notes,
           status: 'draft',
+          submitted_at: direct ? null : new Date().toISOString(),
+          submitted_by: direct ? null : actor.userId,
         }, actor);
 
         for (const l of usable) {
@@ -194,10 +201,10 @@ export default function KharabLikho() {
             note: reason.label,
           });
         }
-        await postAdjustment(tx, id, actor);
+        if (direct) await postAdjustment(tx, id, actor);
       });
 
-      notify(reason.aside ? `${totalQty} pcs kharab mein daal diya.` : `${totalQty} pcs stock se hata diya.`, 'ok');
+      notify(reason.aside ? `${totalQty} pcs kharab mein daal diya.` : direct ? `${totalQty} pcs stock se hata diya.` : `${totalQty} pcs owner ko bhej diya — approve hote hi stock se hatega.`, 'ok');
       router.back();
     } catch (e) {
       notify(`Kharab nahi likha gaya: ${String((e as Error).message ?? e)}`, 'danger');

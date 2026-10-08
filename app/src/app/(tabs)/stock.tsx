@@ -66,7 +66,8 @@ export default function StockScreen() {
   const { data: rows, isLoading: rowsLoading } = useQuery<Row>(sq.sql, sq.params);
   const { data: locations, isLoading: locationsLoading } = useQuery<LocRow>(STOCK_VALUE_BY_LOCATION.sql);
   const { data: waiting } = useQuery<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL`);
+    `SELECT (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL)
+          + (SELECT COUNT(*) FROM stock_adjustments WHERE status = 'draft' AND submitted_at IS NOT NULL) AS n`);
   const waitingCount = waiting?.[0]?.n ?? 0;
   const { data: negative } = useQuery<{ id: string; sku: string; product_name: string; variant_name: string; location: string; qty: number; photo_path: string | null }>(
     `SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, l.name AS location, s.qty,

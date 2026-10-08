@@ -60,8 +60,10 @@ export default function HomeScreen() {
   const seeTotals = can('reports.view');
   const approver = can('purchase.approve');
   const { data: waitingRows } = useQuery<{ n: number; mine: number; back: number }>(
-    `SELECT (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL) AS n,
+    `SELECT (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL)
+          + (SELECT COUNT(*) FROM stock_adjustments WHERE status = 'draft' AND submitted_at IS NOT NULL) AS n,
             (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL AND submitted_by = ?1)
+          + (SELECT COUNT(*) FROM stock_adjustments WHERE status = 'draft' AND submitted_at IS NOT NULL AND submitted_by = ?1)
           + (SELECT COUNT(*) FROM change_requests WHERE status = 'pending' AND submitted_by = ?1) AS mine,
             (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NULL AND submitted_by = ?1)
           + (SELECT COUNT(*) FROM change_requests WHERE status = 'rejected' AND submitted_by = ?1) AS back`,

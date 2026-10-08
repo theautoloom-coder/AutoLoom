@@ -185,7 +185,7 @@ export default function RootLayout() {
                 <Stack.Screen name="stock/add" options={{ title: 'Stock Chadhao' }} />
                 <Stack.Screen name="kharab-maal" options={{ title: 'Kharab Likho' }} />
                 <Stack.Screen name="kharab" options={{ title: 'Kharab maal' }} />
-                <Stack.Screen name="stock-check" options={{ title: 'Ginti Karo' }} />
+                <Stack.Screen name="stock-check" options={{ title: 'Stock theek karo' }} />
                 <Stack.Screen name="expenses" options={{ title: 'Kharcha Likho' }} />
                 <Stack.Screen name="partner-paisa" options={{ title: 'Partner ka paisa' }} />
                 <Stack.Screen name="reports" options={{ title: 'Report' }} />

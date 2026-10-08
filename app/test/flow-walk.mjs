@@ -37,7 +37,7 @@ const SCREENS = [
   ['Shop settings', '/admin/settings'],
   ['Stock chadhao', '/stock/add'],
   ['Kharab Likho', '/kharab-maal'],
-  ['Ginti Karo', '/stock-check'],
+  ['Stock theek karo', '/stock-check'],
   ['Maal kahan pada hai', '/warehouse'],
   ['Partner ka paisa likho', '/partner-kharcha'],
   ['New item', '/admin/item'],

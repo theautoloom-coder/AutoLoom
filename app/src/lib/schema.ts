@@ -605,6 +605,7 @@ export const purchases = new Table(
     settled_by: column.text,
     settle_note: column.text,
     revised_at: column.text,
+    corrects_purchase_id: column.text,
   },
   { indexes: { supplier: ['supplier_id'], date: ['doc_date'] } }
 );
@@ -758,6 +759,8 @@ export const stock_adjustment_lines = new Table(
     note: column.text,
     created_at: column.text,
     updated_at: column.text,
+    system_qty: column.real,
+    counted_qty: column.real,
   },
   { indexes: { adj: ['adjustment_id'] } }
 );
@@ -776,6 +779,11 @@ export const stock_adjustments = new Table(
     device_id: column.text,
     created_at: column.text,
     updated_at: column.text,
+    submitted_at: column.text,
+    submitted_by: column.text,
+    cancel_reason: column.text,
+    cancelled_at: column.text,
+    cancelled_by: column.text,
   },
   {}
 );

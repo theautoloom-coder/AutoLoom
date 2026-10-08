@@ -490,6 +490,89 @@ let entryId = '';
   await ctx.close();
 }
 
+// ---------------------------------------------------------------------------
+// Owner, 8 Oct 2026: an approved entry that was wrong, and stock that does not
+// match the shelf — staff ask, the owner approves, only then does it move.
+// ---------------------------------------------------------------------------
+let fixId = '';
+let askId = '';
+{
+  const { ctx, page } = await session(STAFF);
+
+  await step('staff send a correction of an approved entry', async () => {
+    if (!entryId || sql(`select status from purchases where id = '${entryId}'`) !== 'posted') throw new Error('no approved staff entry');
+    const before = godownQty();
+    await go(page, `/purchase/${entryId}`, 6000);
+    await page.getByRole('button', { name: 'Galti hai — sudhaar bhejo' }).click();
+    await page.waitForTimeout(7000);
+    check('the correction opens with the entry copied', await visible(page, 'Entry sudhaar'));
+    await page.getByLabel('Kitne aaye').locator('visible=true').first().fill('4');
+    await page.waitForTimeout(1500);
+    check('each line shows what it was', await page.getByText(/Pehle 5 → ab 4/).first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: 'Sudhaar owner ko bhejo' }).click();
+    await page.waitForTimeout(8000);
+    fixId = sql(`select id from purchases where corrects_purchase_id = '${entryId}' and status = 'draft' and submitted_at is not null limit 1`);
+    check('the correction reached the owner', !!fixId);
+    check('the correction carries the new qty', num(`select coalesce(sum(qty),0) from purchase_lines where purchase_id = '${fixId}'`) === 4);
+    check('the old buy rate came along, unseen by staff', num(`select max(rate) from purchase_lines where purchase_id = '${fixId}'`) === 1500);
+    check('stock did not move before approval', godownQty() === before);
+  });
+
+  await step('staff ask to put the stock right', async () => {
+    const before = godownQty();
+    await go(page, `/stock-check?variant=${H4}`, 7000);
+    await page.getByPlaceholder('Jitne gine, wo likho').locator('visible=true').first().fill(String(before + 2));
+    await page.waitForTimeout(800);
+    await page.getByText('Mil gaya', { exact: true }).locator('visible=true').first().click();
+    await page.getByRole('button', { name: /1 item theek kar do/ }).click();
+    await page.waitForTimeout(1500);
+    await page.getByRole('button', { name: 'Haan, owner ko bhejo' }).click();
+    await page.waitForTimeout(8000);
+    askId = sql(`select a.id from stock_adjustments a join stock_adjustment_lines l on l.adjustment_id = a.id
+                  where a.status = 'draft' and a.submitted_at is not null and l.variant_id = '${H4}' order by a.submitted_at desc limit 1`);
+    check('the stock request reached the owner', !!askId);
+    check('it says +2, from the count', num(`select qty_delta from stock_adjustment_lines where adjustment_id = '${askId}'`) === 2
+      && num(`select counted_qty from stock_adjustment_lines where adjustment_id = '${askId}'`) === before + 2);
+    check('stock did not move before approval', godownQty() === before);
+  });
+
+  await ctx.close();
+}
+{
+  const { ctx, page } = await session(OWNER);
+
+  await step('owner approves the correction', async () => {
+    if (!fixId) throw new Error('no correction to approve');
+    const before = godownQty();
+    await go(page, '/requests', 6000);
+    await page.getByText(/^Sudhaar .* · 4 pcs$/).locator('visible=true').first().click();
+    await page.waitForTimeout(6000);
+    await page.getByRole('button', { name: 'Sudhaar lagao' }).click();
+    await yes(page);
+    await page.waitForTimeout(9000);
+    check('the wrong entry is cancelled', sql(`select status from purchases where id = '${entryId}'`) === 'cancelled');
+    check('the correction is posted in its place', sql(`select status from purchases where id = '${fixId}'`) === 'posted');
+    check('stock is one less, as corrected', godownQty() === before - 1, `${before} → ${godownQty()}`);
+    check('supplier khata has the corrected amount', num(`select grand_total from purchases where id = '${fixId}'`) === 6000);
+  });
+
+  await step('owner approves the stock request', async () => {
+    if (!askId) throw new Error('no stock request');
+    const before = godownQty();
+    await go(page, '/requests', 6000);
+    await page.getByText(/^Stock theek · 1 item/).locator('visible=true').first().click();
+    await page.waitForTimeout(5000);
+    check('the request shows the count', await page.getByText(/app mein .* → asal/).first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: 'Approve karo — stock theek karo' }).click();
+    await yes(page);
+    await page.waitForTimeout(9000);
+    check('the request is approved', sql(`select status from stock_adjustments where id = '${askId}'`) === 'posted');
+    check('stock went up by 2 on approval', godownQty() === before + 2, `${before} → ${godownQty()}`);
+  });
+
+  await ctx.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} ok`);

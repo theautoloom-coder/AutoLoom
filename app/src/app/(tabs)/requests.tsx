@@ -8,9 +8,10 @@
  * Rejections are given the loudest treatment on purpose. A rejection that is
  * easy to miss is a rejection that gets resubmitted unchanged next week.
  *
- * Two kinds of thing wait here: maal a staff member counted in (it does not
+ * Three kinds of thing wait here: maal a staff member counted in (it does not
  * reach the stock until an owner or admin approves it — owner, 6 Oct 2026),
- * and new items a staff member asked for.
+ * stock put right — an approved entry corrected, or the shelf count fixed
+ * (owner, 8 Oct 2026) — and new items a staff member asked for.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useRouter } from 'expo-router';
@@ -25,7 +26,16 @@ type Entry = {
   id: string; status: string; doc_no: string | null; doc_date: string; submitted_at: string | null; revised_at: string | null;
   notes: string | null; cancel_reason: string | null; decided_at: string | null;
   supplier: string | null; submitter: string | null; decider: string | null; items: number; qty: number;
+  corrects_no: string | null;
 };
+type Fix = {
+  id: string; status: string; doc_no: string | null; doc_date: string; submitted_at: string | null; notes: string | null;
+  cancel_reason: string | null; decided_at: string | null; submitter: string | null; decider: string | null;
+  items: number; up: number; down: number;
+};
+/** "Sudhaar PUR/0007 · Bright Auto · 8 pcs" for a correction; the plain line otherwise. */
+const entryTitle = (e: Entry) => `${e.corrects_no ? `Sudhaar ${e.corrects_no} · ` : ''}${e.supplier ?? 'Supplier'} · ${e.qty} pcs`;
+const fixTitle = (f: Fix) => [`Stock theek · ${f.items} item`, f.up ? `+${f.up}` : null, f.down ? `−${f.down}` : null].filter(Boolean).join('  ');
 
 const when = (iso: string) => {
   const d = new Date(iso);
@@ -72,13 +82,14 @@ export default function RequestsScreen() {
   const { data: entryRows } = useQuery<Entry>(
     `SELECT p.id, p.status, p.doc_no, p.doc_date, p.submitted_at, p.revised_at, p.notes, p.cancel_reason,
             COALESCE(p.posted_at, p.cancelled_at) AS decided_at,
-            s.name AS supplier, pr.full_name AS submitter, dp.full_name AS decider,
+            s.name AS supplier, pr.full_name AS submitter, dp.full_name AS decider, o.doc_no AS corrects_no,
             (SELECT COUNT(*) FROM purchase_lines l WHERE l.purchase_id = p.id) AS items,
             (SELECT COALESCE(SUM(l.qty), 0) FROM purchase_lines l WHERE l.purchase_id = p.id) AS qty
        FROM purchases p
        LEFT JOIN suppliers s ON s.id = p.supplier_id
        LEFT JOIN profiles pr ON pr.id = p.submitted_by
        LEFT JOIN profiles dp ON dp.id = COALESCE(p.approved_by, p.cancelled_by)
+       LEFT JOIN purchases o ON o.id = p.corrects_purchase_id
       WHERE p.doc_type = 'purchase' AND p.submitted_by IS NOT NULL
         AND (?1 = 1 OR p.submitted_by = ?2)
         AND (p.status = 'draft' OR COALESCE(p.posted_at, p.cancelled_at, p.updated_at) >= ?3)
@@ -90,6 +101,25 @@ export default function RequestsScreen() {
   const sentBack = drafts.filter((e) => !e.submitted_at);
   const decidedEntries = (entryRows ?? []).filter((e) => e.status !== 'draft').slice(0, 30);
   const revised = (e: Entry) => !!e.revised_at && !!e.submitted_at && e.revised_at > e.submitted_at;
+
+  // Stock put right on the shelf: a count or a piece gone, waiting or decided.
+  const fixer = can('stock.adjust');
+  const { data: fixRows } = useQuery<Fix>(
+    `SELECT a.id, a.status, a.doc_no, a.doc_date, a.submitted_at, a.notes, a.cancel_reason,
+            COALESCE(a.posted_at, a.cancelled_at) AS decided_at, pr.full_name AS submitter, dp.full_name AS decider,
+            (SELECT COUNT(*) FROM stock_adjustment_lines l WHERE l.adjustment_id = a.id) AS items,
+            (SELECT COALESCE(SUM(CASE WHEN l.qty_delta > 0 THEN l.qty_delta ELSE 0 END), 0) FROM stock_adjustment_lines l WHERE l.adjustment_id = a.id) AS up,
+            (SELECT COALESCE(SUM(CASE WHEN l.qty_delta < 0 THEN -l.qty_delta ELSE 0 END), 0) FROM stock_adjustment_lines l WHERE l.adjustment_id = a.id) AS down
+       FROM stock_adjustments a
+       LEFT JOIN profiles pr ON pr.id = a.submitted_by
+       LEFT JOIN profiles dp ON dp.id = COALESCE(a.approved_by, a.cancelled_by)
+      WHERE a.submitted_by IS NOT NULL AND (?1 = 1 OR a.submitted_by = ?2)
+        AND (a.status = 'draft' OR COALESCE(a.posted_at, a.cancelled_at, a.updated_at) >= ?3)
+      ORDER BY COALESCE(a.posted_at, a.cancelled_at, a.submitted_at) DESC`,
+    [fixer ? 1 : 0, me, since],
+  );
+  const fixWaiting = (fixRows ?? []).filter((f) => f.status === 'draft');
+  const fixDecided = (fixRows ?? []).filter((f) => f.status !== 'draft').slice(0, 20);
 
   // A reviewer sees the whole queue; everyone else sees only their own.
   const { data: rows } = useQuery<Row>(
@@ -127,7 +157,7 @@ export default function RequestsScreen() {
             <SectionTitle>{approver ? 'Maal — staff ke paas wapas' : 'Maal — abhi bheja nahi ya wapas aaya'}</SectionTitle>
             {sentBack.map((e) => (
               <Card key={e.id} keyline={!approver} spine="accent">
-                <Text variant="rowTitle">{e.supplier ?? 'Supplier'} · {e.qty} pcs</Text>
+                <Text variant="rowTitle">{entryTitle(e)}</Text>
                 <Text variant="small" color="textMuted">{[approver ? e.submitter : null, `${e.items} item`, e.doc_date].filter(Boolean).join('  ·  ')}</Text>
                 {e.notes ? <Text variant="small">{e.notes}</Text> : null}
                 <Button title={approver ? 'Dekho' : 'Theek karo'} tone={approver ? 'secondary' : 'primary'} onPress={() => router.push(`/purchase/approve?id=${e.id}`)} />
@@ -153,7 +183,7 @@ export default function RequestsScreen() {
               <React.Fragment key={e.id}>
                 {i > 0 ? <Divider /> : null}
                 <ListRow
-                  title={`${e.supplier ?? 'Supplier'} · ${e.qty} pcs`}
+                  title={entryTitle(e)}
                   subtitle={[approver ? e.submitter : null, `${e.items} item`, e.doc_date, revised(e) ? `badla ${when(e.revised_at!)}` : null].filter(Boolean).join('  ·  ')}
                   right={
                     revised(e) && approver
@@ -167,6 +197,51 @@ export default function RequestsScreen() {
           </Card>
         )}
 
+        {/* Stock put right: a count, a piece broken or gone. Nothing moves
+            until an owner or admin says yes. */}
+        <SectionTitle>{fixer ? `Stock theek karna — approve karo ${fixWaiting.length || ''}` : `Stock theek karne ki request ${fixWaiting.length || ''}`}</SectionTitle>
+        {fixWaiting.length === 0 ? (
+          <Empty
+            title={fixer ? 'Koi request nahi' : 'Kuch bheja nahi'}
+            hint={fixer
+              ? 'Staff ginti kare ya stock theek karna maange to yahan aayega.'
+              : 'Shelf par maal app se alag ho to item kholo → “Stock theek karo”, ya “Ginti Karo”.'}
+          />
+        ) : (
+          <Card style={{ gap: 0 }}>
+            {fixWaiting.map((f, i) => (
+              <React.Fragment key={f.id}>
+                {i > 0 ? <Divider /> : null}
+                <ListRow
+                  title={fixTitle(f)}
+                  subtitle={[fixer ? f.submitter : null, f.notes, when(f.submitted_at ?? f.doc_date)].filter(Boolean).join('  ·  ')}
+                  right={<Badge tone="warn">{fixer ? 'Dekho' : 'Review mein'}</Badge>}
+                  onPress={() => router.push(`/adjustment/${f.id}`)}
+                />
+              </React.Fragment>
+            ))}
+          </Card>
+        )}
+        {fixDecided.length > 0 ? (
+          <Card style={{ gap: 0 }}>
+            {fixDecided.map((f, i) => (
+              <React.Fragment key={f.id}>
+                {i > 0 ? <Divider /> : null}
+                <ListRow
+                  title={fixTitle(f)}
+                  subtitle={[
+                    fixer ? f.submitter : null,
+                    f.status === 'posted' ? `${f.decider ?? 'Owner'} ne approve kiya` : `${f.decider ?? 'Owner'} ne mana kiya: ${f.cancel_reason ?? '—'}`,
+                    f.decided_at ? when(f.decided_at) : f.doc_date,
+                  ].filter(Boolean).join('  ·  ')}
+                  right={f.status === 'posted' ? <Badge tone="ok">Approve</Badge> : <Badge tone="danger">Mana kiya</Badge>}
+                  onPress={() => router.push(`/adjustment/${f.id}`)}
+                />
+              </React.Fragment>
+            ))}
+          </Card>
+        ) : null}
+
         {decidedEntries.length > 0 ? (
           <>
             <SectionTitle>{approver ? 'Haal ke faisle (30 din)' : 'Faisla ho gaya (30 din)'}</SectionTitle>
@@ -175,7 +250,7 @@ export default function RequestsScreen() {
                 <React.Fragment key={e.id}>
                   {i > 0 ? <Divider /> : null}
                   <ListRow
-                    title={`${e.supplier ?? 'Supplier'} · ${e.qty} pcs`}
+                    title={entryTitle(e)}
                     subtitle={[
                       approver ? e.submitter : null,
                       e.status === 'posted'

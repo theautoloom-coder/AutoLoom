@@ -185,8 +185,11 @@ console.log('\n▸ staff (godown): stock-in with a new supplier typed in, ginti'
       num(`select count(*) from supplier_products sp join suppliers s on s.id=sp.supplier_id where s.name='${tag}'`) === 0);
   });
 
-  await step('ginti as the godown', async () => {
-    const before = num("select count(*) from stock_adjustments where status='posted' and reason='audit'");
+  // Owner, 8 Oct 2026: a staff ginti asks; the stock moves when the owner
+  // approves it (e2e-wholesale walks the approval).
+  await step('ginti as the godown goes to the owner', async () => {
+    const posted = num("select count(*) from stock_adjustments where status='posted' and reason='audit'");
+    const asked = num("select count(*) from stock_adjustments where status='draft' and submitted_at is not null");
     await go(page, '/stock-check', 6000);
     await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
     await page.waitForTimeout(2500);
@@ -196,14 +199,16 @@ console.log('\n▸ staff (godown): stock-in with a new supplier typed in, ginti'
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: /theek kar do/i }).last().click();
     await page.waitForTimeout(2000);
-    await page.getByRole('button', { name: /Haan, ginti theek kar do/i }).click();
+    await page.getByRole('button', { name: /Haan, owner ko bhejo/i }).click();
     await page.waitForTimeout(1500);
     const popup = await page.getByRole('button', { name: /Aage badho/i }).isVisible().catch(() => false);
     check('ginti asks once, not twice', !popup);
     if (popup) await confirmYes(page);
     await page.waitForTimeout(7000);
-    const after = num("select count(*) from stock_adjustments where status='posted' and reason='audit'");
-    check('ginti posted on the server', after === before + 1, `${before} → ${after}`);
+    check('staff ginti reached the owner as a request',
+      num("select count(*) from stock_adjustments where status='draft' and submitted_at is not null") === asked + 1);
+    check('staff ginti did not change the stock by itself',
+      num("select count(*) from stock_adjustments where status='posted' and reason='audit'") === posted);
   });
 
   await ctx.close();

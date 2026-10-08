@@ -55,11 +55,13 @@ export default function MoreScreen() {
   const { data: reqRows } = useQuery<{ pending: number; mine_back: number; mine_waiting: number }>(
     `SELECT
        (SELECT COUNT(*) FROM change_requests WHERE status = 'pending')
-     + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL) AS pending,
+     + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL)
+     + (SELECT COUNT(*) FROM stock_adjustments WHERE status = 'draft' AND submitted_at IS NOT NULL) AS pending,
        (SELECT COUNT(*) FROM change_requests WHERE status = 'rejected' AND submitted_by = ?1)
      + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NULL AND submitted_by = ?1) AS mine_back,
        (SELECT COUNT(*) FROM change_requests WHERE status = 'pending' AND submitted_by = ?1)
-     + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL AND submitted_by = ?1) AS mine_waiting`,
+     + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL AND submitted_by = ?1)
+     + (SELECT COUNT(*) FROM stock_adjustments WHERE status = 'draft' AND submitted_at IS NOT NULL AND submitted_by = ?1) AS mine_waiting`,
     [actor.userId ?? ''],
   );
   const { data: kharabRows } = useQuery<{ items: number }>(
@@ -249,8 +251,8 @@ export default function MoreScreen() {
         {canStock || can('stock.count') ? (
           <ListRow
             left={<IconBadge name="checkbox-outline" accent="teal" />}
-            title="Ginti Karo"
-            subtitle="Godown ka maal ginke app se mila lo"
+            title="Stock theek karo"
+            subtitle="Ginti, toota ya galat chadha — jitna sach mein hai wo likho"
             onPress={() => router.push('/stock-check')}
           />
         ) : null}

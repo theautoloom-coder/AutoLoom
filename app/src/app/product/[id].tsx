@@ -268,11 +268,15 @@ export default function ProductScreen() {
             <Divider />
             <KV k="Godown mein" v={`${totalQty} ${product.unit_code ?? 'pcs'}`.trim()} mono />
             {kharabQty > 0 ? <KV k="Kharab mein (supplier ko jaana hai)" v={`${kharabQty} ${product.unit_code ?? 'pcs'}`.trim()} mono /> : null}
-            <Row gap={space.sm}>
+            <Row gap={space.sm} wrap>
               {/* Standing on the item's own page is the moment you know its
                   stock is wrong. Before this the fix was four screens away. */}
               {can('purchase.create') ? (
                 <Button title="Stock chadhao" size="sm" onPress={() => router.push(`/stock/add?variant=${variant.id}` as never)} />
+              ) : null}
+              {/* Upar ya neeche — staff ka owner ke approval se (8 Oct 2026). */}
+              {can('stock.count') || can('stock.adjust') ? (
+                <Button title="Stock theek karo" tone="secondary" size="sm" onPress={() => router.push(`/stock-check?variant=${variant.id}` as never)} />
               ) : null}
               <Button title="Aana-jaana ka hisaab" tone="ghost" size="sm" onPress={() => router.push(`/stock/ledger/${variant.id}`)} />
             </Row>

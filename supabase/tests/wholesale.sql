@@ -27,6 +27,8 @@ declare
   other   uuid;
   item    uuid;
   kid     uuid := gen_random_uuid();
+  aid     uuid := gen_random_uuid();
+  cid     uuid := gen_random_uuid();
   pass    int := 0;
   fail    int := 0;
   ok      boolean;
@@ -168,8 +170,48 @@ begin
     raise notice 'FAIL  staff changed a kism rate'; fail := fail + 1;
   end if;
 
+  -- 6b. Owner, 8 Oct 2026: staff ask to put the stock right; only the owner
+  -- makes it so.
+  insert into public.stock_adjustments (id, doc_date, location_id, reason, status, submitted_at, submitted_by, created_by)
+  values (aid, current_date, godown, 'audit', 'draft', now(), staff, staff);
+  insert into public.stock_adjustment_lines (adjustment_id, variant_id, qty_delta, system_qty, counted_qty, reason_code)
+  values (aid, variant, 2, 5, 7, 'found');
+  raise notice 'PASS  staff can ask for a stock correction'; pass := pass + 1;
+  begin
+    update public.stock_adjustments set status = 'posted', doc_no = 'TEST/ADJ' where id = aid;
+    raise notice 'FAIL  staff posted their own stock correction'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  staff cannot approve a stock correction'; pass := pass + 1;
+  end;
+  begin
+    insert into public.stock_adjustments (doc_date, location_id, reason, status, created_by)
+    values (current_date, godown, 'audit', 'posted', staff);
+    raise notice 'FAIL  staff wrote a stock correction straight in'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  staff cannot write a correction straight in'; pass := pass + 1;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', other, 'role', 'authenticated')::text, true);
+  begin
+    update public.stock_adjustment_lines set qty_delta = 50 where adjustment_id = aid;
+    raise notice 'FAIL  another staff member changed the correction'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  another staff member cannot change the correction'; pass := pass + 1;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', staff, 'role', 'authenticated')::text, true);
+
+  -- 6c. A correction of an approved entry is an ordinary entry for staff.
+  insert into public.purchases (id, doc_type, supplier_id, location_id, status, submitted_at, submitted_by, corrects_purchase_id)
+  values (cid, 'purchase', sup, godown, 'draft', now(), staff, pid);
+  raise notice 'PASS  staff can send a correction of an entry'; pass := pass + 1;
+
   -- 7. The owner approves it.
   perform set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
+  update public.stock_adjustments set status = 'posted', doc_no = 'TEST/ADJ', approved_by = owner where id = aid;
+  if (select status = 'posted' from public.stock_adjustments where id = aid) then
+    raise notice 'PASS  the owner approves a stock correction'; pass := pass + 1;
+  else
+    raise notice 'FAIL  owner approval of a correction did not post'; fail := fail + 1;
+  end if;
   update public.purchases set status = 'posted', doc_no = 'TEST/1', approved_by = owner where id = pid;
   select status = 'posted' into ok from public.purchases where id = pid;
   if ok then

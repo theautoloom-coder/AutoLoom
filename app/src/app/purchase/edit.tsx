@@ -8,6 +8,9 @@
  *   /purchase/edit?against=<purchase>  good maal going back against a receipt
  *   /purchase/edit?kharab=1            kharab maal going back to the supplier
  *   /purchase/edit?replace=<return>    the supplier's replacement for a return
+ *   /purchase/edit?correct=<purchase>  an approved entry that was wrong, put right
+ *                                      (owner, 8 Oct 2026): a copy to fix, which on
+ *                                      approval cancels the old entry and takes its place
  *
  * Only an owner or admin posts. A staff member's receipt is sent for approval
  * instead — the owner checks the count, puts the buy rate on and approves, and
@@ -31,7 +34,7 @@ import { View } from 'react-native';
 import { formatINR, isDateString, toDateString } from '@domain';
 
 import { useDropEmptyDraft } from '@/lib/drafts';
-import { postPurchase, totalLines, type DraftLine } from '@/lib/posting';
+import { postCorrection, postPurchase, totalLines, type DraftLine } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { deleteRow, insertRow, nextPartyCode, searchText, updateRow } from '@/lib/writes';
@@ -46,13 +49,17 @@ type Purchase = {
   id: string; doc_type: 'purchase' | 'debit_note'; status: string; supplier_id: string | null; doc_date: string;
   location_id: string | null; other_charges: number; notes: string | null; against_purchase_id: string | null;
   submitted_at: string | null; submitted_by: string | null; supplier_invoice_no: string | null;
-  created_by: string | null; revised_at: string | null;
+  created_by: string | null; revised_at: string | null; corrects_purchase_id: string | null;
+};
+type Orig = {
+  id: string; doc_no: string | null; status: string; supplier_id: string; supplier_name: string | null; location_id: string;
+  doc_date: string; supplier_invoice_no: string | null; other_charges: number; against_purchase_id: string | null;
 };
 type Line = DraftLine & { purchase_id: string; line_no: number; sku: string | null; last_cost: number; here: number; retail_price: number };
 type SourceLine = DraftLine & { line_no: number; done: number };
 
 export default function PurchaseEdit() {
-  const params = useLocalSearchParams<{ id?: string; against?: string; kharab?: string; replace?: string }>();
+  const params = useLocalSearchParams<{ id?: string; against?: string; kharab?: string; replace?: string; correct?: string }>();
   const router = useRouter();
   const { db } = useSystem();
   const { can, actor, locationId } = useSession();
@@ -95,6 +102,15 @@ export default function PurchaseEdit() {
        FROM purchase_lines pl JOIN purchases p ON p.id = pl.purchase_id
       WHERE pl.purchase_id = ? ORDER BY pl.line_no`, [sourceId]);
 
+  // The approved entry a correction puts right, and its lines as they were.
+  const origId = params.correct ?? doc?.corrects_purchase_id ?? '';
+  const { data: origRows, isLoading: origLoading } = useQuery<Orig>(
+    `SELECT id, doc_no, status, supplier_id, supplier_name, location_id, doc_date, supplier_invoice_no, other_charges, against_purchase_id
+       FROM purchases WHERE id = ?`, [origId]);
+  const orig = origRows?.[0] ?? null;
+  const { data: origLines, isLoading: origLinesLoading } = useQuery<DraftLine & { line_no: number }>(
+    'SELECT * FROM purchase_lines WHERE purchase_id = ? ORDER BY line_no', [origId]);
+
   // Create the draft on first open, once whatever it copies from has loaded.
   // isLoading, not `undefined`: PowerSync answers [] while it is still reading.
   const markCreated = useDropEmptyDraft(db, 'purchases');
@@ -103,8 +119,29 @@ export default function PurchaseEdit() {
     const copying = params.against || params.replace;
     if (copying && (sourceLoading || sourceLinesLoading || !source?.[0])) return;
     if (params.kharab && !kharabLoc?.[0]) return;
+    if (params.correct && (origLoading || origLinesLoading || !orig)) return;
     setCreating(true);
     (async () => {
+      if (params.correct && orig) {
+        // One correction at a time: a second tap opens the one already started.
+        const open = await db.getAll<{ id: string }>(
+          "SELECT id FROM purchases WHERE corrects_purchase_id = ? AND status = 'draft' LIMIT 1", [orig.id]);
+        if (open[0]) { setId(open[0].id); return; }
+        const cid = await insertRow(db, 'purchases', {
+          doc_type: 'purchase', doc_date: orig.doc_date, supplier_id: orig.supplier_id, supplier_name: orig.supplier_name,
+          location_id: orig.location_id, supplier_invoice_no: orig.supplier_invoice_no, other_charges: orig.other_charges ?? 0,
+          is_interstate: false, status: 'draft', against_purchase_id: orig.against_purchase_id, corrects_purchase_id: orig.id,
+        }, actor);
+        for (const [i, ol] of (origLines ?? []).entries()) {
+          await insertRow(db, 'purchase_lines', {
+            purchase_id: cid, line_no: i + 1, variant_id: ol.variant_id, description: ol.description,
+            qty: ol.qty, unit_code: ol.unit_code ?? null, rate: ol.rate, discount_pct: 0, discount_amt: 0, tax_rate_pct: 0,
+          });
+        }
+        markCreated(cid);
+        setId(cid);
+        return;
+      }
       const base = source?.[0];
       const isReturn = !!params.against || !!params.kharab;
       const where = params.kharab ? kharabLoc![0].id
@@ -132,7 +169,7 @@ export default function PurchaseEdit() {
       markCreated(newId);
       setId(newId);
     })().catch((e) => notify(String((e as Error).message ?? e), 'danger'));
-  }, [id, creating, locationId, db, actor, params.against, params.replace, params.kharab, source, sourceLines, sourceLoading, sourceLinesLoading, kharabLoc, markCreated]);
+  }, [id, creating, locationId, db, actor, params.against, params.replace, params.kharab, params.correct, source, sourceLines, sourceLoading, sourceLinesLoading, kharabLoc, markCreated, orig, origLines, origLoading, origLinesLoading]);
 
   const totals = useMemo(() => totalLines(lines ?? [], false, doc?.other_charges ?? 0, true), [lines, doc?.other_charges]);
   const supplier = suppliers?.find((s) => s.id === doc?.supplier_id) ?? null;
@@ -182,6 +219,11 @@ export default function PurchaseEdit() {
     if (!isDateString(doc.doc_date)) return 'Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.';
     if (!(lines ?? []).length) return 'Kam se kam ek item daalo.';
     if ((lines ?? []).some((l) => l.qty <= 0)) return 'Har line mein qty chahiye.';
+    if (doc.corrects_purchase_id) {
+      const was = (origLines ?? []).map((l) => `${l.variant_id}:${l.qty}:${l.rate}`).sort().join('|');
+      const now = (lines ?? []).map((l) => `${l.variant_id}:${l.qty}:${l.rate}`).sort().join('|');
+      if (was === now) return 'Kuch badla hi nahi — jo galat hai wo theek karo.';
+    }
     if (doc.doc_type === 'debit_note') {
       for (const l of lines ?? []) {
         const sl = sourceLines?.find((x) => x.id === l.against_line_id);
@@ -199,6 +241,25 @@ export default function PurchaseEdit() {
     if (bad) { notify(bad, 'danger'); return; }
     const isReturn = doc.doc_type === 'debit_note';
     const unpriced = (lines ?? []).filter((l) => !l.rate).length;
+    if (doc.corrects_purchase_id) {
+      const ok = await confirm(
+        'Sudhaar laga dein?',
+        `${orig?.doc_no ?? 'Purani entry'} cancel hogi aur ye sudhaari hui entry lagegi — ${(lines ?? []).reduce((a, l) => a + l.qty, 0)} pcs · ${formatINR(totals.totals.grand_total)}. Stock aur supplier ka khata dono theek ho jayenge; is entry par diya paisa nayi entry par chala jayega.`,
+      );
+      if (!ok) return;
+      setPosting(true);
+      try {
+        let docNo = '';
+        await db.writeTransaction(async (tx) => { docNo = await postCorrection(tx, id, actor); });
+        router.replace(`/purchase/${id}`);
+        notify(`Sudhaar ho gaya — ${docNo} ne ${orig?.doc_no ?? 'purani entry'} ki jagah li.`, 'ok');
+      } catch (e) {
+        notify(`Nahi hua: ${(e as Error).message}`, 'danger');
+      } finally {
+        setPosting(false);
+      }
+      return;
+    }
     const ok = await confirm(
       isReturn ? 'Supplier ko wapsi likh dein?' : 'Approve karke stock chadha dein?',
       [
@@ -229,7 +290,9 @@ export default function PurchaseEdit() {
     const bad = problems();
     if (bad) { notify(bad, 'danger'); return; }
     await patch({ submitted_at: new Date().toISOString(), submitted_by: actor.userId, revised_at: null });
-    notify('Owner ko bhej diya. Approve hote hi stock mein chadh jayega.', 'ok');
+    notify(doc?.corrects_purchase_id
+      ? 'Sudhaar owner ko bhej diya. Approve hote hi stock aur khata theek ho jayenge.'
+      : 'Owner ko bhej diya. Approve hote hi stock mein chadh jayega.', 'ok');
     router.back();
   }
 
@@ -280,7 +343,12 @@ export default function PurchaseEdit() {
   const revisedAfterSend = !!doc.revised_at && !!doc.submitted_at && doc.revised_at > doc.submitted_at;
   const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
   const fromKharab = isReturn && !doc.against_purchase_id;
-  const title = isReturn ? 'Supplier ko wapsi' : isReplacement ? 'Replacement aaya' : 'Maal aaya';
+  const isCorrection = !!doc.corrects_purchase_id;
+  const title = isCorrection ? 'Entry sudhaar' : isReturn ? 'Supplier ko wapsi' : isReplacement ? 'Replacement aaya' : 'Maal aaya';
+  // What the approved entry had, kism by kism, to show beside each line.
+  const before = new Map<string, number>();
+  for (const ol of origLines ?? []) before.set(ol.variant_id, (before.get(ol.variant_id) ?? 0) + ol.qty);
+  const dropped = isCorrection ? (origLines ?? []).filter((ol) => !(lines ?? []).some((l) => l.variant_id === ol.variant_id)) : [];
 
   return (
     <>
@@ -291,11 +359,25 @@ export default function PurchaseEdit() {
           <Badge tone={waiting ? 'warn' : 'neutral'}>{waiting ? 'approval baaki' : 'adhoora'}</Badge>
         </Row>
 
+        {isCorrection ? (
+          <Card spine="accent" style={{ gap: space.xs }}>
+            <Text variant="heading">{orig?.doc_no ?? 'Approve hui entry'} ka sudhaar</Text>
+            <Text variant="small" color="textMuted">
+              Jo galat chadha wo yahan theek karo — qty badlo, galat kism hatao, chhooti hui jodo.
+              {approver
+                ? ' “Sudhaar lagao” par purani entry cancel hokar ye lagegi; stock aur supplier ka khata dono theek.'
+                : ' Owner approve karega tab stock aur khata theek honge.'}
+            </Text>
+            {orig && orig.status !== 'posted' ? <Text variant="small" color="danger">Purani entry ab approve wali nahi rahi — ye sudhaar ab nahi lag sakta. “Hata do” kar do.</Text> : null}
+          </Card>
+        ) : null}
         {waiting && approver ? (
           <Card spine="warn">
             <Text variant="heading">{submitter?.[0]?.full_name ?? 'Staff'} ne bheja hai</Text>
             <Text variant="small" color="textMuted">
-              Gin ke dekho qty sahi hai na, har item ka kharid rate bharo, phir approve karo. Tab stock badhega.
+              {isCorrection
+                ? 'Har line ke neeche “pehle” wali qty dikh rahi hai — farak dekh lo, phir sudhaar lagao.'
+                : 'Gin ke dekho qty sahi hai na, har item ka kharid rate bharo, phir approve karo. Tab stock badhega.'}
             </Text>
             {revisedAfterSend ? (
               <Text variant="small" color="danger">Bhejne ke baad badla — {when(doc.revised_at!)}. Neeche jo hai wahi taaza hai.</Text>
@@ -361,6 +443,13 @@ export default function PurchaseEdit() {
             title={l.description}
             subtitle={`${l.sku ?? ''} · ${fromKharab ? 'kharab mein' : 'godown mein'} ${l.here}`}
             onRemove={locked ? undefined : () => removeLine(l.id)}>
+            {isCorrection ? (
+              <Text variant="small" color={before.get(l.variant_id) === l.qty ? 'textFaint' : 'warn'}>
+                {before.has(l.variant_id)
+                  ? before.get(l.variant_id) === l.qty ? `Pehle bhi ${l.qty}` : `Pehle ${before.get(l.variant_id)} → ab ${l.qty} (${l.qty - (before.get(l.variant_id) ?? 0) > 0 ? '+' : ''}${l.qty - (before.get(l.variant_id) ?? 0)})`
+                  : `Nayi line — pehle nahi thi`}
+              </Text>
+            ) : null}
             <Row gap={12} wrap>
               <View style={{ flex: 1, minWidth: 90 }}>
                 <NumberField label={isReturn ? 'Kitne wapas' : 'Kitne aaye'} value={l.qty} onChange={(v) => patchLine(l.id, { qty: v ?? 0 })} decimals={0} editable={!locked} />
@@ -397,6 +486,13 @@ export default function PurchaseEdit() {
           </LineCard>
         ))}
 
+        {dropped.length ? (
+          <Card spine="warn" style={{ gap: space.xs }}>
+            <Text variant="label" color="textMuted">Hata di gayi lines</Text>
+            {dropped.map((ol) => <Text key={ol.id} variant="small">{ol.description} — pehle {ol.qty}, ab 0</Text>)}
+          </Card>
+        ) : null}
+
         <FormSection title={showCost ? 'Total' : 'Note'}>
           <Input label="Note" value={doc.notes ?? ''} onChangeText={(v) => patch({ notes: v || null })} placeholder="Gaadi number, driver, kuch bhi" editable={!locked} />
           {showCost ? (
@@ -416,7 +512,7 @@ export default function PurchaseEdit() {
         {approver ? (
           <>
             <Button
-              title={isReturn ? 'Wapsi likh do' : waiting ? 'Approve karo — stock chadhao' : 'Stock chadha do'}
+              title={isCorrection ? 'Sudhaar lagao' : isReturn ? 'Wapsi likh do' : waiting ? 'Approve karo — stock chadhao' : 'Stock chadha do'}
               size="lg" full onPress={approve} loading={posting}
             />
             {waiting ? (
@@ -445,7 +541,7 @@ export default function PurchaseEdit() {
           </View>
         ) : (
           <Row gap={space.sm}>
-            <Button title="Owner ko bhejo" size="lg" onPress={submit} style={{ flex: 1 }} />
+            <Button title={isCorrection ? 'Sudhaar owner ko bhejo' : 'Owner ko bhejo'} size="lg" onPress={submit} style={{ flex: 1 }} />
             <Button title="Chhod do" tone="danger" onPress={discard} />
           </Row>
         )}

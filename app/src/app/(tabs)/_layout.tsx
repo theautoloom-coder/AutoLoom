@@ -72,7 +72,8 @@ function useOwnerNav(): OwnerItem[] {
   const { can } = useSession();
   const { data } = useQuery<{ pending: number }>(
     `SELECT (SELECT COUNT(*) FROM change_requests WHERE status = 'pending')
-          + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL) AS pending`);
+          + (SELECT COUNT(*) FROM purchases WHERE status = 'draft' AND submitted_at IS NOT NULL)
+          + (SELECT COUNT(*) FROM stock_adjustments WHERE status = 'draft' AND submitted_at IS NOT NULL) AS pending`);
   const pending = data?.[0]?.pending ?? 0;
 
   const out: OwnerItem[] = [];

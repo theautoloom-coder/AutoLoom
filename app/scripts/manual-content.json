@@ -34,7 +34,7 @@
           "Paisa Aaya — grahak ne udhaar ka paisa diya.",
           "Kharcha Likho — chai, bhada, transport.",
           "Kharab Likho — maal toota ya kharab nikla.",
-          "Ginti Karo — godown ka maal gino."
+          "Stock theek karo — shelf aur app ka farak."
         ]
       }
     ]
@@ -130,6 +130,17 @@
           "“Badla gaya” dikhe to staff ne bhejne ke baad badla hai — jo screen par hai wahi taaza hai."
         ],
         "note": "Rate abhi na pata ho to bina rate bhi approve kar sakte ho — wo item Stock tab ke “Rate baaki” mein dikhega. Jaldi bhar dena, warna uski bikri poora munafa dikhegi."
+      },
+      {
+        "img": "approve.png",
+        "title": "Galat entry ka sudhaar",
+        "what": "Approve hui entry mein qty ya kism galat chadh gayi? Entry kholke sudhaar bhejo — partner approve kare to purani entry cancel hokar sahi wali lagti hai.",
+        "steps": [
+          "Entry kholo. Staff: “Galti hai — sudhaar bhejo”. Partner: “Entry sudhaaro”.",
+          "Copy mein jo galat hai theek karo — qty badlo, galat kism hatao, chhooti hui jodo. Har line ke neeche “Pehle → ab” dikhta hai.",
+          "Staff: “Sudhaar owner ko bhejo”. Partner: Approval mein “Sudhaar …” kholke “Sudhaar lagao”."
+        ],
+        "note": "Stock aur supplier ka khata dono theek ho jaate hain, aur us entry par diya paisa nayi entry par chala jaata hai."
       }
     ]
   },
@@ -190,11 +201,13 @@
       },
       {
         "img": "ginti.png",
-        "title": "Ginti Karo",
-        "what": "Godown mein jitna gina wo likho. App ke stock se farak ho to theek ho jaata hai.",
+        "title": "Stock theek karo",
+        "what": "Shelf par jitna sach mein hai aur app mein farak ho — ginti, toota, galat chadha. Staff ki request owner ke approve karne par hi stock badalti hai.",
         "steps": [
-          "Maal scan karo ya naam likho, “Ginti mein kitna nikla” likho.",
-          "Farak ki wajah chuno, “… item theek kar do” → “Haan, ginti theek kar do”."
+          "Item kholo → kism ke neeche “Stock theek karo”, ya “Nayi entry” → “Stock theek karo”.",
+          "“Asal mein kitna hai” mein jitna sach mein hai wo likho — farak (+/−) dikh jaata hai. Wajah chuno.",
+          "Staff: “Haan, owner ko bhejo”. Partner: “Haan, stock theek kar do” — turant lagta hai.",
+          "Partner: Approval → “Stock theek karna” → request kholo → “Approve karo” ya wajah likh ke “Mana karo”."
         ]
       },
       {

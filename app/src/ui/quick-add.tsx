@@ -84,8 +84,8 @@ export function QuickAdd() {
       allowed: can('stock.adjust') || can('stock.damage'),
     },
     {
-      label: 'Ginti Karo',
-      hint: 'Shelf par gino, farak ho to theek karo',
+      label: 'Stock theek karo',
+      hint: 'Ginti ya galti — upar niche karo',
       icon: 'checkbox-outline',
       accent: 'violet',
       href: '/stock-check',

@@ -496,6 +496,8 @@ let entryId = '';
 // ---------------------------------------------------------------------------
 let fixId = '';
 let askId = '';
+let editKism = '';
+let editReq = '';
 {
   const { ctx, page } = await session(STAFF);
 
@@ -536,6 +538,26 @@ let askId = '';
     check('stock did not move before approval', godownQty() === before);
   });
 
+
+  // Owner, 8 Oct 2026: "har cheez mein edit — gaadi galat, specification
+  // galat"; staff ask, the owner approves.
+  await step('staff ask to change a kism', async () => {
+    const kid = sql(`select id from product_variants where product_id = '${H4_ITEM}' and variant_name like 'Swift · H1%' limit 1`);
+    if (!kid) throw new Error('no staff kism to change');
+    editKism = kid;
+    await go(page, `/admin/item?id=${H4_ITEM}&variant=${kid}`, 8000);
+    check('the kism form opens for staff', await visible(page, 'Kism mein badlav'));
+    await pickFrom(page, 'Creta, Swift, Nexon…', 'Creta', 'Hyundai Creta');
+    await page.getByLabel('Bechne ka rate').locator('visible=true').first().fill('555');
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /Badlav owner ko bhejo|Badlav bhejo/ }).click();
+    await page.waitForTimeout(8000);
+    editReq = sql(`select id from change_requests where kind = 'edit_kism' and status = 'pending' and payload like '%${kid}%' order by submitted_at desc limit 1`);
+    check('the change waits for the owner', !!editReq);
+    check('the kism is unchanged until approved', num(`select retail_price from product_variants where id = '${kid}'`) !== 555
+      || sql(`select count(*) from change_requests where kind = 'edit_kism' and status = 'approved' and payload like '%${kid}%'`) !== '0');
+  });
+
   await ctx.close();
 }
 {
@@ -568,6 +590,22 @@ let askId = '';
     await page.waitForTimeout(9000);
     check('the request is approved', sql(`select status from stock_adjustments where id = '${askId}'`) === 'posted');
     check('stock went up by 2 on approval', godownQty() === before + 2, `${before} → ${godownQty()}`);
+  });
+
+
+  await step('owner approves a kism change', async () => {
+    if (!editReq) throw new Error('no change to approve');
+    const h4Specs = num(`select count(*) from spec_values where variant_id = '${H4}'`);
+    await go(page, `/request/${editReq}`, 6000);
+    check('the owner sees what was and what is asked', await visible(page, 'Pehle → ab', false) || await visible(page, 'PEHLE → AB', false));
+    await page.getByRole('button', { name: 'Approve karo — badlav lagao' }).click();
+    await yes(page);
+    await page.waitForTimeout(9000);
+    check('the change is approved', sql(`select status from change_requests where id = '${editReq}'`) === 'approved');
+    check('the kism has the new rate', num(`select retail_price from product_variants where id = '${editKism}'`) === 555);
+    check('the kism has the added car', num(`select count(*) from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
+                                               where pf.variant_id = '${editKism}' and vm.name = 'Creta'`) === 1);
+    check('the other kisms kept their details', num(`select count(*) from spec_values where variant_id = '${H4}'`) === h4Specs);
   });
 
   await ctx.close();

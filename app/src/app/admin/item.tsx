@@ -12,21 +12,21 @@
  * are handed to the kism form, so every old link still goes somewhere right.
  */
 import { useQuery } from '@powersync/react';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { formatINR, slug } from '@domain';
 
 import {
-  applyItemProposal, parseProposal, resubmitRequest, submitRequest, validateProposal,
-  type ChangeRequest, type ItemProposal,
+  applyItemEdit, applyItemProposal, formHref, parseProposal, resubmitRequest, submitRequest, validateProposal,
+  type ChangeRequest, type EditSnapshot, type ItemProposal,
 } from '@/lib/requests';
 import { tokenClause, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
-import { insertRow, searchText, updateRow } from '@/lib/writes';
+import { insertRow, updateRow } from '@/lib/writes';
 import { Badge, Button, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { SpecFields, buildSpecs, toVal, useFamilySpecs, type SpecRow, type SpecVal } from '@/ui/catalog-fields';
 import { FormSection, NumberField, SelectField, notify } from '@/ui/forms';
@@ -42,6 +42,8 @@ export default function ItemRoute() {
   const { data: reqRows, isLoading } = useQuery<ChangeRequest>('SELECT * FROM change_requests WHERE id = ? LIMIT 1', [params.request ?? '']);
   const proposal = params.request && reqRows?.[0] ? parseProposal(reqRows[0]) : null;
 
+  // A change to a kism opens on that kism, whatever link brought it here.
+  if (proposal?.edit_variant_id && !params.variant) return <Redirect href={formHref(reqRows![0]) as never} />;
   if (params.variant || params.product || proposal?.product_id) return <KismForm />;
   if (params.request && isLoading) return <Screen><Text color="textMuted">Khul raha hai…</Text></Screen>;
   return <ItemMaster request={params.request ? reqRows?.[0] ?? null : null} proposal={proposal} />;
@@ -51,7 +53,7 @@ type Family = { id: string; name: string; sku_prefix: string };
 type Item = { id: string; name: string; family_id: string | null; default_price: number | null; default_cost: number | null; is_universal_fit: number };
 type Kism = { id: string; variant_name: string; retail_price: number; qty: number };
 
-function ItemMaster({ request, proposal }: { request: ChangeRequest | null; proposal: ItemProposal | null }) {
+function ItemMaster({ request: asked, proposal: askedProposal }: { request: ChangeRequest | null; proposal: ItemProposal | null }) {
   const { id, name: nameParam, back } = useLocalSearchParams<Params>();
   const router = useRouter();
   const { db } = useSystem();
@@ -64,8 +66,16 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
   const { data: families } = useQuery<Family>('SELECT id, name, sku_prefix FROM product_families WHERE is_active = 1 ORDER BY sort_order, name');
   const { data: items } = useQuery<Item>('SELECT id, name, family_id, default_price, default_cost, is_universal_fit FROM products WHERE id = ?', [id ?? '']);
   const item = items?.[0] ?? null;
-  const { data: sharedRows } = useQuery<SpecRow & { product_id: string }>(
-    'SELECT product_id, spec_definition_id, variant_id, option_id, option_ids, value_text, value_number, value_bool FROM spec_values WHERE product_id = ? AND variant_id IS NULL', [id ?? '']);
+  // A staff member's change to this item already with the owner, or sent
+  // back: reopened and sent again, never sent twice (owner, 8 Oct 2026).
+  const { data: openEdits } = useQuery<ChangeRequest>(
+    `SELECT * FROM change_requests WHERE kind = 'edit_item' AND status IN ('pending', 'rejected') AND submitted_by = ? AND payload LIKE ?
+      ORDER BY submitted_at DESC LIMIT 1`,
+    [actor.userId ?? '', `%"edit_product_id":"${id ?? '-'}"%`]);
+  const request = asked ?? (!canEdit && id ? openEdits?.[0] ?? null : null);
+  const proposal = askedProposal ?? (request ? parseProposal(request) : null);
+  const { data: sharedRows } = useQuery<SpecRow & { product_id: string; display_value: string | null }>(
+    'SELECT product_id, spec_definition_id, variant_id, option_id, option_ids, value_text, value_number, value_bool, display_value FROM spec_values WHERE product_id = ? AND variant_id IS NULL', [id ?? '']);
   const { data: kisms } = useQuery<Kism>(
     `SELECT pv.id, pv.variant_name, pv.retail_price,
             COALESCE((SELECT SUM(s.qty) FROM stock_on_hand s JOIN locations l ON l.id = s.location_id
@@ -96,6 +106,8 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
   const [universal, setUniversal] = useState(false);
   const [vals, setVals] = useState<Record<string, SpecVal>>({});
   const [note, setNote] = useState('');
+  // The item as it stood when opened: travels with a staff member's change.
+  const [before, setBefore] = useState<EditSnapshot | null>(null);
 
   const { defs, optsByDef } = useFamilySpecs(familyId);
   // The item's own details: the ones every kism shares. Socket, colour and
@@ -111,6 +123,10 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
     setName(item.name);
     setPrice(item.default_price);
     setCost(item.default_cost);
+    setBefore({
+      name: item.name, family_name: families?.find((f) => f.id === item.family_id)?.name ?? null, price: item.default_price,
+      specs: sharedRows.map((r) => ({ def_id: r.spec_definition_id, display: r.display_value ?? '' })), universal: !!item.is_universal_fit,
+    });
     setUniversal(!!item.is_universal_fit);
     const sv: Record<string, SpecVal> = {};
     for (const r of sharedRows) sv[r.spec_definition_id] = toVal(r);
@@ -156,7 +172,10 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
   function proposalNow(): ItemProposal {
     const fam = families?.find((f) => f.id === familyId);
     return {
-      master: true,
+      // A new item, or a change to this one (owner, 8 Oct 2026).
+      master: !item,
+      edit_product_id: item?.id ?? null,
+      before: item ? before : null,
       family_id: familyId,
       family_name: fam?.name ?? (newFamilyName.trim() || null),
       name, price, cost: showCost ? cost : null, universal,
@@ -177,26 +196,16 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
     try {
       if (!canEdit) {
         if (request) { await resubmitRequest(db, request.id, p, note); notify(request.status === 'pending' ? 'Badlav owner tak pahunch gaya.' : 'Dobara bhej diya.', 'ok'); }
-        else { await submitRequest(db, p, { actor, locationId, note }); notify('Owner ko bhej diya. Approve hote hi item ban jayega.', 'ok'); }
-        if (back && router.canGoBack()) router.back(); else router.replace('/requests');
+        else {
+          await submitRequest(db, p, { actor, locationId, note });
+          notify(item ? 'Badlav owner ko bhej diya — approve hote hi lagega.' : 'Owner ko bhej diya. Approve hote hi item ban jayega.', 'ok');
+        }
+        if ((back || item) && router.canGoBack()) router.back(); else router.replace('/requests');
         return;
       }
       if (item) {
-        const shared = p.specs ?? [];
-        await db.writeTransaction(async (tx) => {
-          await updateRow(tx, 'products', item.id, {
-            family_id: familyId, name: name.trim(), default_price: price, default_cost: showCost ? cost : item.default_cost,
-            is_universal_fit: universal, search_text: searchText(name, p.family_name, ...shared.map((s) => s.display)),
-          });
-          await tx.execute('DELETE FROM spec_values WHERE product_id = ? AND variant_id IS NULL', [item.id]);
-          for (const sp of shared) {
-            await insertRow(tx, 'spec_values', {
-              product_id: item.id, variant_id: null, spec_definition_id: sp.def_id, option_id: sp.option_id ?? null,
-              option_ids: sp.option_ids ?? null, value_text: sp.text ?? null, value_number: sp.number ?? null,
-              value_bool: sp.bool == null ? null : sp.bool, display_value: sp.display.trim(),
-            });
-          }
-        });
+        // The same path an approved staff change takes.
+        await db.writeTransaction((tx) => applyItemEdit(tx, p, actor));
         notify('Item badal gaya.', 'ok');
         router.back();
         return;
@@ -225,14 +234,23 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
     }
   }
 
-  if (!canEdit && !isNew) return <Screen><Text>Sirf owner item badal sakta hai.</Text></Screen>;
   const missing = validateProposal(proposalNow());
 
   return (
     <>
-      <Stack.Screen options={{ title: isNew ? 'Naya item' : 'Item badlo' }} />
+      <Stack.Screen options={{ title: isNew ? 'Naya item' : canEdit ? 'Item badlo' : 'Item mein badlav' }} />
       <Screen>
-        <Text variant="display">{isNew ? 'Naya item' : 'Item badlo'}</Text>
+        <Text variant="display">{isNew ? 'Naya item' : canEdit ? 'Item badlo' : 'Item mein badlav'}</Text>
+        {!isNew && !canEdit ? (
+          <Card spine="warn" style={{ gap: space.xs }}>
+            <Text variant="heading">{request ? (request.status === 'rejected' ? 'Owner ne wapas bheja' : 'Aapka badlav review mein hai') : 'Jo galat hai wo theek karo'}</Text>
+            <Text variant="small" color="textMuted">
+              {request?.status === 'rejected'
+                ? `Wajah: ${request.review_note ?? '—'}. Theek karke dobara bhejo.`
+                : 'Naam, category, rate ya common detail badlo — owner approve karega tab lagega.'}
+            </Text>
+          </Card>
+        ) : null}
         <Text variant="small" color="textMuted">
           Item ek baar banta hai — naam, category, rate aur common detail. Kism (socket, colour, gaadi) stock chadhate waqt chunoge.
         </Text>

@@ -59,7 +59,33 @@ export type ItemProposal = {
    * `price`/`cost` are the item's default selling and buying rates.
    */
   master?: boolean;
+  /**
+   * A change to a kism that exists (owner, 8 Oct 2026: staff ask, the owner
+   * approves): its id. `product_id` is then its item.
+   */
+  edit_variant_id?: string | null;
+  /** A change to the item itself: name, category, rate, shared details. */
+  edit_product_id?: string | null;
+  /** What it was when the change was asked for — shown beside what is asked. */
+  before?: EditSnapshot | null;
 };
+
+/** The parts of a kism or item an edit can change, as they stood. */
+export type EditSnapshot = {
+  name?: string | null;
+  family_name?: string | null;
+  price?: number | null;
+  /** Each detail as it read — enough to show beside what is asked. */
+  specs?: { def_id: string; display: string }[];
+  fits?: ProposalFit[];
+  universal?: boolean;
+  pack_size?: number | null;
+  warranty_months?: number | null;
+};
+
+/** Which kind of request a proposal is. */
+export const kindOf = (p: ItemProposal): 'new_item' | 'edit_kism' | 'edit_item' =>
+  p.edit_variant_id ? 'edit_kism' : p.edit_product_id ? 'edit_item' : 'new_item';
 
 /**
  * One filled-in spec. It carries what the writer needs from its definition
@@ -173,6 +199,17 @@ export type ChangeRequest = {
   /** Set when the submitter changed it while it was still waiting. */
   revised_at?: string | null;
 };
+
+/**
+ * Where a request is fixed or sent again: a kism change on that kism, an item
+ * change on that item, anything else in the item form.
+ */
+export function formHref(req: Pick<ChangeRequest, 'id' | 'payload'>): string {
+  const p = parseProposal(req);
+  if (p?.edit_variant_id) return `/admin/item?id=${p.product_id}&variant=${p.edit_variant_id}&request=${req.id}`;
+  if (p?.edit_product_id) return `/admin/item?id=${p.edit_product_id}&request=${req.id}`;
+  return `/admin/item?request=${req.id}`;
+}
 
 export function parseProposal(req: Pick<ChangeRequest, 'payload'>): ItemProposal | null {
   try {
@@ -312,6 +349,61 @@ export async function applyItemProposal(
   return { productId, variantId };
 }
 
+/**
+ * A kism changed: its own details, its cars, its rate, its name. Only this
+ * kism's rows — the item and every other kism are left as they are. (On 8 Oct
+ * an old kism form rewrote the whole item from one kism's save and wiped the
+ * cars of seven others; this is the one path an edit takes now.)
+ */
+export async function applyKismEdit(tx: Writable, p: ItemProposal, actor?: Actor): Promise<void> {
+  const variantId = p.edit_variant_id;
+  const productId = p.product_id;
+  if (!variantId || !productId) throw new Error('Kaunsi kism — ye pata nahi chala.');
+  const found = await tx.execute(
+    `SELECT p.name, p.search_text, pv.sku FROM product_variants pv JOIN products p ON p.id = pv.product_id
+      WHERE pv.id = ? AND pv.product_id = ?`, [variantId, productId]);
+  const row = found.rows?._array?.[0] as { name: string; search_text: string | null; sku: string } | undefined;
+  if (!row) throw new Error('Ye kism is phone par nahi mili — sync hone do, phir dobara karo.');
+  const fits = fitsOf(p);
+  const variantName = variantNameOf(p);
+  const patch: Record<string, string | number | null> = {
+    variant_name: variantName,
+    search_text: searchText(row.search_text ?? row.name, row.sku, variantName,
+      ...(p.specs ?? []).map((sp) => sp.display), ...fits.flatMap((f) => [f.make ?? '', f.label ?? ''])),
+  };
+  if (p.price != null && p.price > 0) { patch.retail_price = p.price; patch.dealer_price = p.price; }
+  if (p.pack_size != null) patch.pack_size = p.pack_size;
+  if (p.pack_label !== undefined) patch.pack_label = p.pack_label?.trim() || null;
+  if (p.warranty_months != null) patch.warranty_months = p.warranty_months;
+  await updateRow(tx, 'product_variants', variantId, patch);
+  await writeSpecsAndFits(tx, productId, variantId, p, actor, { scope: 'kism' });
+  // A kism with its own cars means the item is not "every car" any more.
+  // Never the other way: one kism with no car says nothing about the rest.
+  if (fits.length && !p.universal) await updateRow(tx, 'products', productId, { is_universal_fit: false });
+}
+
+/** The item changed: name, category, usual rates, details every kism shares. */
+export async function applyItemEdit(tx: Writable, p: ItemProposal, actor?: Actor): Promise<void> {
+  const productId = p.edit_product_id;
+  if (!productId) throw new Error('Kaunsa item — ye pata nahi chala.');
+  const shared = (p.specs ?? []).filter((sp) => !sp.axis && sp.display.trim());
+  const patch: Record<string, string | number | boolean | null> = {
+    name: p.name.trim(), is_universal_fit: !!p.universal, default_price: p.price ?? null,
+    search_text: searchText(p.name, p.family_name, ...shared.map((sp) => sp.display)),
+  };
+  if (p.family_id) patch.family_id = p.family_id;
+  if (p.cost != null) patch.default_cost = p.cost;
+  await updateRow(tx, 'products', productId, patch);
+  await tx.execute('DELETE FROM spec_values WHERE product_id = ? AND variant_id IS NULL', [productId]);
+  for (const sp of shared) {
+    await insertRow(tx, 'spec_values', {
+      product_id: productId, variant_id: null, spec_definition_id: sp.def_id,
+      option_id: sp.option_id ?? null, option_ids: sp.option_ids ?? null, value_text: sp.text ?? null,
+      value_number: sp.number ?? null, value_bool: sp.bool == null ? null : sp.bool, display_value: sp.display.trim(),
+    }, actor);
+  }
+}
+
 /** The item alone: its name, category, usual rates and shared details. */
 async function makeItem(tx: Writable, p: ItemProposal, familyId: string | null, actor?: Actor): Promise<{ productId: string; variantId: string }> {
   const productId = uuidv7();
@@ -415,7 +507,7 @@ export async function submitRequest(
   const userId = opts.actor.userId;
   if (!userId) throw new Error('Session purana ho gaya. Dobara sign in karo.');
   return insertRow(db, 'change_requests', {
-    kind: 'new_item',
+    kind: kindOf(p),
     status: 'pending',
     payload: JSON.stringify(p),
     note: opts.note?.trim() || null,
@@ -479,14 +571,23 @@ export async function approveRequest(
   if (bad) throw new Error(bad);
 
   return db.writeTransaction(async (tx) => {
-    const { productId } = await applyItemProposal(tx, p, {
-      actor: opts.actor,
-      // The stock lands where the submitter said it was, not where the admin
-      // happens to be standing.
-      locationId: req.location_id ?? opts.locationId ?? null,
-      takenSkus: opts.takenSkus,
-      skuPrefix: opts.skuPrefix,
-    });
+    let productId: string;
+    if (p.edit_variant_id) {
+      await applyKismEdit(tx, p, opts.actor);
+      productId = p.product_id!;
+    } else if (p.edit_product_id) {
+      await applyItemEdit(tx, p, opts.actor);
+      productId = p.edit_product_id;
+    } else {
+      ({ productId } = await applyItemProposal(tx, p, {
+        actor: opts.actor,
+        // The stock lands where the submitter said it was, not where the admin
+        // happens to be standing.
+        locationId: req.location_id ?? opts.locationId ?? null,
+        takenSkus: opts.takenSkus,
+        skuPrefix: opts.skuPrefix,
+      }));
+    }
 
     await tx.execute(
       'UPDATE change_requests SET status = ?, applied_product_id = ?, review_note = ? WHERE id = ?',

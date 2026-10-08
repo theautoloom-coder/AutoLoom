@@ -84,6 +84,30 @@ values ('min_runtime_version', '"2"', 'Isse purani APK band — Nayi APK chahiye
 on conflict (id) do update set value = excluded.value;
 ```
 
+### Purana app band karna (data likhne se)
+
+Every upload carries the app's build (`app/src/lib/build.ts`, `APP_BUILD`).
+The server refuses uploads from a build below `app_settings.min_app_build`,
+with a retryable error. The old app keeps its unsent work and sends it after
+it updates.
+
+This exists because of 8 Oct 2026. A browser tab left open since the day
+before ran an old kism form, and its save deleted every spec and car of a
+whole item.
+
+When a change means older apps would write wrong data:
+
+1. Raise `APP_BUILD`.
+2. Push, which deploys the web, and run `ship-update`, which updates the phones.
+3. Raise `min_app_build` to match:
+
+```sql
+update app_settings set value = '2026100901'::jsonb where id = 'min_app_build';
+```
+
+Web tabs check for a new build when the tab comes back into view and every
+5 minutes. A phone checks when the app opens.
+
 ## On the iPhone
 
 Open `https://app.theautoloom.in` in **Safari** (not Chrome — only Safari

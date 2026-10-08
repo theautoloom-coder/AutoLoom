@@ -18,7 +18,7 @@ import { Stack, useRouter } from 'expo-router';
 import React from 'react';
 
 import { useSession } from '@/lib/session';
-import { parseProposal, type ChangeRequest } from '@/lib/requests';
+import { formHref, parseProposal, type ChangeRequest } from '@/lib/requests';
 import { Badge, Button, Card, Divider, Empty, ListRow, Screen, SectionTitle, Text } from '@/ui';
 
 type Row = ChangeRequest & { submitter: string | null };
@@ -47,6 +47,9 @@ const when = (iso: string) => {
 function title(req: ChangeRequest): string {
   const p = parseProposal(req);
   if (!p) return 'Request';
+  // A change to what exists (owner, 8 Oct 2026): which kism or item.
+  if (p.edit_variant_id) return `Badlav · ${p.product_name ?? p.name} · ${p.before?.name ?? 'kism'}`;
+  if (p.edit_product_id) return `Badlav · ${p.before?.name ?? p.name} (item)`;
   // A kism request names the item it belongs to and what is new about it.
   if (p.product_id) {
     const what = [...(p.fits ?? []).map((f) => f.label), p.colour].filter(Boolean).join(', ');
@@ -140,7 +143,7 @@ export default function RequestsScreen() {
     // A reviewer reviews it. The submitter of a rejected one goes straight back
     // into the form to fix it — that is the only thing they can do with it.
     if (isReviewer) router.push(`/request/${r.id}`);
-    else if (r.status === 'rejected') router.push(`/admin/item?request=${r.id}`);
+    else if (r.status === 'rejected') router.push(formHref(r) as never);
     else router.push(`/request/${r.id}`);
   };
 
@@ -280,7 +283,7 @@ export default function RequestsScreen() {
                 <Text variant="small">{r.review_note || '—'}</Text>
                 <Button
                   title="Theek karke dobara bhejo"
-                  onPress={() => router.push(`/admin/item?request=${r.id}`)}
+                  onPress={() => router.push(formHref(r) as never)}
                 />
               </Card>
             ))}

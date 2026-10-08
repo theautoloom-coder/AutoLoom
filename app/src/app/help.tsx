@@ -100,6 +100,18 @@ const TOPICS: Topic[] = [
     go: { label: 'Approval kholo', href: '/requests' },
   },
   {
+    q: 'Kism ya item mein galti — gaadi, saal, detail, rate kaise badlein?',
+    icon: 'construct-outline',
+    accent: 'violet',
+    steps: [
+      'Item kholo (Stock → item par tap). Galat kism ki chip chuno.',
+      'Staff: kism ke paas “Badlav bhejo”, ya upar “Item mein badlav” (naam, category, common detail ke liye). Owner: “Kism badlo” / “Item badlo”.',
+      'Form mein abhi wala sab bhara aata hai — jo galat hai wahi theek karo: gaadi hatao (✕) ya jodo, saal, socket/colour, rate.',
+      'Staff: “Badlav owner ko bhejo”. Owner Approval mein “Badlav · …” kholta hai — har cheez “pehle → ab” dikhti hai — “Approve karo — badlav lagao” ya wajah likh ke “Wapas bhejo”.',
+    ],
+    note: 'Kism ka badlav sirf usi kism par lagta hai — item ki baaki kism aur unki gaadiyan waisi hi rehti hain. Approve hone tak bheja hua badlav dobara khol ke badal sakte ho.',
+  },
+  {
     q: 'Naya item kaise banayein?',
     icon: 'add-circle-outline',
     accent: 'violet',

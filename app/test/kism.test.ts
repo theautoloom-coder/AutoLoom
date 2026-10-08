@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { Transaction } from '@powersync/react-native';
 
-import { applyItemProposal, variantNameOf, writeSpecsAndFits, type ItemProposal, type ProposalSpec } from '../src/lib/requests';
+import { applyItemProposal, applyKismEdit, approveRequest, kindOf, submitRequest, variantNameOf, writeSpecsAndFits, type ChangeRequest, type ItemProposal, type ProposalSpec } from '../src/lib/requests';
 import type { Actor } from '../src/lib/writes';
 import { createDb, many, one, row, type FakeDb } from './harness';
 
@@ -121,6 +121,57 @@ describe('one item, many kisms', () => {
     expect(v.sku).toBe('MAT-ABC7DM-CRETA2-BLAC');
     // qty 0: the stock comes with the entry's own lines, not twice.
     expect(many(db, 'SELECT id FROM stock_movements')).toHaveLength(0);
+  });
+
+  // Owner, 8 Oct 2026: a kism's change — the owner's own or a staff request
+  // approved — touches that kism only. An old form's save once wiped every
+  // spec and car of the item.
+  it('changing a kism leaves the item and every other kism alone', async () => {
+    const item = await db.writeTransaction(() => applyItemProposal(tx(), {
+      family_id: 'mat', family_name: 'Mats', name: 'ABC 7D Mat', master: true, price: 2400,
+      specs: [spec('material', 'TPE', false)],
+    }, { actor, locationId: 'main', takenSkus: new Set() }));
+    const kism = (car: string, label: string) => applyItemProposal(tx(), {
+      family_id: 'mat', name: 'ABC 7D Mat', product_id: item.productId, product_name: 'ABC 7D Mat', price: 2400, qty: 0,
+      specs: [spec('colour', 'Black', true)], fits: [{ model_id: car, label }],
+    }, { actor, locationId: 'main', takenSkus: new Set(many<{ sku: string }>(db, 'SELECT sku FROM product_variants').map((r) => r.sku)) });
+    const tiago = await db.writeTransaction(() => kism('tiago', 'Tiago'));
+    const punch = await db.writeTransaction(() => kism('punch', 'Punch'));
+
+    // Tiago's kism was really for the Tiago 2026; and its rate.
+    await db.writeTransaction(() => applyKismEdit(tx(), {
+      family_id: 'mat', name: 'ABC 7D Mat', product_id: item.productId, edit_variant_id: tiago.variantId, price: 2600,
+      specs: [spec('colour', 'Black', true)], fits: [{ model_id: 'tiago', year_from: 2026, year_to: 2026, label: 'Tiago 2026' }],
+    }, actor));
+
+    expect(one<{ n: string; r: number }>(db, 'SELECT variant_name AS n, retail_price AS r FROM product_variants WHERE id = ?', tiago.variantId))
+      .toEqual({ n: 'Tiago 2026 · Black', r: 2600 });
+    // Punch untouched: its car, its colour, its name.
+    expect(many(db, 'SELECT model_id FROM product_fitments WHERE variant_id = ?', punch.variantId)).toEqual([{ model_id: 'punch' }]);
+    expect(many(db, 'SELECT display_value AS d FROM spec_values WHERE variant_id = ?', punch.variantId)).toEqual([{ d: 'Black' }]);
+    // The item's own detail and its name untouched; not "every car".
+    expect(many(db, 'SELECT display_value AS d FROM spec_values WHERE product_id = ? AND variant_id IS NULL', item.productId)).toEqual([{ d: 'TPE' }]);
+    expect(one<{ n: string; u: number }>(db, 'SELECT name AS n, is_universal_fit AS u FROM products WHERE id = ?', item.productId))
+      .toEqual({ n: 'ABC 7D Mat', u: 0 });
+  });
+
+  it('a staff change waits as a request and goes on when approved', async () => {
+    const item = await db.writeTransaction(() => applyItemProposal(tx(), abc(), { actor, locationId: 'main', takenSkus: new Set() }));
+    const ask = {
+      ...abc({ price: 2500 }), product_id: item.productId, product_name: 'ABC 7D Mat', edit_variant_id: item.variantId,
+      fits: [{ model_id: 'swift', label: 'Swift' }], before: { name: 'Creta 2019–2023 · Black', price: 2400 },
+    };
+    expect(kindOf(ask)).toBe('edit_kism');
+    const rid = await submitRequest(tx(), ask, { actor: { userId: 'staff-1', deviceId: 'd2' } });
+    // Nothing changed yet.
+    expect(one<{ r: number }>(db, 'SELECT retail_price AS r FROM product_variants WHERE id = ?', item.variantId).r).toBe(2400);
+    const req = one<ChangeRequest>(db, 'SELECT * FROM change_requests WHERE id = ?', rid);
+    expect(req.kind).toBe('edit_kism');
+    await approveRequest(db as unknown as Parameters<typeof approveRequest>[0], req, { actor, takenSkus: new Set() });
+    expect(one<{ n: string; r: number }>(db, 'SELECT variant_name AS n, retail_price AS r FROM product_variants WHERE id = ?', item.variantId))
+      .toEqual({ n: 'Swift · Black', r: 2500 });
+    expect(many(db, 'SELECT model_id FROM product_fitments WHERE variant_id = ?', item.variantId)).toEqual([{ model_id: 'swift' }]);
+    expect(many(db, 'SELECT id FROM product_variants')).toHaveLength(1);
   });
 
   it('a bulb sold by socket, on every car, is named by its specs', () => {

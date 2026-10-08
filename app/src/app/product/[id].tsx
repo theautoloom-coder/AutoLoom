@@ -180,7 +180,8 @@ export default function ProductScreen() {
             <Text variant="display" style={{ marginTop: space.xs, flex: 1 }}>
               {product.name}
             </Text>
-            {can('catalog.edit') ? <Button title="Item badlo" tone="secondary" size="sm" onPress={() => router.push(`/admin/item?id=${product.id}` as never)} /> : null}
+            {/* Staff ask, the owner approves (8 Oct 2026). */}
+            <Button title={can('catalog.edit') ? 'Item badlo' : 'Item mein badlav'} tone="secondary" size="sm" onPress={() => router.push(`/admin/item?id=${product.id}` as never)} />
           </Row>
           {product.description ? (
             <Text variant="small" color="textMuted">
@@ -195,8 +196,8 @@ export default function ProductScreen() {
             // Same item for another car or colour: a new kism, never a new item.
             // Staff send it as a request; the owner adds it straight away.
             <Row gap={space.xs}>
-              {can('catalog.edit') && variant ? (
-                <Button title="Kism badlo" size="sm" tone="ghost" onPress={() => router.push(`/admin/item?id=${product.id}&variant=${variant.id}` as never)} />
+              {variant ? (
+                <Button title={can('catalog.edit') ? 'Kism badlo' : 'Badlav bhejo'} size="sm" tone="ghost" onPress={() => router.push(`/admin/item?id=${product.id}&variant=${variant.id}` as never)} />
               ) : null}
               <Button title={can('catalog.edit') ? '+ Nayi kism' : 'Nayi kism maango'} size="sm" tone="secondary"
                 onPress={() => router.push(`/admin/item?product=${product.id}` as never)} />

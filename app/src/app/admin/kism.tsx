@@ -25,10 +25,10 @@ import { slug } from '@domain';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import {
-  applyItemProposal, fitsOf, parseProposal, resubmitRequest, submitRequest, validateProposal, variantNameOf, writeSpecsAndFits,
-  type ChangeRequest, type ItemProposal, type ProposalFit, type ProposalSpec,
+  applyItemProposal, applyKismEdit, fitsOf, parseProposal, resubmitRequest, submitRequest, validateProposal, variantNameOf,
+  type ChangeRequest, type EditSnapshot, type ItemProposal, type ProposalFit, type ProposalSpec,
 } from '@/lib/requests';
-import { insertRow, searchText, updateRow } from '@/lib/writes';
+import { insertRow, updateRow } from '@/lib/writes';
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
 import { Button, Card, Chip, Input, Row, Screen, Text } from '@/ui';
 import { Disclosure, FormSection, NumberField, SelectField, notify } from '@/ui/forms';
@@ -40,7 +40,7 @@ type Family = { id: string; name: string; sku_prefix: string };
 type Model = { id: string; name: string; make_name: string };
 type Def = { id: string; code: string; name: string; data_type: string; unit: string | null; is_required: number; is_variant_axis: number; show_in_variant_name: number; sort_order: number };
 type Opt = { id: string; spec_definition_id: string; value: string };
-type SpecRow = { product_id: string; spec_definition_id: string; variant_id: string | null; option_id: string | null; option_ids: string | null; value_text: string | null; value_number: number | null; value_bool: number | null };
+type SpecRow = { product_id: string; spec_definition_id: string; variant_id: string | null; option_id: string | null; option_ids: string | null; value_text: string | null; value_number: number | null; value_bool: number | null; display_value?: string | null };
 type Base = { id: string; name: string; family_id: string; family_name: string | null; kisms: number; first_kism: string | null; spec_count: number; fit_count: number };
 type Existing = {
   id: string; name: string; family_id: string; variant_id: string; variant_name: string; sku: string; is_universal_fit: number;
@@ -84,7 +84,13 @@ export default function KismForm() {
   // Reopening a proposal: the same form, prefilled with what was sent, so the
   // submitter fixes the one thing instead of retyping it all.
   const { data: reqRows } = useQuery<ChangeRequest>('SELECT * FROM change_requests WHERE id = ? LIMIT 1', [requestId ?? '']);
-  const request = requestId ? (reqRows?.[0] ?? null) : null;
+  // A staff member's change to this kism already with the owner, or sent
+  // back: reopened and sent again, never sent twice.
+  const { data: openEdits } = useQuery<ChangeRequest>(
+    `SELECT * FROM change_requests WHERE kind = 'edit_kism' AND status IN ('pending', 'rejected') AND submitted_by = ? AND payload LIKE ?
+      ORDER BY submitted_at DESC LIMIT 1`,
+    [actor.userId ?? '', `%"edit_variant_id":"${existing?.variant_id ?? '-'}"%`]);
+  const request = requestId ? (reqRows?.[0] ?? null) : (!can('catalog.edit') && existing ? openEdits?.[0] ?? null : null);
   const proposalOfRequest = request ? parseProposal(request) : null;
 
   // A new kism of an item that exists: from ?product=, or a request for one.
@@ -101,7 +107,7 @@ export default function KismForm() {
   // Every spec and car row of the item; each mode takes the ones it needs.
   const itemId = id ?? kismOf ?? '';
   const { data: specRows } = useQuery<SpecRow>(
-    'SELECT product_id, spec_definition_id, variant_id, option_id, option_ids, value_text, value_number, value_bool FROM spec_values WHERE product_id = ?', [itemId]);
+    'SELECT product_id, spec_definition_id, variant_id, option_id, option_ids, value_text, value_number, value_bool, display_value FROM spec_values WHERE product_id = ?', [itemId]);
   const { data: fitRows } = useQuery<{ product_id: string; variant_id: string | null; model_id: string; year_from: number | null; year_to: number | null; gen_from: number | null; gen_to: number | null }>(
     `SELECT pf.product_id, pf.variant_id, pf.model_id, pf.year_from, pf.year_to, g.year_from AS gen_from, g.year_to AS gen_to
        FROM product_fitments pf LEFT JOIN vehicle_generations g ON g.id = pf.generation_id WHERE pf.product_id = ?`, [itemId]);
@@ -134,6 +140,9 @@ export default function KismForm() {
   const [packLabel, setPackLabel] = useState('');
   const [warrantyMonths, setWarrantyMonths] = useState<number | null>(null);
   const [note, setNote] = useState('');
+  // The kism as it stood when the form opened: travels with a staff member's
+  // change, so the owner sees what was beside what is asked.
+  const [before, setBefore] = useState<EditSnapshot | null>(null);
   // A category the submitter is proposing rather than choosing. Staff cannot
   // create one — `product_families` is gated by `catalog.edit` — so the name
   // travels with the proposal and the approver creates it.
@@ -183,6 +192,12 @@ export default function KismForm() {
     }
     setFits(oldFits.map((f) => ({ model_id: f.model_id, year_from: f.year_from ?? f.gen_from, year_to: f.year_to ?? f.gen_to })));
     setUniversal(!!existing.is_universal_fit && oldFits.length === 0);
+    setBefore({
+      name: existing.variant_name, price: existing.retail_price,
+      specs: oldSpecs.map((r) => ({ def_id: r.spec_definition_id, display: r.display_value ?? '' })),
+      fits: oldFits.map((f) => ({ model_id: f.model_id, year_from: f.year_from ?? f.gen_from, year_to: f.year_to ?? f.gen_to })),
+      pack_size: existing.pack_size, warranty_months: existing.warranty_months,
+    });
   }
 
   // A new kism starts from the item and its first kism — the same socket, the
@@ -301,7 +316,7 @@ export default function KismForm() {
         text: d.data_type === 'text' || d.data_type === 'multiselect' ? display || null : null,
         number: d.data_type === 'number' ? v.number ?? null : null,
         bool: d.data_type === 'boolean' ? v.bool ?? null : null,
-        inherited: !!kismOf && sameVal(v, baseVals[d.id]),
+        inherited: (!!kismOf || !!existing) && sameVal(v, baseVals[d.id]),
       };
     }).filter((s) => s.display);
   }
@@ -318,10 +333,13 @@ export default function KismForm() {
         return { ...f, label: `${m?.name ?? ''}${yearsLabel(f)}`.trim(), make: m?.make_name };
       }),
       universal: kismOf ? false : universal,
-      product_id: kismOf,
-      product_name: kismOf ? base?.name ?? null : null,
+      product_id: kismOf ?? existing?.id ?? null,
+      product_name: kismOf ? base?.name ?? null : existing?.name ?? null,
+      // A kism that exists: this is a change to it (owner, 8 Oct 2026).
+      edit_variant_id: existing?.variant_id ?? null,
+      before: existing ? before : null,
       qty, price, cost,
-      pack_size: packSize, pack_label: packLabel, warranty_months: warrantyMonths,
+      pack_size: packSize ?? 1, pack_label: packLabel, warranty_months: warrantyMonths ?? 0,
     };
   }
 
@@ -362,16 +380,16 @@ export default function KismForm() {
       // owner instead of writing the catalogue.
       if (!canEdit) {
         if (!actor.userId) { notify('Session purana ho gaya. Dobara sign in karo.', 'danger'); return; }
-        if (requestId) {
-          await resubmitRequest(db, requestId, proposal, note);
-          notify(request?.status === 'pending' ? 'Badlav owner tak pahunch gaya.' : 'Dobara bhej diya. Owner dekhega.', 'ok');
+        if (request) {
+          await resubmitRequest(db, request.id, proposal, note);
+          notify(request.status === 'pending' ? 'Badlav owner tak pahunch gaya.' : 'Dobara bhej diya. Owner dekhega.', 'ok');
         } else {
           await submitRequest(db, proposal, { actor, locationId, note });
-          notify('Owner ko bhej diya. Approve hote hi item ban jayega.', 'ok');
+          notify(existing ? 'Badlav owner ko bhej diya — approve hote hi lagega.' : 'Owner ko bhej diya. Approve hote hi item ban jayega.', 'ok');
         }
         // Sent from Stock Chadhao or a bill (?back=): go back to it, the
-        // half-made entry is still there. Otherwise show the request list.
-        if (back && router.canGoBack()) router.back();
+        // half-made entry is still there. From a kism's page, back to it.
+        if ((back || existing) && router.canGoBack()) router.back();
         else router.replace('/requests');
         return;
       }
@@ -379,22 +397,17 @@ export default function KismForm() {
       const fam = families?.find((f) => f.id === familyId);
 
       if (existing) {
-        const variantName = variantNameOf(proposal);
-        const text = searchText(name, fam?.name, type, colour, ...(proposal.specs ?? []).map((s) => s.display), ...(proposal.fits ?? []).map((f) => f.label ?? ''));
+        // This kism only — the same path an approved staff change takes. The
+        // item's name and category are the item form's.
         await db.writeTransaction(async (tx) => {
-          await updateRow(tx, 'products', existing.id, {
-            family_id: familyId, name: name.trim(), is_universal_fit: universal || (proposal.fits ?? []).length === 0, search_text: text,
-          });
-          await updateRow(tx, 'product_variants', existing.variant_id, {
-            variant_name: variantName, retail_price: price, dealer_price: price,
-            pack_size: packSize ?? 1, pack_label: packLabel.trim() || null, warranty_months: warrantyMonths ?? 0,
-            search_text: searchText(text, existing.sku, variantName),
-            // The Kharid rate is the cost every later sale is booked at.
-            ...(can('catalog.view_cost') && cost != null && cost > 0 && cost !== existing.avg_cost
-              ? { avg_cost: cost, last_purchase_cost: cost }
-              : {}),
-          });
-          await writeSpecsAndFits(tx, existing.id, existing.variant_id, proposal, actor, { scope: 'item', onlyKism: kismCount <= 1 });
+          await applyKismEdit(tx, proposal, actor);
+          // The Kharid rate is the cost every later sale is booked at.
+          if (can('catalog.view_cost') && cost != null && cost > 0 && cost !== existing.avg_cost) {
+            await updateRow(tx, 'product_variants', existing.variant_id, { avg_cost: cost, last_purchase_cost: cost });
+          }
+          // An item with one kism may still carry cars written at item level
+          // by an older build; they were just written onto the kism.
+          if (kismCount === 1) await tx.execute('DELETE FROM product_fitments WHERE product_id = ? AND variant_id IS NULL', [existing.id]);
         });
       } else {
         // The same function an approval runs, so a hand-typed item and an
@@ -426,20 +439,36 @@ export default function KismForm() {
     }
   }
 
-  // Editing an existing item stays owner-only; proposing a new one does not.
-  if (!canEdit && !isNew) {
-    return <Screen><Text>Sirf owner item badal sakta hai.</Text></Screen>;
-  }
-
   const proposal = buildProposal();
   const missing = validateProposal(proposal) ?? missingRequired();
   const preview = variantNameOf(proposal);
 
   return (
     <>
-      <Stack.Screen options={{ title: kismOf ? 'Nayi kism' : isNew ? 'Naya item' : 'Item badlo' }} />
+      <Stack.Screen options={{ title: kismOf ? 'Nayi kism' : isNew ? 'Naya item' : canEdit ? 'Kism badlo' : 'Kism mein badlav' }} />
       <Screen>
-        <Text variant="display">{kismOf ? 'Nayi kism' : isNew ? 'Naya item' : 'Item badlo'}</Text>
+        <Text variant="display">{kismOf ? 'Nayi kism' : isNew ? 'Naya item' : canEdit ? 'Kism badlo' : 'Kism mein badlav'}</Text>
+        {existing ? (
+          <Card spine="accent" style={{ gap: space.xs }}>
+            <Text variant="heading">{existing.name}</Text>
+            <Text variant="small" color="textMuted">
+              {canEdit
+                ? `Sirf “${existing.variant_name}” badlegi — iski detail, gaadi, saal aur rate. Item ka naam ya category “Item badlo” se.`
+                : `“${existing.variant_name}” mein jo galat hai wo theek karo — detail, gaadi, saal, rate. Owner approve karega tab badlega.`}
+            </Text>
+            <Button title="Item badlo" tone="ghost" size="sm" onPress={() => router.push(`/admin/item?id=${existing.id}` as never)} />
+          </Card>
+        ) : null}
+        {request && existing && !canEdit ? (
+          <Card spine="warn" style={{ gap: space.xs }}>
+            <Text variant="heading">{request.status === 'rejected' ? 'Owner ne wapas bheja' : 'Aapka badlav owner ke review mein hai'}</Text>
+            <Text variant="small" color="textMuted">
+              {request.status === 'rejected'
+                ? `Wajah: ${request.review_note ?? '—'}. Theek karke dobara bhejo.`
+                : 'Neeche wahi hai jo bheja tha — badal ke dobara bhej sakte ho.'}
+            </Text>
+          </Card>
+        ) : null}
 
         {kismOf ? (
           <Card spine="accent">
@@ -449,13 +478,6 @@ export default function KismForm() {
             </Text>
             <Text variant="small" color="textMuted">
               Isi item ki nayi kism — sirf gaadi, saal, colour jaisi jo cheez alag hai wo chuno. Naam, category aur baaki detail wahi rahegi.
-            </Text>
-          </Card>
-        ) : null}
-        {!isNew && kismCount > 1 ? (
-          <Card spine="warn">
-            <Text variant="small" color="textMuted">
-              Is item ki {kismCount} kism hain — yahan “{existing?.variant_name}” badal rahe ho. Naam, category aur common detail sab kism par lagegi; gaadi aur rate sirf isi kism ka.
             </Text>
           </Card>
         ) : null}
@@ -485,7 +507,7 @@ export default function KismForm() {
             onPickLocal={setPendingPhoto}
             canEdit={canEdit}
           />
-          {kismOf ? null : (<>
+          {kismOf || existing ? null : (<>
           <SelectField
             label="Category"
             value={familyId}
@@ -591,7 +613,7 @@ export default function KismForm() {
             value={note}
             onChangeText={setNote}
             placeholder="Kyu chahiye, ya kya badla — ek line"
-            hint={requestId && request?.status === 'rejected' ? 'Pichli baar wapas aayi thi — yahan likho ki ab kya theek kiya.' : 'Owner yahi padhega jab approve karega.'}
+            hint={request?.status === 'rejected' ? 'Pichli baar wapas aayi thi — yahan likho ki ab kya theek kiya.' : 'Owner yahi padhega jab approve karega.'}
             multiline
           />
         ) : null}
@@ -601,7 +623,7 @@ export default function KismForm() {
         {missing ? <Text variant="small" color="textFaint">{missing}</Text> : null}
         <Row gap={space.sm}>
           <Button
-            title={canEdit ? (isNew ? 'Item bana do' : 'Badlav kar do') : (requestId ? (request?.status === 'pending' ? 'Badlav bhejo' : 'Dobara bhejo') : 'Owner ko bhejo')}
+            title={canEdit ? (isNew ? 'Item bana do' : 'Badlav kar do') : (request ? (request.status === 'pending' ? 'Badlav bhejo' : 'Dobara bhejo') : existing ? 'Badlav owner ko bhejo' : 'Owner ko bhejo')}
             size="lg" onPress={save} loading={saving} disabled={!!missing} style={{ flex: 1 }}
           />
           <Button title="Rehne do" tone="secondary" onPress={() => router.back()} />

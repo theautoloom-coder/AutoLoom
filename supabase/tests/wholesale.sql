@@ -204,6 +204,33 @@ begin
   values (cid, 'purchase', sup, godown, 'draft', now(), staff, pid);
   raise notice 'PASS  staff can send a correction of an entry'; pass := pass + 1;
 
+  -- 6d. Staff ask for a change to a kism; it waits for the owner.
+  insert into public.change_requests (kind, status, payload, submitted_by, submitted_at, revision)
+  values ('edit_kism', 'pending', '{"name":"x","edit_variant_id":"y","price":1}', staff, now(), 1);
+  raise notice 'PASS  staff can ask to change a kism'; pass := pass + 1;
+
+  -- 6e. An app too old to write correctly does not write (8 Oct 2026).
+  perform set_config('role', 'postgres', true);
+  update public.app_settings set value = '2026100901'::jsonb where id = 'min_app_build';
+  perform set_config('role', 'authenticated', true);
+  begin
+    perform public.apply_crud('[]'::jsonb);
+    raise notice 'FAIL  an old app could still upload'; fail := fail + 1;
+  exception when raise_exception then
+    raise notice 'PASS  an app without its build cannot upload'; pass := pass + 1;
+  end;
+  begin
+    perform public.apply_crud_v2('[]'::jsonb, 2026100800);
+    raise notice 'FAIL  an older build could still upload'; fail := fail + 1;
+  exception when raise_exception then
+    raise notice 'PASS  an older build cannot upload'; pass := pass + 1;
+  end;
+  if public.apply_crud_v2('[]'::jsonb, 2026100901) = '[]'::jsonb then
+    raise notice 'PASS  the current build uploads'; pass := pass + 1;
+  else
+    raise notice 'FAIL  the current build was refused'; fail := fail + 1;
+  end if;
+
   -- 7. The owner approves it.
   perform set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
   update public.stock_adjustments set status = 'posted', doc_no = 'TEST/ADJ', approved_by = owner where id = aid;

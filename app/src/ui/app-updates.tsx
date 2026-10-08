@@ -16,6 +16,9 @@
  *     new version is waiting; it goes on with "Abhi lagao" or at the next
  *     break.
  *
+ * The web app follows the same rules (8 Oct 2026): a tab compares the build it
+ * runs with the one the server serves, on return and every 5 minutes.
+ *
  * A new APK is needed only when the native layer changes (a new native module,
  * a permission, an Expo SDK upgrade); app.json's runtimeVersion then goes up
  * and older APKs stop receiving updates. To stop those older APKs being used,
@@ -59,7 +62,52 @@ export function AppUpdates() {
 
   const apply = useCallback(async () => {
     setCover('applying');
+    if (Platform.OS === 'web') { window.location.reload(); return; }
     try { await Updates.reloadAsync(); } catch { setCover(null); setWaiting(true); }
+  }, []);
+
+  // The web app: a tab left open keeps running the code it opened with. On
+  // 8 Oct one open since the day before ran an old kism form and its save
+  // wiped every spec and car of an item. So the tab asks the server which
+  // build is live — on return to it, and every 5 minutes — and takes the new
+  // one by the same rules as a phone: at once after a while away, otherwise a
+  // banner that stays until it is taken.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || __DEV__ || typeof document === 'undefined') return;
+    const mine = Array.from(document.scripts).map((s) => s.src.match(/entry-[0-9a-f]+\.js/)?.[0]).find(Boolean);
+    if (!mine) return;
+    let hiddenSince: number | null = document.visibilityState === 'hidden' ? Date.now() : null;
+    const check = async (takeNow: boolean) => {
+      try {
+        const html = await (await fetch(`/?fresh=${Date.now()}`, { cache: 'no-store' })).text();
+        const live = html.match(/entry-[0-9a-f]+\.js/)?.[0];
+        if (!live || live === mine) return;
+        // One reload per build: if a cache still hands back the old page,
+        // say so with the banner instead of reloading round and round.
+        let tried = false;
+        try { tried = sessionStorage.getItem('autoloom-reloaded-for') === live; } catch { /* private window */ }
+        if (takeNow && !tried) {
+          try { sessionStorage.setItem('autoloom-reloaded-for', live); } catch { /* private window */ }
+          window.location.reload();
+        } else {
+          setWaiting(true);
+        }
+      } catch {
+        // No signal: keep going on what is open.
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') { hiddenSince = Date.now(); return; }
+      const long = hiddenSince != null && Date.now() - hiddenSince >= AWAY_MS;
+      hiddenSince = null;
+      check(long);
+    };
+    const timer = setInterval(() => {
+      check(hiddenSince != null && Date.now() - hiddenSince >= AWAY_MS);
+    }, RECHECK_MS);
+    document.addEventListener('visibilitychange', onVisible);
+    check(true);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 
   // Opening the app: put the newest version on first.

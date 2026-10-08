@@ -32,6 +32,8 @@ self.addEventListener('fetch', (event) => {
   // and a stale token or checkpoint is worse than being offline.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/auth/') || url.pathname.includes('powersync')) return;
+  // The app asking which build is live: always the network, never kept.
+  if (url.searchParams.has('fresh')) return;
 
   // Navigations: network first so a deploy is picked up, cache as the
   // fallback so no-signal still opens the app.

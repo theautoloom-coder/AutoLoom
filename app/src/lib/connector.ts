@@ -15,6 +15,7 @@ import {
   UpdateType,
 } from '@powersync/common';
 
+import { APP_BUILD } from './build';
 import { POWERSYNC_URL, supabase } from './supabase';
 import { announceRejection } from './sync-events';
 
@@ -82,6 +83,8 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
    * the shop before its migration did). Then the old row-at-a-time path runs.
    */
   private atomic = true;
+  /** False once the server has said it has no apply_crud_v2. */
+  private versioned = true;
 
   async uploadData(database: AbstractPowerSyncDatabase): Promise<void> {
     const transaction = await database.getNextCrudTransaction();
@@ -97,9 +100,17 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
       // refused: stock left the shelf on the server with no bill behind it.
       if (this.atomic && crud.length > 0) {
         lastOp = headerOf(crud);
-        const { data, error } = await supabase.rpc('apply_crud', {
-          ops: crud.map((op) => ({ op: op.op, table: op.table, id: op.id, data: op.opData ?? {} })),
-        });
+        const ops = crud.map((op) => ({ op: op.op, table: op.table, id: op.id, data: op.opData ?? {} }));
+        // With the build, so the server can refuse an app too old to write
+        // correctly (P0001, retried: the work stays here until the update).
+        let { data, error } = this.versioned
+          ? await supabase.rpc('apply_crud_v2', { ops, app_build: APP_BUILD })
+          : await supabase.rpc('apply_crud', { ops });
+        if (error?.code === 'PGRST202' && this.versioned) {
+          // A server not migrated yet: the plain one still takes it.
+          this.versioned = false;
+          ({ data, error } = await supabase.rpc('apply_crud', { ops }));
+        }
         if (!error) {
           if (Array.isArray(data) && data.length > 0) {
             // RLS skipped these quietly — the server keeps them itself (avg_cost).

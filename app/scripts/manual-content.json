@@ -46,16 +46,19 @@
       {
         "img": "stock-chadhao.png",
         "title": "Stock Chadhao — supplier se maal aaya",
-        "what": "Kis supplier se aaya, kya aaya, kitna aaya. Staff ki entry owner ke approval ke baad hi stock mein judti hai.",
+        "what": "Kis supplier se aaya, kab aaya, kya aaya, kitna aaya. Har maal ke liye: item chuno → kism chuno → kitne aaye. Staff ki entry owner ke approval ke baad hi stock mein judti hai.",
         "steps": [
           "Supplier chuno. Naya ho to naam likho aur “+ Naya banao”.",
-          "Maal scan karo ya naam likho — socket, gaadi sab list mein dikhta hai. “Kitne aaye” gin ke likho.",
+          "“Maal kab aaya” — Aaj, Kal, Parso, ya “Aur tareekh…” se calendar. Kal ka maal aaj likh rahe ho to “Kal” dabao.",
+          "Item ka naam likho aur item chuno — jaise “Philips X-tremeVision”.",
+          "“Kaunsi kism aayi?” — chip dabao (H4, H7, Creta 2019–2023…). Nayi kism ho to “+ Nayi kism”: socket ya colour chuno, gaadi chuno (chunte hi jud jaati hai), saal ki chip dabao.",
+          "“Kitne aaye” likho aur “Line jodo”. Aur maal ho to “+ Maal jodo”.",
           "Supplier ke bill ki photo laga sakte ho (zaroori nahi).",
           "Staff: “… pcs owner ko bhejo”. Owner gin ke dekhega, rate bharega, approve karega.",
           "Partner: kharid rate bhar do (zaroori nahi) aur “… pcs chadha do” — stock turant badhega.",
           "Staff: galti dikhi to “Aur” → “Maine kya bheja” → “Review mein” wali entry kholo, theek karo, “Ho gaya” — approve hone tak badal sakte ho."
         ],
-        "note": "Approve hone tak wo maal stock mein nahi ginta — na bill par dikhega, na Hisab mein. Approve ya mana hone ke baad entry sirf partner badal sakta hai; “Maine kya bheja” mein dikhta hai kya hua aur kyun."
+        "note": "Jo kism pehle se hai use “Nayi kism” mein dobara chuno to app wahi purani kism le leta hai — ek jaisi do kism kabhi nahi banti. Approve hone tak maal stock mein nahi ginta — na bill par dikhega, na Hisab mein."
       },
       {
         "img": "bill-bharte-hue.png",
@@ -98,7 +101,7 @@
           "Kitna, kis cheez ka (chip dabao), kaise diya, kisne diya.",
           "“₹… ka kharcha likh do”."
         ],
-        "note": "Partner ne apne liye paisa nikala to wo yahan nahi — “Partner ka paisa” mein likho."
+        "note": "Partner ne apne liye paisa nikala to wo yahan nahi — “Partner ka paisa” mein likho. Kharche ke prakar (chai, bhada…) partner “Aur” → “Dukan settings” → “Kharche ke prakar” se badalta hai."
       }
     ]
   },
@@ -165,15 +168,15 @@
       {
         "img": "naya-item.png",
         "title": "Naya item / item badlo",
-        "what": "Category chuno — uske hisaab se detail ke dabbe khulte hain: bulb mein socket (H4, H7…), watt, colour; mat mein type, colour.",
+        "what": "Item ek hi baar banta hai — category, naam, bechne ka rate. Uski kism (socket, colour, gaadi, saal) stock chadhate waqt chuni jaati hai.",
         "steps": [
-          "Category, item ka naam, qty, bechne ka rate. Partner kharid rate bhi bhar sakta hai.",
-          "“Detail” mein jo pata ho bharo — socket zaroori hai, baaki chahe to.",
-          "“Kis gaadi mein lagta hai” — company + model chuno, saal se–tak likho, “+ Gaadi jodo”. Kai gaadi jod sakte ho. Har gaadi mein lagta ho to “Sab gaadi”.",
-          "“Item bana do” / “Badlav kar do”. Staff ke liye ye request ban ke partner ke paas jaati hai.",
-          "Wahi item doosri gaadi ya colour ke liye? Naya item mat banao — item ke page par “+ Nayi gaadi / kism”: naam, category aur detail wahi rehti hai, sirf gaadi, saal, colour chuno. Naya naam likhte hi “Ye item pehle se hai?” bhi dikhta hai."
+          "“Aur” → “Saara maal” → “+ Naya item”, ya Stock Chadhao mein naam likh ke “+ Naya item banao”.",
+          "Category chuno, item ka naam likho, bechne ka rate bharo — har nayi kism isi rate se shuru hogi. Partner kharid rate bhi bhar sakta hai.",
+          "Jo detail har kism mein same hai (voltage, warranty…) wo “Common detail” mein.",
+          "“Item bana do”. Staff ke liye ye request ban ke partner ke paas jaati hai.",
+          "Item kholo to neeche uski saari kism dikhti hain — kism par tap karke uska rate, detail ya gaadi badlo; “+ Nayi kism” se nayi."
         ],
-        "note": "Jo detail bharoge wahi stock list, bill ki search aur item ke page par dikhegi — jaise “H4 · 60/55W · Creta 2019–2023”."
+        "note": "Naam likhte hi “Ye item pehle se hai?” dikhe to wahi use karo — same naam ka doosra item nahi banta. Wahi item doosri gaadi ke liye = nayi kism, naya item nahi."
       },
       {
         "img": "gaadi.png",
@@ -249,6 +252,17 @@
         "img": "khata-supplier.png",
         "title": "Khata tab — supplier",
         "what": "Saare supplier aur kisko kitna dena hai (rakam sirf partner ko dikhti hai). Supplier kholo to usse aaya maal aur wapsi dikhti hai."
+      },
+      {
+        "img": "parties.png",
+        "title": "Supplier aur grahak ki list",
+        "what": "Saare supplier aur grahak — naam, firm, mobile, shehar, type. Paisa Khata tab mein; yahan khate khud sambhalo.",
+        "steps": [
+          "“Aur” → “Supplier aur grahak ki list”, ya Khata tab mein “Saari list”.",
+          "Upar “Grahak” ya “Supplier”. Naam, mobile ya shehar se dhoondo; grahak ko type (dealer, retail…) se chhaanto.",
+          "“+ Grahak” / “+ Supplier” se naya; kisi ke aage “Badlo” se naam, number, type theek karo.",
+          "Partner: jisse kaam band ho gaya use “Band karo” — naye bill mein nahi aayega, purana khata waisa hi. “Band wale bhi” se dekh ke “Chalu karo”."
+        ]
       },
       {
         "img": "grahak-khata.png",
@@ -338,6 +352,18 @@
           "Kisi par tap karke role badlo, band karo, ya naya password do.",
           "Kharid rate, munafa, nuksan, partner ka paisa aur report sirf Partner aur Admin dekhte hain."
         ]
+      },
+      {
+        "img": "categories.png",
+        "title": "Category aur detail",
+        "what": "Har category ki apni detail — bulb ka socket aur watt, mat ka type aur colour. Yahan badlo to sab phones par apne aap pahunch jaata hai, app update nahi chahiye.",
+        "steps": [
+          "“Aur” → “Category aur detail”. Nayi category ho to naam likh ke “Category banao”.",
+          "Category kholo — uski detail dikhti hai. Kisi detail par “Badlo” se uske options (jaise naya socket “H16”) jodo ya band karo.",
+          "“Kism ki pehchaan” lagi detail stock chadhate waqt kism mein poochi jaati hai aur kism ke naam mein aati hai. Baaki item ki common detail.",
+          "Nayi detail chahiye to neeche “Nayi detail” mein naam likho, type chuno, “Detail jodo”."
+        ],
+        "note": "Kuch delete nahi hota — galat detail ya option “Band” kar do; purani kism ka data waisa hi rehta hai."
       }
     ]
   },

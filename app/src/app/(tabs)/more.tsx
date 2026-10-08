@@ -183,6 +183,14 @@ export default function MoreScreen() {
           subtitle="Transport, packing, chai, advance — jo bhi paisa bahar jaaye"
           onPress={() => router.push('/expenses')}
         />
+        {can('party.edit') ? (
+          <ListRow
+            left={<IconBadge name="people-circle-outline" accent="teal" />}
+            title="Supplier aur grahak ki list"
+            subtitle="Naya jodo, number badlo, band karo — saare khate ek jagah"
+            onPress={() => router.push('/parties' as never)}
+          />
+        ) : null}
         <ListRow
           left={<IconBadge name="logo-whatsapp" accent="green" />}
           title="Yaad dilao"
@@ -308,6 +316,14 @@ export default function MoreScreen() {
                 subtitle={pendingReq > 0 ? `${pendingReq} cheez aapke haan ya na ka intezaar kar rahi hai` : 'Staff ka aaya hua maal aur naye item — abhi kuch baaki nahi'}
                 onPress={() => router.push('/requests')}
                 right={pendingReq > 0 ? <Badge tone="warn">{String(pendingReq)}</Badge> : undefined}
+              />
+            ) : null}
+            {can('catalog.edit') ? (
+              <ListRow
+                left={<IconBadge name="pricetags-outline" accent="violet" />}
+                title="Category aur detail"
+                subtitle="Category, uski detail (socket, colour, watt) aur options — app badle bina"
+                onPress={() => router.push('/admin/categories' as never)}
               />
             ) : null}
             {can('catalog.edit') ? (

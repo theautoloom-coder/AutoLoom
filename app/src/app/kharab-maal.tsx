@@ -29,6 +29,7 @@ import { confirm, notify } from '@/ui/forms';
 import { VariantPicker, type PickedVariant } from '@/ui/lines';
 import { PhotoPicker } from '@/ui/photo';
 import { space } from '@/ui/theme';
+import { DateField } from '@/ui/date-field';
 
 /**
  * What the shop says, and what the database is allowed to store.
@@ -235,18 +236,7 @@ export default function KharabLikho() {
               <Chip key={r.key} label={r.label} selected={r.key === reasonKey} onPress={() => setReasonKey(r.key)} />
             ))}
           </Row>
-          {/* Autocorrect rewrites a typed date and says nothing about it. */}
-          <Input
-            label="Tareekh"
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            hint="Aaj ki tareekh pehle se bhari hai."
-            keyboardType="numbers-and-punctuation"
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="done"
-          />
+          <DateField label="Kab hua" value={date} onChange={setDate} />
         </Card>
 
         <VariantPicker onPick={add} locationId={locationId} showCost={can('catalog.view_cost')} />

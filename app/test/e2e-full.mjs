@@ -179,14 +179,23 @@ console.log('\n▸ Stock Chadhao');
   await go('/stock/add', 6500);
   // Each SelectField carries its own placeholder, so there is no single
   // "Chuno…" to click — Stock Chadhao's says "Kis supplier se aaya?".
-  await page.getByText('Kis supplier se aaya?').first().click();
+  await page.getByText('Kis supplier se aaya?').locator('visible=true').first().click();
   await page.waitForTimeout(1800);
-  await page.locator('text=/Auto|Traders|Enterprises|Agency|Sales|Motors/i').first().click();
+  // A real supplier by name, in the open list only — "Auto" alone also
+  // matches "AutoLoom" on the screen underneath.
+  const supplier = sql(`select name from suppliers where is_active and name not ilike 'e2e%' order by name limit 1`);
+  await page.getByPlaceholder('Naam likh ke dhoondo').fill(supplier);
+  await page.waitForTimeout(900);
+  await page.getByText(supplier, { exact: true }).locator('visible=true').first().click();
   await page.waitForTimeout(1800);
-  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+  // The item, then its kism, then "Line jodo" (8 Oct 2026).
+  await page.getByPlaceholder('Naam, category, SKU ya barcode').fill('xtreme');
   await page.waitForTimeout(2800);
-  await page.getByText(/X-tremeVision/i).first().click();
+  await page.getByText(/ · \d+ kism$/).locator('visible=true').first().click();
   await page.waitForTimeout(2500);
+  await page.getByText(/^H4 .* · -?\d+$/).locator('visible=true').first().click();
+  await page.getByRole('button', { name: 'Line jodo' }).click();
+  await page.waitForTimeout(1200);
   const chadha = page.getByRole('button', { name: /chadha do/i });
   if (await chadha.isEnabled().catch(() => false)) {
     await chadha.click();

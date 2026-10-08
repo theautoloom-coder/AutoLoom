@@ -41,7 +41,7 @@ export default function ProductsAdmin() {
       {tokens.length > 0 ? (
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {(hits ?? []).map((h) => (
-            <ListRow key={h.id} title={`${h.product_name} · ${h.variant_name}`} subtitle={h.sku} onPress={() => router.push(`/admin/item?id=${h.product_id}`)} right={<Text mono>{h.qty}</Text>} />
+            <ListRow key={h.id} title={`${h.product_name} · ${h.variant_name}`} subtitle={h.sku} onPress={() => router.push(`/admin/item?id=${h.product_id}&variant=${h.id}` as never)} right={<Text mono>{h.qty}</Text>} />
           ))}
           {(hits ?? []).length === 0 ? <Empty art="search" title="Koi SKU nahi mila" /> : null}
         </Card>

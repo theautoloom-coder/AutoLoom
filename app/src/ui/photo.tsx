@@ -80,7 +80,10 @@ export function PhotoPicker({
   onChange,
   onPickLocal,
   canEdit = true,
+  hint,
 }: {
+  /** The line under the buttons, before a photo is chosen. */
+  hint?: string;
   /**
    * Where the file is filed. Not the name: names have spaces and slashes.
    * Absent while a brand new item is still being typed — it has no variant to
@@ -143,7 +146,7 @@ export function PhotoPicker({
             <Button title="Photo kheencho" size="sm" onPress={() => take('camera')} loading={busy} />
             <Button title="Gallery se" tone="secondary" size="sm" onPress={() => take('library')} />
           </Row>
-          {path ? (
+          {path || localUri ? (
             <Pressable onPress={remove} disabled={busy}>
               <Text variant="small" color="danger">
                 Photo hatao
@@ -151,7 +154,7 @@ export function PhotoPicker({
             </Pressable>
           ) : (
             <Text variant="small" color="textFaint">
-              Maal ki photo lagao — counter par dhoondhne mein aasani hoti hai.
+              {hint ?? 'Maal ki photo lagao — counter par dhoondhne mein aasani hoti hai.'}
             </Text>
           )}
         </View>

@@ -37,6 +37,7 @@ import { Button, Card, Chip, Divider, Empty, Input, ListRow, Row, Screen, Sectio
 import { notify } from '@/ui/forms';
 import { VariantPicker, type PickedVariant } from '@/ui/lines';
 import { space } from '@/ui/theme';
+import { DateField } from '@/ui/date-field';
 
 /**
  * The shop's words, and the values stock_adjustments_reason_check allows:
@@ -311,20 +312,7 @@ export default function GintiKaro() {
         )}
 
         <Card style={{ gap: space.md }}>
-          {/* Autocorrect rewrites a typed date and says nothing about it. */}
-          <Input
-            label="Tareekh"
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            hint="Aaj ki tareekh pehle se bhari hai."
-            keyboardType="numbers-and-punctuation"
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="next"
-            onSubmitEditing={() => noteRef.current?.focus()}
-            submitBehavior="submit"
-          />
+          <DateField label="Ginti kab hui" value={date} onChange={setDate} />
           <Input
             ref={noteRef}
             label="Note"

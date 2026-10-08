@@ -53,6 +53,12 @@ export type ItemProposal = {
    */
   product_id?: string | null;
   product_name?: string | null;
+  /**
+   * The item alone — name, category, usual rates, shared details — with no
+   * kism (owner, 8 Oct 2026: items are made once; kisms come with the stock).
+   * `price`/`cost` are the item's default selling and buying rates.
+   */
+  master?: boolean;
 };
 
 /**
@@ -217,6 +223,8 @@ export async function applyItemProposal(
     locationId?: string | null;
     takenSkus: Set<string>;
     skuPrefix?: string | null;
+    /** False for a staff stock entry: it may add a kism, not change the item. */
+    canEditItem?: boolean;
   },
 ): Promise<{ productId: string; variantId: string }> {
   const { actor, locationId, takenSkus } = opts;
@@ -245,6 +253,8 @@ export async function applyItemProposal(
       sort_order: 100,
     }, actor);
   }
+
+  if (p.master) return makeItem(tx, p, familyId, actor);
 
   const variantName = variantNameOf(p);
   const fits = fitsOf(p);
@@ -302,6 +312,30 @@ export async function applyItemProposal(
   return { productId, variantId };
 }
 
+/** The item alone: its name, category, usual rates and shared details. */
+async function makeItem(tx: Writable, p: ItemProposal, familyId: string | null, actor?: Actor): Promise<{ productId: string; variantId: string }> {
+  const productId = uuidv7();
+  const shared = (p.specs ?? []).filter((s) => !s.axis && s.display.trim());
+  await insertRow(tx, 'products', {
+    id: productId,
+    family_id: familyId,
+    name: p.name.trim(),
+    is_universal_fit: !!p.universal,
+    default_price: p.price ?? null,
+    default_cost: p.cost ?? null,
+    search_text: searchText(p.name, p.family_name, ...shared.map((s) => s.display)),
+    is_active: true,
+  }, actor);
+  for (const sp of shared) {
+    await insertRow(tx, 'spec_values', {
+      product_id: productId, variant_id: null, spec_definition_id: sp.def_id,
+      option_id: sp.option_id ?? null, option_ids: sp.option_ids ?? null, value_text: sp.text ?? null,
+      value_number: sp.number ?? null, value_bool: sp.bool == null ? null : sp.bool, display_value: sp.display.trim(),
+    });
+  }
+  return { productId, variantId: '' };
+}
+
 /**
  * A new kism of an item that already exists: the same mat for another car,
  * the same bulb in another socket. The item is not made again — one variant
@@ -310,7 +344,7 @@ export async function applyItemProposal(
 async function addKism(
   tx: Writable,
   p: ItemProposal,
-  opts: { actor?: Actor; locationId?: string | null; takenSkus: Set<string>; skuPrefix?: string | null },
+  opts: { actor?: Actor; locationId?: string | null; takenSkus: Set<string>; skuPrefix?: string | null; canEditItem?: boolean },
 ): Promise<{ productId: string; variantId: string }> {
   const { actor, locationId, takenSkus } = opts;
   const productId = p.product_id!;
@@ -323,7 +357,10 @@ async function addKism(
 
   const fits = fitsOf(p);
   const variantName = variantNameOf(p);
-  const base = [item.sku_prefix || opts.skuPrefix || 'ITM', slug(item.name, 6), slug(fits[0]?.label ?? '', 6), slug(p.colour ?? '', 4)]
+  // The SKU says what the kism is: item, car, then its first own detail
+  // (socket H11, colour Black) — "HAL-PHILIP-CRETA2-H11", not "-2".
+  const own = (p.specs ?? []).find((s) => s.axis && s.display.trim())?.display ?? p.colour ?? '';
+  const base = [item.sku_prefix || opts.skuPrefix || 'ITM', slug(item.name, 6), slug(fits[0]?.label ?? '', 6), slug(own, 4)]
     .filter(Boolean).join('-');
   const variantId = uuidv7();
   await insertRow(tx, 'product_variants', {
@@ -331,8 +368,8 @@ async function addKism(
     product_id: productId,
     variant_name: variantName,
     sku: uniqueSku(base, takenSkus),
-    retail_price: p.price,
-    dealer_price: p.price,
+    retail_price: p.price ?? 0,
+    dealer_price: p.price ?? 0,
     min_stock: 0,
     reorder_level: 0,
     reorder_qty: 0,
@@ -348,7 +385,9 @@ async function addKism(
   }, actor);
 
   // A kism made for particular cars means the item is no longer "every car".
-  if (fits.length && !p.universal) {
+  // Only someone who may change the item does it; a staff stock entry adds the
+  // kism (catalog.add_kism) and the lists show its own cars regardless.
+  if (fits.length && !p.universal && opts.canEditItem !== false) {
     await updateRow(tx, 'products', productId, { is_universal_fit: false });
   }
   await writeSpecsAndFits(tx, productId, variantId, p, actor, { scope: 'kism' });

@@ -64,6 +64,10 @@ const shown = sql(`select p.id || '|' || pv.id from products p join product_vari
                     where p.is_active and exists (select 1 from product_fitments f where f.product_id = p.id)
                     order by (select count(*) from spec_values sv where sv.product_id = p.id) desc limit 1`).split('|');
 
+// The bulb category: its socket, watt and the rest, for "Category aur detail".
+const bulbFamily = sql(`select f.id from product_families f join spec_definitions d on d.family_id = f.id
+                         where d.code = 'socket' and d.is_variant_axis order by f.sort_order limit 1`);
+
 // A staff stock entry waiting for the owner, so Approval has something on it.
 const staffId = sql(`select id from profiles where role = 'staff' and is_active order by full_name limit 1`);
 const waitingId = sql(`insert into purchases (doc_type, supplier_id, location_id, status, submitted_at, submitted_by, doc_date)
@@ -76,7 +80,6 @@ sql(`insert into purchase_lines (purchase_id, line_no, variant_id, description, 
 
 const SHOTS = [
   ['ghar', '/'],
-  ['stock-chadhao', '/stock/add'],
   ['approval', '/requests'],
   ['approve', `/purchase/approve?id=${waitingId}`],
   ['kharcha', '/expenses'],
@@ -88,6 +91,8 @@ const SHOTS = [
   ['kya-mangwana', '/reorder'],
   ['khata', '/khata'],
   ['khata-supplier', '/khata?tab=supplier'],
+  ['parties', '/parties?tab=supplier'],
+  ['categories', `/admin/categories?id=${bulbFamily}`],
   ['bill', `/invoice/${inv}`],
   ['grahak-khata', `/customer/${cust}`],
   ['paisa-aaya', `/payment/edit?direction=in&party=${cust}`],
@@ -137,6 +142,16 @@ try {
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${out}/rate-baaki.png`, fullPage: true });
   console.log('  Rate baaki → rate-baaki.png');
+
+  // Stock Chadhao with an item picked: its kisms as chips, "+ Nayi kism".
+  await page.goto(base + '/stock/add', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(6000);
+  await page.getByPlaceholder('Naam, category, SKU ya barcode').fill('xtreme');
+  await page.waitForTimeout(2500);
+  await page.getByText(/ · \d+ kism$/).locator('visible=true').first().click();
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: `${out}/stock-chadhao.png`, fullPage: true });
+  console.log('  stock-in with an item picked → stock-chadhao.png');
 
   // A bill half-written: the manual has to show what a line looks like.
   await page.goto(base + '/invoice/edit', { waitUntil: 'domcontentloaded', timeout: 60000 });

@@ -503,6 +503,8 @@ export const products = new Table(
     device_id: column.text,
     created_at: column.text,
     updated_at: column.text,
+    default_price: column.real,
+    default_cost: column.real,
   },
   { indexes: { family: ['family_id'], brand: ['brand_id'] } }
 );

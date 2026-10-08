@@ -10,12 +10,20 @@
 // Universal search
 // -----------------------------------------------------------------------------
 
-/** Turn "h4 led" into a LIKE clause that requires every token. */
+/** A search word without the marks people skip: "x-treme" and "xtreme" are one word. */
+const bare = (t: string) => t.toLowerCase().replace(/[-.]/g, '');
+
+/**
+ * Turn "h4 led" into a LIKE clause that requires every token. Hyphens and
+ * dots are dropped on both sides, so "xtreme" finds "X-tremeVision" and
+ * "hb3" finds "HB-3".
+ */
 export function tokenClause(column: string, tokens: string[]): { sql: string; params: string[] } {
-  if (tokens.length === 0) return { sql: '1=1', params: [] };
+  const words = tokens.map(bare).filter(Boolean);
+  if (words.length === 0) return { sql: '1=1', params: [] };
   return {
-    sql: tokens.map(() => `${column} LIKE ?`).join(' AND '),
-    params: tokens.map((t) => `%${t.toLowerCase()}%`),
+    sql: words.map(() => `replace(replace(lower(${column}), '-', ''), '.', '') LIKE ?`).join(' AND '),
+    params: words.map((t) => `%${t}%`),
   };
 }
 

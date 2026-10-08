@@ -6,11 +6,13 @@
  *   node test/e2e-wholesale.mjs http://127.0.0.1:8222
  *
  *   staff:  tabs and home without money · stock in waits for approval ·
+ *           a new kism made while stocking in ·
  *           kharab goes to the kharab corner · cash bill has no udhaar ·
  *           reports are not theirs
  *   owner:  approves the staff entry with a rate · sends kharab back to the
  *           supplier · replacement settles it · partner money · a PDF ·
- *           a bulb with its socket and cars · every new screen opens clean
+ *           an item made once, its kisms chosen while stocking in ·
+ *           categories, party list, kharcha types · every new screen opens clean
  *
  * Local stack only. It writes real rows.
  */
@@ -77,10 +79,32 @@ async function pickItem(page, q = 'H4') {
   await page.waitForTimeout(1800);
 }
 
+// Stock Chadhao (owner, 8 Oct 2026): search the item, then choose its kism.
+async function stockItem(page, q) {
+  await page.getByPlaceholder('Naam, category, SKU ya barcode').locator('visible=true').first().fill(q);
+  await page.waitForTimeout(2500);
+  await page.getByText(/ · \d+ kism$/).locator('visible=true').first().click();
+  await page.waitForTimeout(2500);
+}
+const lastVisible = (page, label) => page.getByLabel(label, { exact: true }).locator('visible=true').last();
+async function socket(page, value) {
+  // Chips or a list, whichever the category has.
+  const chip = page.getByText(value, { exact: true }).locator('visible=true').first();
+  if (await chip.isVisible().catch(() => false)) await chip.click();
+  else await pickFrom(page, 'Chuno…', value, value);
+  await page.waitForTimeout(500);
+}
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // The same item pickItem() clicks: the first X-tremeVision the "H4" search lists.
 const H4 = sql(`select pv.id from product_variants pv join products p on p.id = pv.product_id
                  where p.name ilike '%X-tremeVision%' and pv.search_text ilike '%h4%' order by p.name, pv.sort_order, pv.variant_name limit 1`);
+const H4_NAME = sql(`select variant_name from product_variants where id = '${H4}'`);
+const H4_ITEM = sql(`select product_id from product_variants where id = '${H4}'`);
 const SUPPLIER = sql(`select name from suppliers where is_active and name not ilike 'e2e%' order by name limit 1`);
+const SUPPLIER2 = sql(`select name from suppliers where is_active and name not ilike 'e2e%' order by name offset 1 limit 1`);
+const yesterday = sql(`select (current_date - 1)::text`);
+const variantQty = (id) => num(`select coalesce(sum(m.qty),0) from stock_movements m join locations l on l.id = m.location_id where m.variant_id = '${id}' and l.type <> 'damaged'`);
 const STAFF = 'sales@autoloom.local';
 const OWNER = 'owner@autoloom.local';
 const godownQty = () => num(`select coalesce(sum(m.qty),0) from stock_movements m join locations l on l.id = m.location_id where m.variant_id = '${H4}' and l.type <> 'damaged'`);
@@ -108,11 +132,14 @@ let entryId = '';
     const before = godownQty();
     await go(page, '/stock/add', 6000);
     await pickFrom(page, 'Kis supplier se aaya?', SUPPLIER.slice(0, 6), SUPPLIER);
-    await pickItem(page);
-    await page.getByLabel('Kitne aaye').first().fill('3');
+    await stockItem(page, 'xtreme');
+    await page.getByText(new RegExp(`^${esc(H4_NAME)} · `)).locator('visible=true').first().click();
+    await lastVisible(page, 'Kitne aaye').fill('3');
     await page.waitForTimeout(500);
-    check('staff sees no buy-rate box', !(await page.getByLabel(/Kharid rate/).first().isVisible().catch(() => false)));
-    await page.getByRole('button', { name: /owner ko bhejo/i }).click();
+    check('staff sees no buy-rate box', !(await page.getByLabel(/Kharid rate/).locator('visible=true').first().isVisible().catch(() => false)));
+    await page.getByRole('button', { name: 'Line jodo' }).click();
+    await page.waitForTimeout(1200);
+    await page.getByRole('button', { name: /pcs owner ko bhejo/i }).click();
     await page.waitForTimeout(9000);
     entryId = sql(`select id from purchases where status = 'draft' and submitted_at is not null order by submitted_at desc limit 1`);
     check('entry reached the server as waiting', !!entryId);
@@ -135,6 +162,34 @@ let entryId = '';
     check('the change reached the server', num(`select coalesce(sum(qty),0) from purchase_lines where purchase_id = '${entryId}'`) === 5);
     check('still waiting for the owner', sql(`select (submitted_at is not null)::text from purchases where id = '${entryId}'`) === 'true');
     check('the change is stamped for the owner', sql(`select coalesce(revised_at::text,'') from purchases where id = '${entryId}'`) !== '');
+  });
+
+  // Owner, 8 Oct 2026: the item is made once; another socket or another car
+  // is chosen while writing the stock in — staff too, no new item asked for.
+  await step('staff make a new kism while stocking in', async () => {
+    await go(page, '/stock/add', 6000);
+    await pickFrom(page, 'Kis supplier se aaya?', SUPPLIER2.slice(0, 6), SUPPLIER2);
+    await page.getByRole('button', { name: 'Parso', exact: true }).locator('visible=true').first().click();
+    await stockItem(page, 'x-treme halogen');
+    await page.getByText('+ Nayi kism', { exact: true }).locator('visible=true').first().click();
+    await page.waitForTimeout(800);
+    await socket(page, 'H1');
+    await page.getByLabel(/^Wattage/).locator('visible=true').first().fill('55');
+    await page.getByText('Single', { exact: true }).locator('visible=true').first().click();
+    await pickFrom(page, 'Creta, Swift, Nexon…', 'Swift', 'Maruti Suzuki Swift');
+    await lastVisible(page, 'Kitne aaye').fill('2');
+    await page.getByRole('button', { name: 'Line jodo' }).click();
+    await page.waitForTimeout(1200);
+    check('the new kism is on the entry, named by car then socket', await page.getByText(/^Swift · H1 · 55 W · Single/).locator('visible=true').first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: /2 pcs owner ko bhejo/i }).click();
+    await page.waitForTimeout(9000);
+    const kism = sql(`select id from product_variants where product_id = '${H4_ITEM}' and variant_name like 'Swift · H1%'`);
+    check('staff made exactly one kism, on the same item', !!kism && !kism.includes('\n'), kism);
+    check('the kism carries its socket', sql(`select string_agg(display_value, ',') from spec_values where variant_id = '${kism}'`).includes('H1'));
+    check('the kism carries its car', num(`select count(*) from product_fitments pf join vehicle_models vm on vm.id = pf.model_id where pf.variant_id = '${kism}' and vm.name = 'Swift'`) === 1);
+    const e2 = sql(`select p.id from purchases p join purchase_lines l on l.purchase_id = p.id where l.variant_id = '${kism}' and p.status = 'draft' and p.submitted_at is not null order by p.submitted_at desc limit 1`);
+    check('the entry waits for the owner with the kism on it', !!e2);
+    check('the entry keeps the day the maal came', sql(`select doc_date::text from purchases where id = '${e2}'`) === sql(`select (current_date - 2)::text`));
   });
 
   await step('staff puts kharab maal aside', async () => {
@@ -218,6 +273,22 @@ let entryId = '';
     check('stock went up on approval', godownQty() === before + 5, `${before} → ${godownQty()}`);
   });
 
+  await step('owner approves the staff entry with a new kism', async () => {
+    const kism = sql(`select id from product_variants where product_id = '${H4_ITEM}' and variant_name like 'Swift · H1%' limit 1`);
+    if (!kism) throw new Error('no staff kism');
+    const before = variantQty(kism);
+    await go(page, '/requests', 6000);
+    await page.getByText(`${SUPPLIER2} · 2 pcs`).locator('visible=true').first().click();
+    await page.waitForTimeout(5000);
+    await page.getByLabel('Kharid rate').locator('visible=true').first().fill('300');
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /Approve karo/i }).click();
+    await yes(page);
+    await page.waitForTimeout(9000);
+    check('the new kism is in stock after approval', variantQty(kism) === before + 2, `${before} → ${variantQty(kism)}`);
+    check('the new kism has a selling rate', num(`select retail_price from product_variants where id = '${kism}'`) > 0);
+  });
+
   let dn = '';
   await step('owner sends kharab back to the supplier', async () => {
     const k0 = kharabQty();
@@ -274,30 +345,69 @@ let entryId = '';
   });
 
   const tag = `E2E Bulb ${Date.now().toString().slice(-5)}`;
-  await step('a bulb with its socket and cars', async () => {
+  // Owner, 8 Oct 2026: the item is made once — name, category, rate. Its
+  // kisms (socket, car, years) are chosen while writing the stock in.
+  await step('an item is made once: name, category, rate', async () => {
     const fam = sql(`select f.name from product_families f join spec_definitions d on d.family_id = f.id and d.code = 'socket' and d.is_variant_axis order by f.sort_order limit 1`);
     await go(page, '/admin/item', 6000);
+    check('item form asks for no socket or car', !(await visible(page, 'Socket / Base *')) && !(await visible(page, 'Creta, Swift, Nexon…')));
     await pickFrom(page, 'LED Bulb / Mats / Seat cover…', fam.slice(0, 5), fam);
     await page.waitForTimeout(1500);
     await page.getByLabel('Item ka naam').fill(tag);
     await page.getByLabel('Bechne ka rate').fill('999');
-    // Socket: chips or a list, whichever the family has.
-    const chip = page.getByRole('button', { name: 'H4', exact: true }).first();
-    if (await chip.isVisible().catch(() => false)) await chip.click();
-    else await pickFrom(page, 'Chuno…', 'H4', 'H4');
-    await pickFrom(page, 'Creta, Swift, Nexon…', 'Creta', 'Hyundai Creta');
-    await page.getByLabel('Saal se').fill('2019');
-    await page.getByLabel('Saal tak').fill('2023');
-    await page.getByRole('button', { name: /Gaadi jodo/i }).click();
-    await page.waitForTimeout(800);
     await page.getByRole('button', { name: /Item bana do/i }).click();
     await page.waitForTimeout(10000);
     const pid = sql(`select id from products where name = '${tag}'`);
     check('item reached the server', !!pid);
-    check('socket stored as a spec', sql(`select string_agg(display_value, ',') from spec_values where product_id = '${pid}'`).includes('H4'));
-    check('car stored with its years', sql(`select year_from || '-' || year_to from product_fitments where product_id = '${pid}'`) === '2019-2023');
-    // A kism is named by its car, then its socket: "Creta 2019–2023 · H4".
-    check('kism named by its car and socket', /^Creta 2019–2023 · H4/.test(sql(`select variant_name from product_variants where product_id = '${pid}'`)));
+    check('item has its rate', num(`select default_price from products where id = '${pid}'`) === 999);
+    check('item has no kism yet', num(`select count(*) from product_variants where product_id = '${pid}'`) === 0);
+
+    await go(page, '/admin/item', 6000);
+    await page.getByLabel('Item ka naam').fill(tag);
+    await page.waitForTimeout(2500);
+    check('typing an existing name offers that item', await visible(page, 'Ye item pehle se hai?'));
+  });
+
+  await step('stock in by item: kism, car, years, date', async () => {
+    const pid = sql(`select id from products where name = '${tag}'`);
+    if (!pid) throw new Error('no item from the step before');
+    await go(page, '/stock/add', 6000);
+    await pickFrom(page, 'Kis supplier se aaya?', SUPPLIER.slice(0, 6), SUPPLIER);
+    await page.getByRole('button', { name: 'Kal', exact: true }).locator('visible=true').first().click();
+    await stockItem(page, tag);
+    check('an item with no kism opens on its first kism', await visible(page, 'Is item ki pehli kism — detail aur gaadi chuno.'));
+    await socket(page, 'H4');
+    await pickFrom(page, 'Creta, Swift, Nexon…', 'Creta', 'Hyundai Creta');
+    check('a chosen car is on the kism at once', await page.getByText(/^Hyundai Creta\s+✕/).locator('visible=true').first().isVisible().catch(() => false));
+    await page.getByLabel('Saal se').locator('visible=true').first().fill('2019');
+    await page.getByLabel('Saal tak').locator('visible=true').first().fill('2023');
+    await lastVisible(page, 'Kitne aaye').fill('6');
+    await lastVisible(page, 'Kharid rate').fill('700');
+    await page.getByRole('button', { name: 'Line jodo' }).click();
+    await page.waitForTimeout(1200);
+
+    // The same kism chosen again as "new" is the one that exists.
+    await page.getByRole('button', { name: '+ Maal jodo' }).click();
+    await stockItem(page, tag);
+    await socket(page, 'H4');
+    await pickFrom(page, 'Creta, Swift, Nexon…', 'Creta', 'Hyundai Creta');
+    await page.getByLabel('Saal se').locator('visible=true').first().fill('2019');
+    await page.getByLabel('Saal tak').locator('visible=true').first().fill('2023');
+    await lastVisible(page, 'Kitne aaye').fill('1');
+    await page.getByRole('button', { name: 'Line jodo' }).click();
+    await page.waitForTimeout(1200);
+    check('the same new kism twice is one line', await visible(page, 'Maal · 1', false) || await visible(page, 'MAAL · 1', false));
+
+    await page.getByRole('button', { name: /7 pcs chadha do/i }).click();
+    await page.waitForTimeout(10000);
+    const kisms = sql(`select variant_name from product_variants where product_id = '${pid}'`);
+    check('one kism, named by its car and socket', /^Creta 2019–2023 · H4/.test(kisms) && !kisms.includes('\n'), kisms);
+    const vid = sql(`select id from product_variants where product_id = '${pid}'`);
+    check('socket stored on the kism', sql(`select string_agg(display_value, ',') from spec_values where variant_id = '${vid}'`).includes('H4'));
+    check('car stored with its years', sql(`select year_from || '-' || year_to from product_fitments where variant_id = '${vid}'`) === '2019-2023');
+    check('the kism took the item\'s rate', num(`select retail_price from product_variants where id = '${vid}'`) === 999);
+    check('7 pcs in stock', variantQty(vid) === 7, String(variantQty(vid)));
+    check('the entry is dated the day the maal came', sql(`select p.doc_date::text from purchases p join purchase_lines l on l.purchase_id = p.id where l.variant_id = '${vid}' limit 1`) === yesterday);
     await go(page, '/stock', 5000);
     await page.getByPlaceholder('SKU, barcode ya naam dhoondo').fill(tag);
     await page.waitForTimeout(2500);
@@ -308,19 +418,19 @@ let entryId = '';
   await step('the same item for another car is a new kism, not a new item', async () => {
     const pid = sql(`select id from products where name = '${tag}'`);
     if (!pid) throw new Error('no bulb item from the step before');
-    await go(page, '/admin/item', 6000);
-    await page.getByLabel('Item ka naam').fill(tag);
-    await page.waitForTimeout(2500);
-    check('typing an existing name offers that item', await visible(page, 'Ye item pehle se hai?'));
-    await page.getByRole('button', { name: 'Isi mein nayi kism' }).locator('visible=true').first().click();
-    await page.waitForTimeout(6000);
-    check('the kism form opens on the same item', await visible(page, 'Nayi kism') && await visible(page, tag));
-    await page.getByLabel('Bechne ka rate').fill('1099');
+    await go(page, '/stock/add', 6000);
+    await pickFrom(page, 'Kis supplier se aaya?', SUPPLIER.slice(0, 6), SUPPLIER);
+    await stockItem(page, tag);
+    check('the kism that exists is offered', await page.getByText(/^Creta 2019–2023 · H4.* · 7$/).locator('visible=true').first().isVisible().catch(() => false));
+    await page.getByText('+ Nayi kism', { exact: true }).locator('visible=true').first().click();
+    await socket(page, 'H4');
     await pickFrom(page, 'Creta, Swift, Nexon…', 'Swift', 'Maruti Suzuki Swift');
-    await page.getByLabel('Saal se').fill('2018');
-    await page.getByRole('button', { name: /Gaadi jodo/i }).click();
-    await page.waitForTimeout(800);
-    await page.getByRole('button', { name: /Item bana do/i }).click();
+    await page.getByLabel('Saal se').locator('visible=true').first().fill('2018');
+    await lastVisible(page, 'Kitne aaye').fill('2');
+    await lastVisible(page, 'Bechne ka rate').fill('1099');
+    await page.getByRole('button', { name: 'Line jodo' }).click();
+    await page.waitForTimeout(1200);
+    await page.getByRole('button', { name: /2 pcs chadha do/i }).click();
     await page.waitForTimeout(10000);
     check('still one item', num(`select count(*) from products where name = '${tag}'`) === 1);
     check('the item now has two kisms', num(`select count(*) from product_variants where product_id = '${pid}'`) === 2);
@@ -328,12 +438,23 @@ let entryId = '';
                                                   where pf.product_id = '${pid}' and vm.name = 'Swift' and pf.variant_id is not null`) === 1);
     check('the first kism kept its car', num(`select count(*) from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
                                                 where pf.product_id = '${pid}' and vm.name = 'Creta'`) === 1);
-    check('the new kism kept the socket', sql(`select string_agg(sv.display_value, ',') from spec_values sv join product_variants pv on pv.id = sv.variant_id
-                                                 where pv.product_id = '${pid}' and pv.variant_name like 'Swift%'`).includes('H4'));
+    check('the new kism has its own rate', num(`select retail_price from product_variants where product_id = '${pid}' and variant_name like 'Swift%'`) === 1099);
+  });
+
+  await step('category, party list and kharcha settings', async () => {
+    await go(page, '/admin/categories', 5000);
+    check('categories list opens', await visible(page, 'Category banao', false) || await visible(page, '+ Category banao', false));
+    const fam = sql(`select f.id from product_families f join spec_definitions d on d.family_id = f.id and d.code = 'socket' limit 1`);
+    await go(page, `/admin/categories?id=${fam}`, 5000);
+    check('a category shows its details', await visible(page, 'Socket / Base', false));
+    await go(page, '/parties?tab=supplier', 5000);
+    check('party list shows the suppliers', await visible(page, SUPPLIER));
+    await go(page, '/admin/settings', 5000);
+    check('kharcha types are set from settings', await visible(page, 'Kharche ke prakar', false));
   });
 
   await step('every new screen opens clean', async () => {
-    for (const path of ['/khata', '/khata?tab=supplier', '/hisab', '/kharab', '/reports', '/partner-paisa', '/purchases', '/admin/users', '/help', '/stock', '/more', '/requests']) {
+    for (const path of ['/khata', '/khata?tab=supplier', '/hisab', '/kharab', '/reports', '/partner-paisa', '/purchases', '/admin/users', '/help', '/stock', '/more', '/requests', '/parties', '/admin/categories']) {
       await go(page, path, 4500);
       const blank = (await page.locator('body').innerText().catch(() => '')).trim().length < 20;
       check(`opens ${path}`, !blank);

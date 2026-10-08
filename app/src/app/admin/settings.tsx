@@ -11,7 +11,7 @@ import { useSystem } from '@/lib/system';
 import { DEFAULT_TEMPLATES, openWhatsApp, reminderMessage } from '@/lib/whatsapp';
 import { useShopSettings } from '@/lib/use-settings';
 import { insertRow, updateRow } from '@/lib/writes';
-import { Button, Card, Input, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Button, Card, Chip, Input, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, SwitchRow, notify } from '@/ui/forms';
 import { radius, space } from '@/ui/theme';
 
@@ -47,6 +47,8 @@ export default function SettingsScreen() {
   const [form, setForm] = useState<Partial<Company>>({});
   const [dirty, setDirty] = useState(false);
   const [tpl, setTpl] = useState<Record<string, string>>({});
+  const [cats, setCats] = useState<string[] | null>(null);
+  const [newCat, setNewCat] = useState('');
   useEffect(() => { if (company && !dirty) setForm(company); }, [company, dirty]);
   const set = <K extends keyof Company>(k: K, v: Company[K]) => { setForm((f) => ({ ...f, [k]: v })); setDirty(true); };
   const readSetting = (id: string) => { const r = settings?.find((x) => x.id === id); if (!r) return null; try { return JSON.parse(r.value); } catch { return r.value; } };
@@ -124,6 +126,26 @@ export default function SettingsScreen() {
             </View>
           );
         })}
+      </Card>
+
+      {/* The kharcha chips — kept in app_settings so they change without a new app. */}
+      <SectionTitle>Kharche ke prakar</SectionTitle>
+      <Card style={{ gap: space.sm }}>
+        <Text variant="small" color="textMuted">Kharcha Likho mein ye chips aate hain. Tap karke hatao, neeche likh ke jodo.</Text>
+        <Row gap={space.xs} wrap>
+          {(cats ?? shop.expenseCategories).map((c) => (
+            <Chip key={c} label={editable ? `${c}  ✕` : c} selected onPress={editable ? () => setCats((cats ?? shop.expenseCategories).filter((x) => x !== c)) : undefined} />
+          ))}
+        </Row>
+        {editable ? (
+          <>
+            <Row gap={space.sm} align="flex-end">
+              <Input containerStyle={{ flex: 1 }} label="Naya prakar" value={newCat} onChangeText={setNewCat} placeholder="Courier, Mobile recharge…" />
+              <Button title="Jodo" disabled={!newCat.trim()} onPress={() => { const list = cats ?? shop.expenseCategories; if (!list.some((x) => x.toLowerCase() === newCat.trim().toLowerCase())) setCats([...list, newCat.trim()]); setNewCat(''); }} />
+            </Row>
+            <Button title="Kharche ke prakar save karo" tone="secondary" disabled={!cats} onPress={() => saveSetting('expense_categories', cats).then(() => { setCats(null); notify('Save ho gaya — sab phones par pahunch jayega.', 'ok'); })} />
+          </>
+        ) : null}
       </Card>
 
       <SectionTitle>Kaise chale</SectionTitle>

@@ -11,6 +11,9 @@ export const PERMISSIONS = [
   'catalog.edit',
   'catalog.edit_price',
   'catalog.view_cost',
+  // Add a kism (another car, colour, socket) to an existing item while writing
+  // stock in. Insert only — changing or removing a kism stays catalog.edit.
+  'catalog.add_kism',
   'purchase.create',
   // Stock a staff member writes in waits until an owner or admin checks the
   // count, puts the buy rate on it and approves. Only then does it count.

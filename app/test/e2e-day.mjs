@@ -162,13 +162,17 @@ console.log('\n▸ staff (godown): stock-in with a new supplier typed in, ginti'
     await page.waitForTimeout(800);
     await page.getByText(new RegExp(`Naya banao: .${tag}`)).first().click();
     await page.waitForTimeout(2000);
-    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+    // Stock Chadhao (8 Oct 2026): the item, then its kism, then how many.
+    await page.getByPlaceholder('Naam, category, SKU ya barcode').fill('xtreme');
     await page.waitForTimeout(2500);
-    await page.getByText(/X-tremeVision/i).first().click();
-    await page.waitForTimeout(2000);
+    await page.getByText(/ · \d+ kism$/).locator('visible=true').first().click();
+    await page.waitForTimeout(2500);
+    await page.getByText(/^H4 .* · -?\d+$/).locator('visible=true').first().click();
     // No rate: staff count the maal; the owner prices and approves it.
-    check('staff are not shown a buy-rate box', !(await page.getByLabel(/Kharid rate/).first().isVisible().catch(() => false)));
-    await page.getByRole('button', { name: /owner ko bhejo/i }).click();
+    check('staff are not shown a buy-rate box', !(await page.getByLabel(/Kharid rate/).locator('visible=true').first().isVisible().catch(() => false)));
+    await page.getByRole('button', { name: 'Line jodo' }).click();
+    await page.waitForTimeout(1200);
+    await page.getByRole('button', { name: /pcs owner ko bhejo/i }).click();
     await page.waitForTimeout(9000);
     const after = num("select count(*) from purchases where status='posted'");
     check('staff stock-in waits for approval, not posted', after === before, `${before} → ${after}`);
@@ -247,7 +251,8 @@ console.log('\n▸ purchase: return to the supplier');
     await go(page, '/stock', 5000);
     const chip = page.getByText(/Rate baaki \d+/).first();
     check('"Rate baaki" shown to the owner', await chip.isVisible().catch(() => false));
-    await go(page, `/admin/item?id=${pid}`, 6000);
+    // A kism's buy rate is set on the kism, not on the item.
+    await go(page, `/admin/item?id=${pid}&variant=${vid}`, 6000);
     await page.getByLabel('Kharid rate').first().fill('432');
     await page.waitForTimeout(600);
     await page.getByRole('button', { name: 'Badlav kar do' }).click();

@@ -27,6 +27,7 @@ import { insertRow, updateRow } from '@/lib/writes';
 import { Button, Card, Chip, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { NumberField, confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
+import { DateField } from '@/ui/date-field';
 
 type Partner = { id: string; full_name: string };
 type Entry = { id: string; party_id: string; partner: string; payment_date: string; direction: 'in' | 'out'; amount: number; mode: string; notes: string | null };
@@ -159,7 +160,7 @@ export default function PartnerPaisa() {
           </Row>
           <NumberField label="Kitna" value={amount} onChange={setAmount} />
           <Row gap={space.sm}>
-            <Input containerStyle={{ flex: 1 }} label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" autoCorrect={false} autoCapitalize="none" />
+            <View style={{ flex: 1 }}><DateField label="Kab" value={date} onChange={setDate} /></View>
           </Row>
           <Text variant="label" color="textMuted">Kaise</Text>
           <Row gap={space.xs} wrap>

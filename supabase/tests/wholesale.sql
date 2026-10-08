@@ -25,6 +25,8 @@ declare
   tid     uuid := gen_random_uuid();
   rid     uuid := gen_random_uuid();
   other   uuid;
+  item    uuid;
+  kid     uuid := gen_random_uuid();
   pass    int := 0;
   fail    int := 0;
   ok      boolean;
@@ -126,6 +128,44 @@ begin
     raise notice 'PASS  editing a pending request counts as a revision'; pass := pass + 1;
   else
     raise notice 'FAIL  pending request edit not marked'; fail := fail + 1;
+  end if;
+
+  -- 5f. Owner, 8 Oct 2026: staff add a kism to an item while stocking in —
+  -- the variant, its own detail and its cars...
+  select product_id into item from public.product_variants where id = variant;
+  insert into public.product_variants (id, product_id, variant_name, sku, retail_price, is_active)
+  values (kid, item, 'Test kism', 'TEST-KISM-' || left(kid::text, 8), 100, true);
+  insert into public.spec_values (product_id, variant_id, spec_definition_id, display_value)
+  values (item, kid, (select id from public.spec_definitions limit 1), 'X');
+  insert into public.product_fitments (product_id, variant_id, model_id)
+  values (item, kid, (select id from public.vehicle_models limit 1));
+  raise notice 'PASS  staff can add a kism with its detail and cars'; pass := pass + 1;
+
+  -- 5g. ...but neither make nor change the item itself.
+  begin
+    insert into public.products (family_id, name) values ((select family_id from public.products where id = item), 'Staff item');
+    raise notice 'FAIL  staff made an item directly'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  staff cannot make an item directly'; pass := pass + 1;
+  end;
+  update public.products set name = 'badla hua' where id = item;
+  if (select name <> 'badla hua' from public.products where id = item) then
+    raise notice 'PASS  staff cannot change an item'; pass := pass + 1;
+  else
+    raise notice 'FAIL  staff renamed an item'; fail := fail + 1;
+  end if;
+  begin
+    insert into public.spec_values (product_id, variant_id, spec_definition_id, display_value)
+    values (item, null, (select id from public.spec_definitions limit 1), 'Y');
+    raise notice 'FAIL  staff changed the item''s shared detail'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  staff cannot add to the item''s shared detail'; pass := pass + 1;
+  end;
+  update public.product_variants set retail_price = 1 where id = variant;
+  if (select retail_price <> 1 from public.product_variants where id = variant) then
+    raise notice 'PASS  staff cannot change a kism''s rate'; pass := pass + 1;
+  else
+    raise notice 'FAIL  staff changed a kism rate'; fail := fail + 1;
   end if;
 
   -- 7. The owner approves it.

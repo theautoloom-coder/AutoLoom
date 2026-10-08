@@ -89,6 +89,40 @@ describe('one item, many kisms', () => {
     expect(many<{ d: string }>(db, "SELECT display_value AS d FROM spec_values WHERE spec_definition_id = 'material'")).toEqual([{ d: 'PU' }]);
   });
 
+  // Owner, 8 Oct 2026: the item is made once — its kisms come with the stock.
+  it('an item made on its own has no kism yet, only its rate and shared detail', async () => {
+    const made = await db.writeTransaction(() => applyItemProposal(tx(), {
+      family_id: 'mat', family_name: 'Mats', name: 'ABC 7D Mat', master: true, price: 2400, cost: 1500,
+      specs: [spec('material', 'Leatherette', false), spec('colour', 'Black', true)],
+    }, { actor, locationId: 'main', takenSkus: new Set() }));
+    expect(made.variantId).toBe('');
+    expect(many(db, 'SELECT id FROM product_variants')).toHaveLength(0);
+    expect(one<{ p: number; c: number }>(db, 'SELECT default_price AS p, default_cost AS c FROM products WHERE id = ?', made.productId))
+      .toEqual({ p: 2400, c: 1500 });
+    // Only the shared detail is the item's; a kism's own detail waits for the kism.
+    expect(many(db, 'SELECT spec_definition_id AS d, variant_id AS v FROM spec_values')).toEqual([{ d: 'material', v: null }]);
+  });
+
+  it('a kism made by staff while stocking in does not change the item', async () => {
+    const item = await db.writeTransaction(() => applyItemProposal(tx(), {
+      family_id: 'mat', family_name: 'Mats', name: 'ABC 7D Mat', master: true, price: 2400, universal: true,
+    }, { actor, locationId: 'main', takenSkus: new Set() }));
+    const kism = await db.writeTransaction(() => applyItemProposal(tx(), {
+      family_id: 'mat', name: 'ABC 7D Mat', product_id: item.productId, product_name: 'ABC 7D Mat', price: 2400, qty: 0,
+      specs: [spec('colour', 'Black', true)],
+      fits: [{ model_id: 'creta', year_from: 2019, year_to: 2023, label: 'Creta 2019–2023', make: 'Hyundai' }],
+    }, { actor, locationId: 'main', takenSkus: new Set(), canEditItem: false }));
+    // Staff may add a kism, not rewrite the item: it stays "every car".
+    expect(one<{ u: number }>(db, 'SELECT is_universal_fit AS u FROM products WHERE id = ?', item.productId).u).toBeTruthy();
+    const v = one<{ n: string; sku: string; r: number }>(db, 'SELECT variant_name AS n, sku, retail_price AS r FROM product_variants WHERE id = ?', kism.variantId);
+    expect(v.n).toBe('Creta 2019–2023 · Black');
+    expect(v.r).toBe(2400);
+    // The SKU names the car and the colour.
+    expect(v.sku).toBe('MAT-ABC7DM-CRETA2-BLAC');
+    // qty 0: the stock comes with the entry's own lines, not twice.
+    expect(many(db, 'SELECT id FROM stock_movements')).toHaveLength(0);
+  });
+
   it('a bulb sold by socket, on every car, is named by its specs', () => {
     expect(variantNameOf({ specs: [spec('socket', 'H4', true), spec('watt', '60/55 W', true)], universal: true })).toBe('H4 · 60/55 W');
   });

@@ -76,10 +76,13 @@ export default function KhataScreen() {
       <Row style={{ justifyContent: 'space-between' }}>
         <Text variant="display">Khata</Text>
         {can('party.edit') ? (
-          <Button
-            title={isCustomer ? 'Naya grahak' : 'Naya supplier'}
-            onPress={() => router.push(isCustomer ? '/customer/edit' : '/supplier/edit')}
-          />
+          <Row gap={space.xs}>
+            <Button title="Saari list" tone="ghost" size="sm" onPress={() => router.push(`/parties?tab=${tab}` as never)} />
+            <Button
+              title={isCustomer ? 'Naya grahak' : 'Naya supplier'}
+              onPress={() => router.push(isCustomer ? '/customer/edit' : '/supplier/edit')}
+            />
+          </Row>
         ) : null}
       </Row>
 

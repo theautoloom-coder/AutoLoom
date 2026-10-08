@@ -27,6 +27,7 @@ import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/for
 import { LineCard, VariantPicker, type PickedVariant } from '@/ui/lines';
 import { space } from '@/ui/theme';
 import { PreparingDraft } from '@/ui/pending';
+import { DateField } from '@/ui/date-field';
 
 type Inv = { id: string; doc_type: 'invoice' | 'credit_note'; status: string; customer_id: string | null; customer_vehicle_id: string | null; location_id: string | null; price_list_id: string | null; doc_date: string; is_interstate: number; place_of_supply_state: string | null; other_charges: number; payment_mode: string | null; credit_days: number; notes: string | null; against_invoice_id: string | null; salesperson_id: string | null };
 type Line = DraftLine & { invoice_id: string; line_no: number; list_price: number | null; price_source: string | null; override_approved_by: string | null; return_condition: string | null; return_note: string | null; sku: string; avg_cost: number; min_selling_price: number | null; last_purchase_cost: number; retail_price: number; dealer_price: number | null; wholesale_price: number | null; here: number };
@@ -325,17 +326,7 @@ export default function InvoiceEdit() {
             {/* Already today's date — the draft was created with it. The job
                 here is only to stop autocorrect rewriting it on the rare day
                 somebody backdates a bill. */}
-            <Input
-              containerStyle={{ flex: 1 }}
-              label="Tareekh"
-              value={doc.doc_date}
-              onChangeText={(v) => patch({ doc_date: v })}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numbers-and-punctuation"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="done"
-            />
+            <View style={{ flex: 1 }}><DateField label="Bill ki tareekh" value={doc.doc_date} onChange={(v) => patch({ doc_date: v })} /></View>
           </Row>
         </FormSection>
 

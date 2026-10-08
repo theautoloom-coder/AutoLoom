@@ -25,7 +25,7 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { formatINR, isDateString, toDateString } from '@domain';
@@ -40,6 +40,7 @@ import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/for
 import { LineCard, VariantPicker, type PickedVariant } from '@/ui/lines';
 import { PreparingDraft } from '@/ui/pending';
 import { space } from '@/ui/theme';
+import { DateField } from '@/ui/date-field';
 
 type Purchase = {
   id: string; doc_type: 'purchase' | 'debit_note'; status: string; supplier_id: string | null; doc_date: string;
@@ -47,7 +48,7 @@ type Purchase = {
   submitted_at: string | null; submitted_by: string | null; supplier_invoice_no: string | null;
   created_by: string | null; revised_at: string | null;
 };
-type Line = DraftLine & { purchase_id: string; line_no: number; sku: string | null; last_cost: number; here: number };
+type Line = DraftLine & { purchase_id: string; line_no: number; sku: string | null; last_cost: number; here: number; retail_price: number };
 type SourceLine = DraftLine & { line_no: number; done: number };
 
 export default function PurchaseEdit() {
@@ -62,11 +63,14 @@ export default function PurchaseEdit() {
   const [creating, setCreating] = useState(false);
   const [posting, setPosting] = useState(false);
   const [backNote, setBackNote] = useState('');
+  // Kisms that had no selling rate when this opened keep their rate box while
+  // it is typed into — otherwise the first digit would make it disappear.
+  const unpricedKisms = useRef(new Set<string>());
 
   const { data: rows } = useQuery<Purchase>('SELECT * FROM purchases WHERE id = ?', [id ?? '']);
   const doc = rows?.[0] ?? null;
   const { data: lines } = useQuery<Line>(
-    `SELECT l.*, pv.sku, COALESCE(NULLIF(pv.last_purchase_cost, 0), pv.avg_cost, 0) AS last_cost,
+    `SELECT l.*, pv.sku, pv.retail_price, COALESCE(NULLIF(pv.last_purchase_cost, 0), pv.avg_cost, 0) AS last_cost,
             COALESCE((SELECT SUM(qty) FROM stock_on_hand s WHERE s.variant_id = l.variant_id AND s.location_id = p.location_id), 0) AS here
        FROM purchase_lines l JOIN purchases p ON p.id = l.purchase_id JOIN product_variants pv ON pv.id = l.variant_id
       WHERE l.purchase_id = ? ORDER BY l.line_no`, [id ?? '']);
@@ -333,7 +337,7 @@ export default function PurchaseEdit() {
             placeholder="Kis supplier ka maal?"
           />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Tareekh" value={doc.doc_date} onChangeText={(v) => patch({ doc_date: v })} placeholder="YYYY-MM-DD" editable={!locked} />
+            <View style={{ flex: 1 }}>{locked ? <Input label="Tareekh" value={doc.doc_date} editable={false} /> : <DateField label="Maal kab aaya" value={doc.doc_date} onChange={(v) => patch({ doc_date: v })} />}</View>
             <Input containerStyle={{ flex: 1 }} label="Supplier ka bill no." value={doc.supplier_invoice_no ?? ''} onChangeText={(v) => patch({ supplier_invoice_no: v || null })} autoCapitalize="characters" editable={!locked} />
           </Row>
         </FormSection>
@@ -372,6 +376,15 @@ export default function PurchaseEdit() {
                 </View>
               ) : null}
             </Row>
+            {/* A kism staff made with this entry has no selling rate yet. */}
+            {approver && doc.doc_type === 'purchase' && (!l.retail_price || unpricedKisms.current.has(l.variant_id)) ? (
+              <NumberField label="Bechne ka rate (nayi kism)" value={l.retail_price || null}
+                onChange={(v) => {
+                  unpricedKisms.current.add(l.variant_id);
+                  if (v && v > 0) updateRow(db, 'product_variants', l.variant_id, { retail_price: v, dealer_price: v });
+                }}
+                hint="Bill par yahi rate aayega" />
+            ) : null}
             {showCost && !l.rate && l.last_cost && approver ? (
               <Button title={`${formatINR(l.last_cost)} lagao`} tone="ghost" size="sm" onPress={() => patchLine(l.id, { rate: l.last_cost })} />
             ) : null}

@@ -26,6 +26,7 @@ import { View, type TextInput } from 'react-native';
 import { formatINR, toDateString } from '@domain';
 
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
+import { useShopSettings } from '@/lib/use-settings';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { insertRow } from '@/lib/writes';
@@ -33,9 +34,9 @@ import { Badge, Button, Card, Chip, Divider, Empty, Grid, Input, ListRow, Row, S
 import { Disclosure, confirm, notify } from '@/ui/forms';
 import { ItemPhoto, PhotoPicker } from '@/ui/photo';
 import { space, type as type_ } from '@/ui/theme';
+import { DateField } from '@/ui/date-field';
 
 /** What this shop actually spends on, in rough order of frequency. */
-const CATEGORIES = ['Transport', 'Petrol', 'Rent', 'Bijli', 'Loading', 'Packing', 'Repair', 'Chai/Pani', 'Aur kuch'];
 
 /**
  * Three ways money goes out, in the shop's words. `mode` on the row keeps the
@@ -61,6 +62,8 @@ type Window = 'aaj' | 'mahina' | 'sab';
 export default function KharchaLikho() {
   const { db } = useSystem();
   const { can, actor, locationId } = useSession();
+  // The chips come from Dukan settings (app_settings.expense_categories).
+  const shopSettings = useShopSettings();
   const mayRecord = can('expense.record');
 
   const [amountText, setAmountText] = useState('');
@@ -221,7 +224,7 @@ export default function KharchaLikho() {
               <View style={{ gap: space.sm }}>
                 <Text variant="label" color="textMuted">KIS CHEEZ KA</Text>
                 <Row gap={8} wrap>
-                  {CATEGORIES.map((c) => (
+                  {shopSettings.expenseCategories.map((c) => (
                     <Chip key={c} label={c} selected={category === c} onPress={() => setCategory(c)} />
                   ))}
                 </Row>
@@ -276,19 +279,7 @@ export default function KharchaLikho() {
 
               {/* Autocorrect on a date turns 2026-09-29 into something the
                   parser will not take, and it does it silently. */}
-              <Input
-                ref={dateRef}
-                label="Tareekh"
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                hint="Aaj ki tareekh pehle se bhari hai."
-                keyboardType="numbers-and-punctuation"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={() => { if (ready && !saving) save(); }}
-              />
+              <DateField label="Kab hua" value={date} onChange={setDate} />
 
               <Button
                 title={ready ? `${formatINR(amount)} ka kharcha likh do` : 'Kharcha likh do'}

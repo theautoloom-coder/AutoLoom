@@ -21,6 +21,7 @@ import { dayLabel } from '@/lib/words';
 import { Badge, Button, Card, Chip, Divider, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
+import { DateField } from '@/ui/date-field';
 
 type Party = { id: string; name: string; mobile: string | null; balance: number };
 type OpenDoc = { id: string; doc_no: string; doc_date: string; outstanding: number; due_date: string | null };
@@ -146,8 +147,8 @@ export default function PaymentEdit() {
           <NumberField label="Kitne rupaye (₹)" value={amount} onChange={setAmount} />
           <Text variant="label" color="textMuted">Kaise aaya</Text>
           <Row gap={space.xs} wrap>{MODES.map((m) => <Chip key={m.value} label={m.label} selected={mode === m.value} onPress={() => setMode(m.value)} />)}</Row>
+          <DateField label="Paisa kab aaya" value={date} onChange={setDate} />
           <Row gap={12}>
-            <Input containerStyle={{ flex: 1 }} label="Tareekh" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
             <Input containerStyle={{ flex: 1 }} label={mode === 'cheque' ? 'Cheque number' : mode === 'upi' ? 'UPI ref / UTR' : 'Ref number (ho to)'} value={ref} onChangeText={setRef} autoCapitalize="characters" />
           </Row>
           <Input label="Remarks · kis account mein aaya / kisne liya" value={remarks} onChangeText={setRemarks} placeholder="Rakesh ji ke HDFC me · Ramesh ne cash liya" />

@@ -73,7 +73,7 @@ export function ItemPhoto({
  * appearing to succeed — a photo that vanishes is worse than one never taken.
  */
 export function PhotoPicker({
-  variantId,
+  folder,
   path,
   localUri,
   name,
@@ -85,11 +85,11 @@ export function PhotoPicker({
   /** The line under the buttons, before a photo is chosen. */
   hint?: string;
   /**
-   * Where the file is filed. Not the name: names have spaces and slashes.
-   * Absent while a brand new item is still being typed — it has no variant to
-   * hang a photo on yet, so the photo waits with `onPickLocal` until save.
+   * Where the file is filed — the item's id. Not the name: names have spaces
+   * and slashes. Absent while a brand new item is still being typed — it has
+   * no id yet, so the photo waits with `onPickLocal` until save.
    */
-  variantId?: string | null;
+  folder?: string | null;
   path?: string | null;
   /** A photo chosen but not yet uploaded, shown so it does not look ignored. */
   localUri?: string | null;
@@ -107,12 +107,12 @@ export function PhotoPicker({
     try {
       const picked = await pickPhoto(source);
       if (!picked) return;
-      if (!variantId) {
+      if (!folder) {
         // Nothing to attach it to yet. Hold it; the form uploads after save.
         onPickLocal?.(picked);
         return;
       }
-      const stored = await uploadPhoto(picked, variantId);
+      const stored = await uploadPhoto(picked, folder);
       await onChange?.(stored);
       notify('Photo lag gayi.', 'ok');
     } catch (e) {

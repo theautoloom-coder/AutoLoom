@@ -18,7 +18,7 @@ import { View } from 'react-native';
 import { formatINR, toDateString } from '@domain';
 
 import { dispatchTransfer, postAdjustment } from '@/lib/posting';
-import { SPECS_OF } from '@/lib/queries';
+import { PHOTO_OF, SPECS_OF } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { dayLabel } from '@/lib/words';
@@ -50,7 +50,7 @@ export default function KharabScreen() {
     SELECT s.variant_id, p.id AS product_id, p.name AS product_name, pv.variant_name, pv.sku, s.qty,
            COALESCE(NULLIF(pv.avg_cost, 0), pv.last_purchase_cost, 0) AS avg_cost,
            ${SPECS_OF('p', 'pv')} AS specs,
-           (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
+           ${PHOTO_OF('p', 'pv')} AS photo_path
       FROM stock_on_hand s
       JOIN product_variants pv ON pv.id = s.variant_id
       JOIN products p ON p.id = pv.product_id

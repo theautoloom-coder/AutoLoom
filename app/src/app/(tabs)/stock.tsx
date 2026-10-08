@@ -19,7 +19,7 @@ import { View } from 'react-native';
 
 import { formatINR, formatINRShort } from '@domain';
 
-import { SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/queries';
+import { PHOTO_OF, SEARCH_VARIANTS, STOCK_VALUE_BY_LOCATION, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { Badge, Card, Chip, Empty, Grid, Input, ListRow, Row, Screen, SectionTitle, StatTile, Text } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
@@ -70,7 +70,7 @@ export default function StockScreen() {
   const waitingCount = waiting?.[0]?.n ?? 0;
   const { data: negative } = useQuery<{ id: string; sku: string; product_name: string; variant_name: string; location: string; qty: number; photo_path: string | null }>(
     `SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, l.name AS location, s.qty,
-            (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
+            ${PHOTO_OF('p', 'pv')} AS photo_path
        FROM stock_on_hand s
        JOIN locations l ON l.id = s.location_id
        JOIN product_variants pv ON pv.id = s.variant_id

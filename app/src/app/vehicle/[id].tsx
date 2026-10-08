@@ -28,7 +28,7 @@ import { View } from 'react-native';
 
 import { formatINR, generationForYear } from '@domain';
 
-import { SELLABLE_QTY, SPECS_OF, VEHICLE_GENERATIONS, VEHICLE_MODEL, VEHICLE_PRODUCTS } from '@/lib/queries';
+import { PHOTO_OF, SELLABLE_QTY, SPECS_OF, VEHICLE_GENERATIONS, VEHICLE_MODEL, VEHICLE_PRODUCTS } from '@/lib/queries';
 import { Badge, Card, Chip, Empty, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { ItemPhoto } from '@/ui/photo';
 import { space } from '@/ui/theme';
@@ -80,7 +80,7 @@ export default function VehicleScreen() {
            f.name AS family_name, NULL AS position, sv.display_value AS socket,
            ${SPECS_OF('p', 'pv')} AS specs,
            ${SELLABLE_QTY('pv')} AS qty,
-           (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
+           ${PHOTO_OF('p', 'pv')} AS photo_path
       FROM spec_values sv
       JOIN spec_definitions sd ON sd.id = sv.spec_definition_id AND sd.code = 'socket'
       JOIN products p ON p.id = sv.product_id AND p.is_active = 1

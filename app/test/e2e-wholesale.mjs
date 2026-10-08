@@ -414,6 +414,32 @@ let entryId = '';
     check('stock list shows the car and years', await page.getByText(/Creta 2019–2023/).first().isVisible().catch(() => false));
   });
 
+  // Owner, 8 Oct 2026: "images show nahi hori jo upload karo". The photo is
+  // the item's, so it shows on every kism — and it must really reach storage.
+  await step('a photo on the item reaches storage and shows on its kism', async () => {
+    const pid = sql(`select id from products where name = '${tag}'`);
+    if (!pid) throw new Error('no item from the step before');
+    await go(page, `/admin/item?id=${pid}`, 6000);
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser', { timeout: 15000 }),
+      page.getByRole('button', { name: 'Gallery se' }).locator('visible=true').first().click(),
+    ]);
+    await chooser.setFiles('assets/images/icon.png');
+    let path = '';
+    for (let i = 0; i < 10 && !path; i++) {
+      await page.waitForTimeout(2000);
+      path = sql(`select storage_path from product_images where product_id = '${pid}' and variant_id is null limit 1`);
+    }
+    check('the item photo row reached the server', !!path, path);
+    const size = num(`select coalesce((metadata->>'size')::int, 0) from storage.objects where bucket_id = 'item-photos' and name = '${path}'`);
+    check('the photo file is in storage, not empty', size > 0, `${size} bytes`);
+    await go(page, '/stock', 5000);
+    await page.getByPlaceholder('SKU, barcode ya naam dhoondo').fill(tag);
+    await page.waitForTimeout(3000);
+    const shown = await page.locator(`img[src*="${path}"]`).locator('visible=true').count().catch(() => 0);
+    check('the kism shows the item photo in the stock list', shown > 0);
+  });
+
   // Owner, 7 Oct 2026: an item made once is not made again for another car.
   await step('the same item for another car is a new kism, not a new item', async () => {
     const pid = sql(`select id from products where name = '${tag}'`);

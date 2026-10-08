@@ -477,7 +477,7 @@ export default function KismForm() {
 
         <FormSection title="Maal" hint="Category, naam, qty aur rate.">
           <PhotoPicker
-            variantId={existing?.variant_id}
+            folder={existing?.id}
             path={photo?.storage_path}
             localUri={pendingPhoto?.uri}
             name={name || 'Item'}

@@ -25,10 +25,12 @@ import {
 import { tokenClause, tokenize } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
+import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
 import { insertRow, searchText, updateRow } from '@/lib/writes';
 import { Badge, Button, Card, Chip, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { SpecFields, buildSpecs, toVal, useFamilySpecs, type SpecRow, type SpecVal } from '@/ui/catalog-fields';
 import { FormSection, NumberField, SelectField, notify } from '@/ui/forms';
+import { PhotoPicker } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
 import KismForm from './kism';
@@ -69,6 +71,22 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
             COALESCE((SELECT SUM(s.qty) FROM stock_on_hand s JOIN locations l ON l.id = s.location_id
                        WHERE s.variant_id = pv.id AND l.type <> 'damaged'), 0) AS qty
        FROM product_variants pv WHERE pv.product_id = ? AND pv.is_active = 1 ORDER BY pv.sort_order, pv.variant_name`, [id ?? '']);
+
+  // The item's photo: one picture of the box, shown on every kism that has
+  // none of its own. A new item has no id yet, so its photo waits for save.
+  const { data: photoRows } = useQuery<{ id: string; storage_path: string }>(
+    'SELECT id, storage_path FROM product_images WHERE product_id = ? AND variant_id IS NULL ORDER BY sort_order LIMIT 1', [id ?? '']);
+  const photo = photoRows?.[0] ?? null;
+  const [pendingPhoto, setPendingPhoto] = useState<PickedPhoto | null>(null);
+  async function setItemPhoto(storagePath: string | null) {
+    if (!item) return;
+    if (storagePath) {
+      if (photo) await updateRow(db, 'product_images', photo.id, { storage_path: storagePath });
+      else await insertRow(db, 'product_images', { product_id: item.id, variant_id: null, storage_path: storagePath, sort_order: 0 }, actor);
+    } else if (photo) {
+      await db.execute('DELETE FROM product_images WHERE id = ?', [photo.id]);
+    }
+  }
 
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [newFamilyName, setNewFamilyName] = useState('');
@@ -185,6 +203,16 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
       }
       const made = await db.writeTransaction((tx) => applyItemProposal(tx, p, { actor, locationId, takenSkus: new Set() }));
       notify('Item ban gaya.', 'ok');
+      // The photo goes up once the item has an id. If it fails the item is
+      // still made, and says so.
+      if (pendingPhoto) {
+        try {
+          const stored = await uploadPhoto(pendingPhoto, made.productId);
+          await insertRow(db, 'product_images', { product_id: made.productId, variant_id: null, storage_path: stored, sort_order: 0 }, actor);
+        } catch (e) {
+          notify(`Item ban gaya, par photo nahi chadhi: ${String((e as Error).message ?? e)}. Item kholke dobara lagao.`, 'danger');
+        }
+      }
       // From Stock Chadhao: back there — the kism is chosen with the stock.
       // From a bill: on to its first kism, so the bill can go on.
       if (back === '/stock/add' && router.canGoBack()) router.back();
@@ -245,6 +273,13 @@ function ItemMaster({ request, proposal }: { request: ChangeRequest | null; prop
             <Chip label="Har gaadi mein lagta hai" selected={universal} onPress={() => setUniversal(!universal)} />
           </Row>
         </FormSection>
+
+        {canEdit ? (
+          <FormSection title="Photo" hint="Ek photo poore item ki — jis kism ki apni photo nahi, us par yahi dikhegi.">
+            <PhotoPicker folder={item?.id} path={photo?.storage_path} localUri={pendingPhoto?.uri} name={name || 'Item'}
+              onChange={setItemPhoto} onPickLocal={setPendingPhoto} />
+          </FormSection>
+        ) : null}
 
         {sharedDefs.length > 0 ? (
           <FormSection title="Common detail" hint="Jo is item ki har kism mein same hai.">

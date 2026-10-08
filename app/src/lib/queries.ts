@@ -69,6 +69,16 @@ export const SELLABLE_QTY = (pv: string) => `
              WHERE sl.variant_id = ${pv}.id
                AND sl.location_id NOT IN (SELECT id FROM locations WHERE type = 'damaged')), 0)`;
 
+/**
+ * A kism's photo: its own if it has one, else the item's. The item's photo
+ * (variant_id NULL) is the usual one since 8 Oct 2026 — an item is made
+ * before any of its kisms exist, and one photo of the box serves them all.
+ */
+export const PHOTO_OF = (p: string, pv: string) => `
+  COALESCE(
+    (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = ${pv}.id ORDER BY pi.sort_order LIMIT 1),
+    (SELECT pi.storage_path FROM product_images pi WHERE pi.product_id = ${p}.id AND pi.variant_id IS NULL ORDER BY pi.sort_order LIMIT 1))`;
+
 export const SEARCH_VARIANTS = (tokens: string[], limit = 40) => {
   const { sql, params } = tokenClause('pv.search_text', tokens);
   return {
@@ -80,8 +90,7 @@ export const SEARCH_VARIANTS = (tokens: string[], limit = 40) => {
              ${SPECS_OF('p', 'pv')} AS specs,
              ${FITS_OF('p', 'pv')} AS fits,
              ${SELLABLE_QTY('pv')} AS qty,
-             (SELECT pi.storage_path FROM product_images pi
-               WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
+             ${PHOTO_OF('p', 'pv')} AS photo_path
       FROM product_variants pv
       JOIN products p ON p.id = pv.product_id
       LEFT JOIN brands b ON b.id = p.brand_id
@@ -177,7 +186,7 @@ export const VEHICLE_PRODUCTS = {
            b.name AS brand_name, f.name AS family_name, f.sort_order AS family_sort,
            pf.position,
            ${SELLABLE_QTY('pv')} AS qty,
-           (SELECT pi.storage_path FROM product_images pi WHERE pi.variant_id = pv.id ORDER BY pi.sort_order LIMIT 1) AS photo_path
+           ${PHOTO_OF('p', 'pv')} AS photo_path
     FROM product_fitments pf
     JOIN products p ON p.id = pf.product_id AND p.is_active = 1
     JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = 1

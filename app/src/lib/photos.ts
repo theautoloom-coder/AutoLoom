@@ -77,12 +77,42 @@ async function shrink(uri: string): Promise<PickedPhoto> {
 }
 
 /**
+ * The photo's bytes, as something supabase-js can send.
+ *
+ * On a phone `fetch(file://…).blob()` hands back a Blob that React Native
+ * cannot turn into a request body, so the upload carried nothing and every
+ * photo taken on the APK was lost (8 Oct 2026: not one file had ever reached
+ * storage). The file is read through expo-file-system instead, as an
+ * ArrayBuffer — what the Supabase guide for React Native uploads uses. The
+ * browser's own blob is fine as it is.
+ */
+async function bytesOf(uri: string): Promise<ArrayBuffer | Blob> {
+  if (Platform.OS === 'web') return (await fetch(uri)).blob();
+  try {
+    const { File } = require('expo-file-system') as typeof import('expo-file-system');
+    return await new File(uri).arrayBuffer();
+  } catch {
+    // Some gallery apps hand back a uri the new API will not open; the
+    // older one reads it as base64, which is turned back into bytes here.
+    const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+    const b64 = await legacy.readAsStringAsync(uri, { encoding: legacy.EncodingType.Base64 });
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out.buffer;
+  }
+}
+
+/**
  * Upload the bytes and return the storage path to record on the row.
+ * `folder` is only where the file is filed — the item's id, or 'bills'.
  * Throws when offline — the caller must say so rather than pretend.
  */
-export async function uploadPhoto(photo: PickedPhoto, variantId: string): Promise<string> {
-  const path = `${variantId}/${uuidv7().slice(-8)}.jpg`;
-  const body = await (await fetch(photo.uri)).blob();
+export async function uploadPhoto(photo: PickedPhoto, folder: string): Promise<string> {
+  const path = `${folder}/${uuidv7().slice(-8)}.jpg`;
+  const body = await bytesOf(photo.uri);
+  const size = body instanceof ArrayBuffer ? body.byteLength : body.size;
+  if (!size) throw new Error('photo khaali nikli — dobara lo');
   const { error } = await supabase.storage
     .from(PHOTO_BUCKET)
     .upload(path, body, { contentType: 'image/jpeg', upsert: false });

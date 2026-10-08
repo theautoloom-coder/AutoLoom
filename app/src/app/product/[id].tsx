@@ -125,10 +125,14 @@ export default function ProductScreen() {
   const totalQty = (locStock ?? []).filter((l) => l.type !== 'damaged').reduce((a, l) => a + l.qty, 0);
   const kharabQty = (locStock ?? []).filter((l) => l.type === 'damaged').reduce((a, l) => a + l.qty, 0);
 
-  // The photo for whichever variant is selected, and the plumbing to set it.
-  const { data: photoRows } = useQuery<{ id: string; storage_path: string }>(
-    'SELECT id, storage_path FROM product_images WHERE variant_id = ? ORDER BY sort_order LIMIT 1',
-    [variant?.id ?? '']
+  // The photo: the selected kism's own if it has one, else the item's. An
+  // item made in the item master has no kism yet, and its photo must still
+  // be settable — it used to need a kism and did nothing without one.
+  const { data: photoRows } = useQuery<{ id: string; storage_path: string; variant_id: string | null }>(
+    `SELECT id, storage_path, variant_id FROM product_images
+      WHERE product_id = ? AND (variant_id IS NULL OR variant_id = ?)
+      ORDER BY CASE WHEN variant_id IS NULL THEN 1 ELSE 0 END, sort_order LIMIT 1`,
+    [productId, variant?.id ?? '']
   );
   const photo = photoRows?.[0] ?? null;
 
@@ -140,12 +144,13 @@ export default function ProductScreen() {
     );
   }
 
+  // A new photo replaces the one showing — the kism's own if it has one,
+  // else the item's, which every kism shows.
   async function setPhoto(storagePath: string | null) {
-    if (!variant) return;
     if (storagePath) {
       if (photo) await updateRow(db, 'product_images', photo.id, { storage_path: storagePath });
       else await insertRow(db, 'product_images', {
-        product_id: product.id, variant_id: variant.id, storage_path: storagePath, sort_order: 0,
+        product_id: product!.id, variant_id: null, storage_path: storagePath, sort_order: 0,
       }, actor);
     } else if (photo) {
       await db.execute('DELETE FROM product_images WHERE id = ?', [photo.id]);
@@ -160,7 +165,7 @@ export default function ProductScreen() {
           {/* What the thing actually looks like — the reason someone opened
               this page instead of trusting the SKU. */}
           <PhotoPicker
-            variantId={variant?.id}
+            folder={product.id}
             path={photo?.storage_path}
             name={product.name}
             onChange={setPhoto}

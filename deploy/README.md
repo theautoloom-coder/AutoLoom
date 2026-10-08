@@ -63,15 +63,26 @@ node scripts/ship-update.mjs "Kya badla, ek line mein"
 
 It exports the Android bundle against production, refuses a bundle that does
 not point at the production Supabase, and publishes it to the `production`
-channel. Each phone picks it up the next time the app opens or comes back to
-the front ("Naya version aa gaya — Abhi lagao"), or on its next launch.
+channel. Updates are compulsory (8 Oct 2026, `src/ui/app-updates.tsx`):
+opening the app puts the newest version on first ("Naya version lag raha
+hai…", giving up after 8 s with no signal), and so does coming back to it
+after 2 minutes or more away. Back sooner (a photo, WhatsApp from a bill), it
+shows a banner with no ✕ and goes on at the next break or "Abhi lagao".
 `node scripts/eas.mjs update:list --branch production` shows what is live.
 
 A new APK is needed only when the native layer changes — a new native module,
 a permission, an Expo SDK upgrade. Then raise `runtimeVersion` in `app.json`
 (so older APKs are not sent code they cannot run) and build with
 `node scripts/build-apk-local.mjs --prebuild`, since the update settings are
-native configuration.
+native configuration. Once the new APK is on the download page, retire the
+old ones: every phone below the new runtime then shows only "Nayi APK chahiye"
+with the download button.
+
+```sql
+insert into app_settings (id, value, description)
+values ('min_runtime_version', '"2"', 'Isse purani APK band — Nayi APK chahiye')
+on conflict (id) do update set value = excluded.value;
+```
 
 ## On the iPhone
 

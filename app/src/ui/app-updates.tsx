@@ -1,72 +1,160 @@
 /**
  * Over-the-air updates (owner, 7 Oct 2026: "apk dynamic banado — bar bar
- * change na karni pade").
+ * change na karni pade"), made compulsory (8 Oct 2026: "app ko force update
+ * laga sakte hai?").
  *
  * The APK carries the native layer; the app itself — every screen, rule and
  * word — comes from EAS Update, published with `node scripts/ship-update.mjs`.
- * A phone checks when the app opens and whenever it comes back to the front
- * (at most every 15 minutes), downloads a new version in the background, and
- * offers it. Nobody is pulled out of a half-written bill: if the button is not
- * pressed, the new version simply starts on the next launch.
+ *
+ *   · Opening the app: the newest version is fetched and put on before
+ *     anything else, behind a "Naya version lag raha hai…" screen. With no
+ *     signal it gives up after a few seconds and opens what it has.
+ *   · Coming back to the app after a while away (2 min+): the same — nobody
+ *     is mid-bill after a break, and a phone left open all day still updates.
+ *   · Back within 2 minutes (a photo taken, WhatsApp opened from a bill): it
+ *     is never pulled out from under the person. A banner with no ✕ says a
+ *     new version is waiting; it goes on with "Abhi lagao" or at the next
+ *     break.
  *
  * A new APK is needed only when the native layer changes (a new native module,
- * a permission, an Expo SDK upgrade) — then app.json's runtimeVersion goes up
- * and older APKs stop receiving updates meant for the new one.
+ * a permission, an Expo SDK upgrade); app.json's runtimeVersion then goes up
+ * and older APKs stop receiving updates. To stop those older APKs being used,
+ * set app_settings 'min_runtime_version' to the new runtime: a phone below it
+ * shows only "Nayi APK chahiye" with the download button. That screen is in
+ * this JS, which every APK already has — so it reaches them before the cut.
  */
+import { useQuery } from '@powersync/react';
 import * as Updates from 'expo-updates';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Platform, Pressable, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, View } from 'react-native';
 
 import { Text, useTheme } from './index';
 import { radius, space } from './theme';
 
-const EVERY_MS = 15 * 60 * 1000;
+/** How long opening the app waits for a new version before giving up. */
+const LAUNCH_WAIT_MS = 8000;
+/** Away at least this long and the update goes on when the app is back. */
+const AWAY_MS = 2 * 60 * 1000;
+/** Back sooner than that: check at most this often. */
+const RECHECK_MS = 5 * 60 * 1000;
+const APK_URL = 'https://app.theautoloom.in/download/autoloom.apk';
+
+const otaOn = () => Platform.OS !== 'web' && Updates.isEnabled && !__DEV__;
+
+/** Fetch a newer version if there is one. True when one is downloaded. */
+async function fetchNewer(): Promise<boolean> {
+  const found = await Updates.checkForUpdateAsync();
+  if (!found.isAvailable) return false;
+  const got = await Updates.fetchUpdateAsync();
+  return got.isNew;
+}
 
 export function AppUpdates() {
   const t = useTheme();
-  const [ready, setReady] = useState(false);
-  const [applying, setApplying] = useState(false);
+  // 'checking' covers the app while opening; 'applying' while it restarts.
+  const [cover, setCover] = useState<null | 'checking' | 'applying'>(otaOn() ? 'checking' : null);
+  const [waiting, setWaiting] = useState(false);
   const lastCheck = useRef(0);
+  const awaySince = useRef<number | null>(null);
 
-  const check = useCallback(async () => {
-    if (Platform.OS === 'web' || !Updates.isEnabled || __DEV__) return;
-    if (Date.now() - lastCheck.current < EVERY_MS) return;
-    lastCheck.current = Date.now();
-    try {
-      const found = await Updates.checkForUpdateAsync();
-      if (!found.isAvailable) return;
-      const got = await Updates.fetchUpdateAsync();
-      if (got.isNew) setReady(true);
-    } catch {
-      // Offline or the update server is unreachable: the app keeps running
-      // the version it has, and tries again next time it comes to the front.
-    }
+  const apply = useCallback(async () => {
+    setCover('applying');
+    try { await Updates.reloadAsync(); } catch { setCover(null); setWaiting(true); }
   }, []);
 
+  // Opening the app: put the newest version on first.
   useEffect(() => {
-    check();
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') check(); });
-    return () => sub.remove();
-  }, [check]);
+    if (!otaOn()) return;
+    let late = false;
+    lastCheck.current = Date.now();
+    const giveUp = setTimeout(() => { late = true; setCover(null); }, LAUNCH_WAIT_MS);
+    fetchNewer()
+      .then((isNew) => {
+        clearTimeout(giveUp);
+        if (!isNew) { setCover(null); return; }
+        // Arrived after the app had opened: the person is already working.
+        if (late) setWaiting(true); else apply();
+      })
+      .catch(() => { clearTimeout(giveUp); setCover(null); });
+    return () => clearTimeout(giveUp);
+  }, [apply]);
 
-  if (!ready) return null;
+  // Back to the app.
+  useEffect(() => {
+    if (!otaOn()) return;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active') { if (awaySince.current == null) awaySince.current = Date.now(); return; }
+      const away = awaySince.current ? Date.now() - awaySince.current : 0;
+      awaySince.current = null;
+      const long = away >= AWAY_MS;
+      if (waiting) { if (long) apply(); return; }
+      if (!long && Date.now() - lastCheck.current < RECHECK_MS) return;
+      lastCheck.current = Date.now();
+      if (long) setCover('checking');
+      fetchNewer()
+        .then((isNew) => { if (isNew && long) apply(); else { setCover(null); if (isNew) setWaiting(true); } })
+        .catch(() => setCover(null));
+    });
+    return () => sub.remove();
+  }, [apply, waiting]);
+
+  // An APK too old for the app the shop now runs.
+  const { data: minRows } = useQuery<{ value: string }>("SELECT value FROM app_settings WHERE id = 'min_runtime_version'");
+  const min = (() => { const v = minRows?.[0]?.value; if (!v) return null; try { return String(JSON.parse(v)); } catch { return v; } })();
+  const tooOld = Platform.OS !== 'web' && !!min && !!Updates.runtimeVersion && Number(Updates.runtimeVersion) < Number(min);
+
+  if (tooOld) {
+    return (
+      <Cover>
+        <Text variant="title" style={{ textAlign: 'center' }}>Nayi APK chahiye</Text>
+        <Text color="textMuted" style={{ textAlign: 'center' }}>
+          Ye APK purani ho gayi hai. Nayi APK download karke install karo — aapka saara data waisa hi rahega.
+        </Text>
+        <Pressable accessibilityRole="button" onPress={() => Linking.openURL(APK_URL)}
+          style={({ pressed }) => ({ paddingVertical: 14, paddingHorizontal: 22, borderRadius: radius.md, backgroundColor: t.accent, opacity: pressed ? 0.7 : 1 })}>
+          <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>Nayi APK download karo</Text>
+        </Pressable>
+      </Cover>
+    );
+  }
+
+  if (cover) {
+    return (
+      <Cover>
+        <Text variant="title" style={{ textAlign: 'center' }}>{cover === 'applying' ? 'Naya version lag raha hai…' : 'Naya version dekh rahe hain…'}</Text>
+        <Text color="textMuted" style={{ textAlign: 'center' }}>Bas kuch second.</Text>
+      </Cover>
+    );
+  }
+
+  if (!waiting) return null;
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: space.md, right: space.md, top: space.xxl + space.md }}>
       <View style={{
         flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md,
         borderRadius: radius.lg, backgroundColor: t.navy,
       }}>
-        <Text style={{ flex: 1 }} color="navyText">Naya version aa gaya.</Text>
+        <Text style={{ flex: 1 }} color="navyText">Naya version aa gaya — kaam save karke lagao.</Text>
         <Pressable
           accessibilityRole="button"
-          onPress={async () => { setApplying(true); try { await Updates.reloadAsync(); } catch { setApplying(false); } }}
-          style={({ pressed }) => ({ paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.md, backgroundColor: t.accent, opacity: pressed || applying ? 0.7 : 1 })}>
-          <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>{applying ? 'Lag raha hai…' : 'Abhi lagao'}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Baad mein" onPress={() => setReady(false)} hitSlop={10}>
-          <Text color="navyText">✕</Text>
+          onPress={apply}
+          style={({ pressed }) => ({ paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.md, backgroundColor: t.accent, opacity: pressed ? 0.7 : 1 })}>
+          <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>Abhi lagao</Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+/** A full screen over the app: nothing behind it can be tapped. */
+function Cover({ children }: { children: React.ReactNode }) {
+  const t = useTheme();
+  return (
+    <View style={{
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: t.bg,
+      alignItems: 'center', justifyContent: 'center', gap: space.md, padding: space.xl,
+    }}>
+      {children}
     </View>
   );
 }

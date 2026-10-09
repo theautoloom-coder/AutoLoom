@@ -32,7 +32,7 @@ import { insertRow, updateRow } from '@/lib/writes';
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
 import { Button, Card, Chip, Input, Row, Screen, Text } from '@/ui';
 import { Disclosure, FormSection, NumberField, SelectField, notify } from '@/ui/forms';
-import { CarPicker, badYears } from '@/ui/catalog-fields';
+import { CarPicker, badYears, kismSignature } from '@/ui/catalog-fields';
 import { PhotoPicker } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
@@ -368,10 +368,31 @@ export default function KismForm() {
     return gap ? `${gap.name} chuno.` : null;
   }
 
+  /**
+   * Another kism of this item that the change would make this one identical
+   * to — the same details and the same cars. Two such kisms split one shelf's
+   * stock between them, so the change is refused instead.
+   */
+  function twinAfterChange(p: ItemProposal): boolean {
+    if (!existing) return false;
+    const axis = new Set((defs ?? []).filter((d) => d.is_variant_axis).map((d) => d.id));
+    const mine = kismSignature((p.specs ?? []).filter((sp) => axis.has(sp.def_id)), p.universal ? [] : fitsOf(p));
+    const others = new Set([...(specRows ?? []).map((r) => r.variant_id), ...(fitRows ?? []).map((f) => f.variant_id)]
+      .filter((v): v is string => !!v && v !== existing.variant_id));
+    for (const vid of others) {
+      const theirs = kismSignature(
+        (specRows ?? []).filter((r) => r.variant_id === vid && axis.has(r.spec_definition_id)).map((r) => ({ def_id: r.spec_definition_id, display: r.display_value ?? '' })),
+        (fitRows ?? []).filter((f) => f.variant_id === vid).map((f) => ({ model_id: f.model_id, year_from: f.year_from, year_to: f.year_to })));
+      if (theirs === mine) return true;
+    }
+    return false;
+  }
+
   async function save() {
     const proposal = buildProposal();
     const bad = validateProposal(proposal) ?? missingRequired()
-      ?? (badYears(proposal.fits ?? []) ? 'Gaadi ka “tak” wala saal “se” se pehle hai — theek karo.' : null);
+      ?? (badYears(proposal.fits ?? []) ? 'Gaadi ka “tak” wala saal “se” se pehle hai — theek karo.' : null)
+      ?? (twinAfterChange(proposal) ? 'Is item ki ek aur kism bilkul aisi hi hai (wahi detail, wahi gaadi). Do ek-jaisi kism mat banao — kuch alag chuno.' : null);
     if (bad) { notify(bad); return; }
 
     setSaving(true);

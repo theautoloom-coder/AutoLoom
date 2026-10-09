@@ -18,10 +18,11 @@ import type { ProposalFit, ProposalSpec } from '@/lib/requests';
 import { variantNameOf } from '@/lib/requests';
 
 import {
-  CarPicker, SpecFields, badYears, buildSpecs, fitWithLabel, keyDefOf, kismSignature, useFamilySpecs, useModels, type SpecVal,
+  CarPicker, SpecFields, badYears, buildSpecs, fitWithLabel, keyDefOf, kismSignature, toVal, useFamilySpecs, useModels,
+  type SpecRow, type SpecVal,
 } from './catalog-fields';
 import { Button, Card, Chip, Row, Text } from './index';
-import { NumberField, notify } from './forms';
+import { NumberField, confirm, notify } from './forms';
 import { space } from './theme';
 
 export type PickedItem = {
@@ -94,7 +95,58 @@ export function KismBuilder({ item, showCost, pending, onAdd, onCancel, onAddCar
   const plain = !isLoading && (kisms ?? []).length === 0 && axisDefs.length === 0;
   const newMode = making || plain || (!isLoading && (kisms ?? []).length === 0);
 
-  function add() {
+  // A new kism starts as the last one was (staff, 9 Oct 2026: "pehle jaisa hi
+  // fill hua ho, bas mujhe change karna ho — bar bar sab cheez daalni padti
+  // hai"). From the kism just added to this entry, else this item's newest
+  // kism, else — for an item's first — the newest of its category. Only what
+  // is different (usually the car) is then changed.
+  const { data: lastRows, isLoading: lastLoading } = useQuery<SpecRow>(
+    `SELECT sv.spec_definition_id, sv.variant_id, sv.option_id, sv.option_ids, sv.value_text, sv.value_number, sv.value_bool
+       FROM spec_values sv
+      WHERE sv.variant_id = (
+        SELECT pv.id FROM product_variants pv JOIN products p ON p.id = pv.product_id
+         WHERE pv.is_active = 1 AND (pv.product_id = ?1 OR p.family_id = ?2)
+         ORDER BY CASE WHEN pv.product_id = ?1 THEN 0 ELSE 1 END, pv.created_at DESC LIMIT 1)`,
+    [item.id, item.family_id ?? '']);
+  const startFrom = useMemo(() => {
+    const axis = new Set(axisDefs.map((d) => d.id));
+    const out: Record<string, SpecVal> = {};
+    const justAdded = [...pending].reverse().find((l) => l.productId === item.id && l.newKism)?.newKism;
+    if (justAdded) {
+      for (const sp of justAdded.specs) {
+        if (!axis.has(sp.def_id)) continue;
+        out[sp.def_id] = { option_id: sp.option_id ?? null, option_ids: sp.option_ids?.split(',').filter(Boolean), text: sp.text ?? undefined, number: sp.number ?? null, bool: sp.bool ?? null };
+      }
+      return out;
+    }
+    for (const r of lastRows ?? []) if (axis.has(r.spec_definition_id)) out[r.spec_definition_id] = toVal(r);
+    return out;
+  }, [axisDefs, pending, item.id, lastRows]);
+  const [prefilled, setPrefilled] = useState(false);
+  if (newMode && !plain && !prefilled && !lastLoading && axisDefs.length > 0 && Object.keys(vals).length === 0) {
+    setPrefilled(true);
+    if (Object.keys(startFrom).length > 0) setVals(startFrom);
+  }
+  const showPrefillNote = prefilled && Object.keys(startFrom).length > 0;
+
+  // The cars this item's kisms already go on, one tap away — the same car in
+  // another colour is not searched for again.
+  const recentCars = useMemo(() => {
+    const seen = new Set<string>();
+    const out: ProposalFit[] = [];
+    const add = (f: ProposalFit) => {
+      const key = `${f.model_id}|${f.year_from ?? ''}|${f.year_to ?? ''}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(fitWithLabel(f, models));
+    };
+    for (const l of [...pending].reverse()) if (l.productId === item.id) for (const f of l.newKism?.fits ?? []) add(f);
+    for (const f of kismFits ?? []) add({ model_id: f.model_id, year_from: f.year_from, year_to: f.year_to });
+    return out.slice(0, 8);
+  }, [pending, item.id, kismFits, models]);
+  const unpicked = recentCars.filter((c) => !fits.some((f) => f.model_id === c.model_id && f.year_from === c.year_from && f.year_to === c.year_to));
+
+  async function add() {
     if (!qty || qty <= 0) { notify('Kitne aaye — qty likho.', 'danger'); return; }
     if (!newMode) {
       if (!existing) { notify('Kism chuno — ya “Nayi kism”.', 'danger'); return; }
@@ -107,6 +159,10 @@ export function KismBuilder({ item, showCost, pending, onAdd, onCancel, onAddCar
     const specs = buildSpecs(axisDefs, optsByDef, vals);
     if (keyDef && !specs.some((s) => s.def_id === keyDef.id)) { notify(`${keyDef.name} chuno.`, 'danger'); return; }
     if (badYears(fits)) { notify('Gaadi ka “tak” wala saal “se” se pehle hai — theek karo.', 'danger'); return; }
+    // Started from the last kism, the car is the thing most easily left as
+    // it was. An item whose kisms go on cars gets asked before one goes on all.
+    if (fits.length === 0 && recentCars.length > 0
+      && !(await confirm('Gaadi nahi chuni', 'Ye kism har gaadi ki maani jayegi. Gaadi chunni hai to “Rehne do” dabao aur gaadi jodo.'))) return;
     const labelled = fits.map((f) => fitWithLabel(f, models));
     const signature = kismSignature(specs, labelled);
     const label = variantNameOf({ specs, fits: labelled });
@@ -149,13 +205,26 @@ export function KismBuilder({ item, showCost, pending, onAdd, onCancel, onAddCar
       {newMode && !plain ? (
         <View style={{ gap: space.md }}>
           <Text variant="small" color="textMuted">
-            {(kisms ?? []).length ? 'Nayi kism — jo alag hai wo chuno.' : 'Is item ki pehli kism — detail aur gaadi chuno.'}
+            {showPrefillNote
+              ? 'Pichhli kism jaisi bhari hai — bas jo alag hai (gaadi, colour…) wahi badlo.'
+              : (kisms ?? []).length ? 'Nayi kism — jo alag hai wo chuno.' : 'Is item ki pehli kism — detail aur gaadi chuno.'}
           </Text>
           <SpecFields defs={axisDefs} optsByDef={optsByDef} values={vals}
             onChange={(id, v) => setVals((p) => ({ ...p, [id]: v }))} required={keyDef ? new Set([keyDef.id]) : undefined} />
           <View style={{ gap: space.xs }}>
             <Text variant="label" color="textMuted">Kis gaadi mein lagta hai (zaroori nahi)</Text>
             <CarPicker fits={fits} onChange={setFits} models={models} onAddCar={onAddCar} />
+            {unpicked.length > 0 ? (
+              <View style={{ gap: space.xs }}>
+                <Text variant="small" color="textFaint">Pichhli gaadiyan — tap karke jodo</Text>
+                <Row gap={space.xs} wrap>
+                  {unpicked.map((c) => (
+                    <Chip key={`${c.model_id}-${c.year_from ?? ''}-${c.year_to ?? ''}`} label={`+ ${c.label || 'Gaadi'}`}
+                      onPress={() => setFits((prev) => [...prev, c])} />
+                  ))}
+                </Row>
+              </View>
+            ) : null}
           </View>
         </View>
       ) : null}

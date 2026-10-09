@@ -74,7 +74,7 @@ const TOPICS: Topic[] = [
       '“Nayi entry” → “Stock Chadhao”.',
       'Supplier chuno (naya ho to naam likh ke bana lo). “Maal kab aaya” — Aaj, Kal, Parso, ya “Aur tareekh…” se calendar.',
       'Item ka naam likho aur item chuno — jaise “Philips X-tremeVision”.',
-      'Kaunsi kism aayi — chip dabao (H4, H7, Creta 2019–2023…). Nayi kism ho to “+ Nayi kism”: socket/colour chuno, gaadi chuno (chunte hi jud jaati hai), saal ki chip dabao.',
+      'Kaunsi kism aayi — chip dabao (H4, H7, Creta 2019–2023…). Nayi kism ho to “+ Nayi kism”: pichhli kism jaisi detail pehle se bhari aati hai — bas jo alag hai (aksar gaadi) wahi badlo. Pichhli gaadiyan “+ Creta…” chip se ek tap mein.',
       '“Kitne aaye” bharo, “Line jodo”. Aur maal ho to “+ Maal jodo” — ek entry mein kitne bhi item.',
       'Staff: “… pcs owner ko bhejo”. Owner gin ke dekhega, rate bharega, approve karega — tab stock badhega.',
       'Owner: kharid rate bhar do (zaroori nahi) aur “… pcs chadha do” — stock turant badhega.',

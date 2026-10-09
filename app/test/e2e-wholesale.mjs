@@ -87,13 +87,30 @@ async function stockItem(page, q) {
   await page.waitForTimeout(2500);
 }
 const lastVisible = (page, label) => page.getByLabel(label, { exact: true }).locator('visible=true').last();
-async function socket(page, value) {
-  // Chips or a list, whichever the category has.
-  const chip = page.getByText(value, { exact: true }).locator('visible=true').first();
-  if (await chip.isVisible().catch(() => false)) await chip.click();
-  else await pickFrom(page, 'Chuno…', value, value);
+// A detail set to a value whatever it was filled with: a new kism starts as
+// the last one was (9 Oct 2026), so a chip may already be on — clicking it
+// again would turn it off — and a list may already show another value.
+async function setDetail(page, label, value) {
+  // The smallest block holding both the label and its chips or list button.
+  const box = page.locator('div', { has: page.getByText(label) }).filter({ has: page.getByRole('button') }).locator('visible=true').last();
+  const chip = box.getByRole('button', { name: value, exact: true });
+  if (await chip.count()) {
+    if ((await chip.first().getAttribute('aria-selected')) !== 'true') await chip.first().click();
+  } else {
+    const field = box.getByRole('button').first();
+    // The field reads "H4 ▾": the value, then the arrow.
+    const shown = ((await field.innerText().catch(() => '')) ?? '').split(/\s*▾/)[0].trim();
+    if (shown !== value) {
+      await field.click();
+      await page.waitForTimeout(900);
+      await page.getByPlaceholder('Naam likh ke dhoondo').fill(value);
+      await page.waitForTimeout(700);
+      await page.getByText(value, { exact: true }).locator('visible=true').last().click();
+    }
+  }
   await page.waitForTimeout(500);
 }
+const socket = (page, value) => setDetail(page, /^Socket \/ Base/, value);
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // The same item pickItem() clicks: the first X-tremeVision the "H4" search lists.
@@ -112,6 +129,8 @@ const kharabQty = () => num(`select coalesce(sum(m.qty),0) from stock_movements 
 
 browser = await chromium.launch();
 let entryId = '';
+// This run's own bulb item, made by the owner and changed later by staff.
+let bulbTag = '';
 
 // ---------------------------------------------------------------------------
 // Staff
@@ -175,7 +194,7 @@ let entryId = '';
     await page.waitForTimeout(800);
     await socket(page, 'H1');
     await page.getByLabel(/^Wattage/).locator('visible=true').first().fill('55');
-    await page.getByText('Single', { exact: true }).locator('visible=true').first().click();
+    await setDetail(page, /^Pack Size/, 'Single');
     await pickFrom(page, 'Creta, Swift, Nexon…', 'Swift', 'Maruti Suzuki Swift');
     await lastVisible(page, 'Kitne aaye').fill('2');
     await page.getByRole('button', { name: 'Line jodo' }).click();
@@ -345,6 +364,7 @@ let entryId = '';
   });
 
   const tag = `E2E Bulb ${Date.now().toString().slice(-5)}`;
+  bulbTag = tag;
   // Owner, 8 Oct 2026: the item is made once — name, category, rate. Its
   // kisms (socket, car, years) are chosen while writing the stock in.
   await step('an item is made once: name, category, rate', async () => {
@@ -375,7 +395,8 @@ let entryId = '';
     await pickFrom(page, 'Kis supplier se aaya?', SUPPLIER.slice(0, 6), SUPPLIER);
     await page.getByRole('button', { name: 'Kal', exact: true }).locator('visible=true').first().click();
     await stockItem(page, tag);
-    check('an item with no kism opens on its first kism', await visible(page, 'Is item ki pehli kism — detail aur gaadi chuno.'));
+    check('an item with no kism opens on its first kism', await visible(page, 'Is item ki pehli kism — detail aur gaadi chuno.')
+      || await visible(page, 'Pichhli kism jaisi bhari hai — bas jo alag hai (gaadi, colour…) wahi badlo.'));
     await socket(page, 'H4');
     await pickFrom(page, 'Creta, Swift, Nexon…', 'Creta', 'Hyundai Creta');
     check('a chosen car is on the kism at once', await page.getByText(/^Hyundai Creta\s+✕/).locator('visible=true').first().isVisible().catch(() => false));
@@ -449,6 +470,15 @@ let entryId = '';
     await stockItem(page, tag);
     check('the kism that exists is offered', await page.getByText(/^Creta 2019–2023 · H4.* · 7$/).locator('visible=true').first().isVisible().catch(() => false));
     await page.getByText('+ Nayi kism', { exact: true }).locator('visible=true').first().click();
+    await page.waitForTimeout(1500);
+    // Staff, 9 Oct 2026: "pehle jaisa hi fill hua ho" — it starts as the last kism.
+    const socketBox = page.locator('div', { has: page.getByText(/^Socket \/ Base/) }).filter({ has: page.getByRole('button') }).locator('visible=true').last();
+    const h4chip = socketBox.getByRole('button', { name: 'H4', exact: true });
+    const startsH4 = (await h4chip.count())
+      ? (await h4chip.first().getAttribute('aria-selected')) === 'true'
+      : /^H4/.test(((await socketBox.getByRole('button').first().innerText().catch(() => '')) ?? '').trim());
+    check('a new kism starts filled as the last one', startsH4);
+    check('the car of the last kism is one tap away', await page.getByText(/^\+ Creta 2019–2023$/).locator('visible=true').first().isVisible().catch(() => false));
     await socket(page, 'H4');
     await pickFrom(page, 'Creta, Swift, Nexon…', 'Swift', 'Maruti Suzuki Swift');
     await page.getByLabel('Saal se').locator('visible=true').first().fill('2018');
@@ -542,20 +572,23 @@ let editReq = '';
   // Owner, 8 Oct 2026: "har cheez mein edit — gaadi galat, specification
   // galat"; staff ask, the owner approves.
   await step('staff ask to change a kism', async () => {
-    const kid = sql(`select id from product_variants where product_id = '${H4_ITEM}' and variant_name like 'Swift · H1%' limit 1`);
-    if (!kid) throw new Error('no staff kism to change');
+    // This run's own bulb, so the change never meets a twin from an earlier run.
+    const pid = sql(`select id from products where name = '${bulbTag}'`);
+    const kid = sql(`select id from product_variants where product_id = '${pid}' and variant_name like 'Swift%' limit 1`);
+    if (!kid) throw new Error('no kism to change');
     editKism = kid;
-    await go(page, `/admin/item?id=${H4_ITEM}&variant=${kid}`, 8000);
+    await go(page, `/admin/item?id=${pid}&variant=${kid}&focus=gaadi`, 8000);
     check('the kism form opens for staff', await visible(page, 'Kism mein badlav'));
-    await pickFrom(page, 'Creta, Swift, Nexon…', 'Creta', 'Hyundai Creta');
-    await page.getByLabel('Bechne ka rate').locator('visible=true').first().fill('555');
+    // The wrong car out, the right one in, and a new rate.
+    await page.getByText(/^Maruti Suzuki Swift.*✕$/).locator('visible=true').first().click();
+    await pickFrom(page, 'Creta, Swift, Nexon…', 'Baleno', 'Maruti Suzuki Baleno');
+    await page.getByLabel('Bechne ka rate').locator('visible=true').first().fill('1199');
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: /Badlav owner ko bhejo|Badlav bhejo/ }).click();
     await page.waitForTimeout(8000);
     editReq = sql(`select id from change_requests where kind = 'edit_kism' and status = 'pending' and payload like '%${kid}%' order by submitted_at desc limit 1`);
     check('the change waits for the owner', !!editReq);
-    check('the kism is unchanged until approved', num(`select retail_price from product_variants where id = '${kid}'`) !== 555
-      || sql(`select count(*) from change_requests where kind = 'edit_kism' and status = 'approved' and payload like '%${kid}%'`) !== '0');
+    check('the kism is unchanged until approved', num(`select retail_price from product_variants where id = '${kid}'`) === 1099);
   });
 
   await ctx.close();
@@ -595,17 +628,19 @@ let editReq = '';
 
   await step('owner approves a kism change', async () => {
     if (!editReq) throw new Error('no change to approve');
-    const h4Specs = num(`select count(*) from spec_values where variant_id = '${H4}'`);
+    const pid = sql(`select id from products where name = '${bulbTag}'`);
+    const creta = sql(`select id from product_variants where product_id = '${pid}' and variant_name like 'Creta%' limit 1`);
     await go(page, `/request/${editReq}`, 6000);
     check('the owner sees what was and what is asked', await visible(page, 'Pehle → ab', false) || await visible(page, 'PEHLE → AB', false));
     await page.getByRole('button', { name: 'Approve karo — badlav lagao' }).click();
     await yes(page);
     await page.waitForTimeout(9000);
     check('the change is approved', sql(`select status from change_requests where id = '${editReq}'`) === 'approved');
-    check('the kism has the new rate', num(`select retail_price from product_variants where id = '${editKism}'`) === 555);
-    check('the kism has the added car', num(`select count(*) from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
-                                               where pf.variant_id = '${editKism}' and vm.name = 'Creta'`) === 1);
-    check('the other kisms kept their details', num(`select count(*) from spec_values where variant_id = '${H4}'`) === h4Specs);
+    check('the kism has the new rate', num(`select retail_price from product_variants where id = '${editKism}'`) === 1199);
+    check('the kism goes on the right car now', sql(`select string_agg(vm.name, ',') from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
+                                                     where pf.variant_id = '${editKism}'`) === 'Baleno');
+    check('the other kism kept its car', sql(`select string_agg(vm.name, ',') from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
+                                                where pf.variant_id = '${creta}'`) === 'Creta');
   });
 
   await ctx.close();

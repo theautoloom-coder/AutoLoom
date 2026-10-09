@@ -629,6 +629,9 @@ export function Chip({ label, selected, onPress }: { label: string; selected?: b
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      // The web drops accessibilityState for a button; say it outright, so a
+      // screen reader (and a test) can tell a chip that is on.
+      aria-selected={!!selected}
       style={(state) => [
         styles.chip,
         {

@@ -115,6 +115,25 @@ function ItemMaster({ request: asked, proposal: askedProposal }: { request: Chan
   const sharedDefs = useMemo(() => defs.filter((d) => !d.is_variant_axis), [defs]);
   const kismDefs = useMemo(() => defs.filter((d) => d.is_variant_axis), [defs]);
 
+  // A new item starts with the details its category's last item had (staff,
+  // 9 Oct 2026: "bar bar category mein sab cheez daalni padti hai").
+  const { data: catLast } = useQuery<SpecRow>(
+    `SELECT sv.spec_definition_id, sv.variant_id, sv.option_id, sv.option_ids, sv.value_text, sv.value_number, sv.value_bool
+       FROM spec_values sv
+      WHERE sv.variant_id IS NULL AND sv.product_id = (
+        SELECT p.id FROM products p
+         WHERE p.family_id = ? AND EXISTS (SELECT 1 FROM spec_values x WHERE x.product_id = p.id AND x.variant_id IS NULL)
+         ORDER BY p.created_at DESC LIMIT 1)`, [isNew ? familyId ?? '' : '']);
+  const [seededFam, setSeededFam] = useState<string | null>(null);
+  const sharedIds = new Set(sharedDefs.map((d) => d.id));
+  const seed = (catLast ?? []).filter((r) => sharedIds.has(r.spec_definition_id));
+  if (isNew && !request && familyId && seededFam !== familyId && seed.length > 0 && Object.keys(vals).length === 0) {
+    setSeededFam(familyId);
+    const sv: Record<string, SpecVal> = {};
+    for (const r of seed) sv[r.spec_definition_id] = toVal(r);
+    setVals(sv);
+  }
+
   // Load the item being edited, once its rows are there.
   const [loaded, setLoaded] = useState<string | null>(null);
   if (item && sharedRows && loaded !== item.id && sharedRows.every((r) => r.product_id === item.id)) {
@@ -300,7 +319,9 @@ function ItemMaster({ request: asked, proposal: askedProposal }: { request: Chan
         ) : null}
 
         {sharedDefs.length > 0 ? (
-          <FormSection title="Common detail" hint="Jo is item ki har kism mein same hai.">
+          <FormSection title="Common detail" hint={seededFam && seededFam === familyId
+            ? 'Is category ke pichhle item jaisi bhari hai — jo alag hai wahi badlo.'
+            : 'Jo is item ki har kism mein same hai.'}>
             <SpecFields defs={sharedDefs} optsByDef={optsByDef} values={vals} onChange={(d, v) => setVals((p) => ({ ...p, [d]: v }))} />
           </FormSection>
         ) : null}

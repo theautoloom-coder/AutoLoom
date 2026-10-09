@@ -61,8 +61,8 @@ const sameVal = (a?: SpecVal, b?: SpecVal) => JSON.stringify([a?.option_id ?? nu
   === JSON.stringify([b?.option_id ?? null, [...(b?.option_ids ?? [])].sort(), (b?.text ?? '').trim(), b?.number ?? null, b?.bool ?? null]);
 
 export default function KismForm() {
-  const { id, variant: variantParam, product: productParam, request: requestId, name: nameParam, back } =
-    useLocalSearchParams<{ id?: string; variant?: string; product?: string; request?: string; name?: string; back?: string }>();
+  const { id, variant: variantParam, product: productParam, request: requestId, name: nameParam, back, focus } =
+    useLocalSearchParams<{ id?: string; variant?: string; product?: string; request?: string; name?: string; back?: string; focus?: string }>();
   const router = useRouter();
   const { db } = useSystem();
   const { actor, locationId, can } = useSession();
@@ -439,6 +439,14 @@ export default function KismForm() {
     }
   }
 
+  // Which cars: a list, each car with its own years.
+  const carsSection = (
+    <FormSection title="Kis gaadi mein lagta hai" hint="Galat gaadi ✕ se hatao, sahi gaadi chuno — turant jud jaati hai — phir saal. Har gaadi mein lagta ho to “Sab gaadi”.">
+      <CarPicker fits={fits} onChange={setFits} models={models ?? []} universal={universal}
+        onUniversal={kismOf ? undefined : setUniversal} onAddCar={addCar} />
+    </FormSection>
+  );
+
   const proposal = buildProposal();
   const missing = validateProposal(proposal) ?? missingRequired();
   const preview = variantNameOf(proposal);
@@ -456,7 +464,7 @@ export default function KismForm() {
                 ? `Sirf “${existing.variant_name}” badlegi — iski detail, gaadi, saal aur rate. Item ka naam ya category “Item badlo” se.`
                 : `“${existing.variant_name}” mein jo galat hai wo theek karo — detail, gaadi, saal, rate. Owner approve karega tab badlega.`}
             </Text>
-            <Button title="Item badlo" tone="ghost" size="sm" onPress={() => router.push(`/admin/item?id=${existing.id}` as never)} />
+            <Button title={canEdit ? 'Item badlo' : 'Item mein badlav'} tone="ghost" size="sm" onPress={() => router.push(`/admin/item?id=${existing.id}` as never)} />
           </Card>
         ) : null}
         {request && existing && !canEdit ? (
@@ -497,6 +505,9 @@ export default function KismForm() {
           </Card>
         ) : null}
 
+        {/* Opened from "Gaadi galat?": the cars first, where the eye goes. */}
+        {focus === 'gaadi' ? carsSection : null}
+
         <FormSection title="Maal" hint="Category, naam, qty aur rate.">
           <PhotoPicker
             folder={existing?.id}
@@ -520,9 +531,12 @@ export default function KismForm() {
           <Input label="Item ka naam" value={name} onChangeText={setName} placeholder="Philips Ultinon LED" autoCapitalize="words" />
           </>)}
           <Row gap={12}>
-            <View style={{ flex: 1 }}>
-              <NumberField label="Qty" value={qty} onChange={setQty} decimals={0} placeholder="10" hint={isNew ? undefined : 'Stock yahan se nahi badalta'} editable={isNew} />
-            </View>
+            {/* Stock is not changed here — Stock theek karo does that. */}
+            {existing ? null : (
+              <View style={{ flex: 1 }}>
+                <NumberField label="Qty" value={qty} onChange={setQty} decimals={0} placeholder="10" />
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <NumberField label="Bechne ka rate" value={price} onChange={setPrice} placeholder="1550" />
             </View>
@@ -590,11 +604,7 @@ export default function KismForm() {
           </FormSection>
         )}
 
-        {/* Which cars: a list, each car with its own years. */}
-        <FormSection title="Kis gaadi mein lagta hai" hint="Gaadi chuno — turant jud jaati hai — phir saal. Har gaadi mein lagta ho to “Sab gaadi”.">
-          <CarPicker fits={fits} onChange={setFits} models={models ?? []} universal={universal}
-            onUniversal={kismOf ? undefined : setUniversal} onAddCar={addCar} />
-        </FormSection>
+        {focus === 'gaadi' ? null : carsSection}
 
         <Disclosure title="Aur detail" hint="Set/pair, warranty — zaroorat ho to kholo." defaultOpen={!isNew && (packSize != null || warrantyMonths != null)}>
           <Row gap={12}>

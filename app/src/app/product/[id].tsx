@@ -144,6 +144,14 @@ export default function ProductScreen() {
     );
   }
 
+  // Change this kism — the owner directly, staff as a request (8 Oct 2026).
+  // Offered where the wrong thing is seen: beside its cars and its details.
+  const editKism = (focus?: 'gaadi') => {
+    if (!product || !variant) return;
+    router.push(`/admin/item?id=${product.id}&variant=${variant.id}${focus ? `&focus=${focus}` : ''}` as never);
+  };
+  const editLabel = (what: string) => (can('catalog.edit') ? `${what} badlo` : `${what} galat? Badlav bhejo`);
+
   // A new photo replaces the one showing — the kism's own if it has one,
   // else the item's, which every kism shows.
   async function setPhoto(storagePath: string | null) {
@@ -197,7 +205,7 @@ export default function ProductScreen() {
             // Staff send it as a request; the owner adds it straight away.
             <Row gap={space.xs}>
               {variant ? (
-                <Button title={can('catalog.edit') ? 'Kism badlo' : 'Badlav bhejo'} size="sm" tone="ghost" onPress={() => router.push(`/admin/item?id=${product.id}&variant=${variant.id}` as never)} />
+                <Button title={can('catalog.edit') ? 'Kism badlo' : 'Kism mein badlav'} size="sm" tone="secondary" onPress={() => editKism()} />
               ) : null}
               <Button title={can('catalog.edit') ? '+ Nayi kism' : 'Nayi kism maango'} size="sm" tone="secondary"
                 onPress={() => router.push(`/admin/item?product=${product.id}` as never)} />
@@ -212,7 +220,7 @@ export default function ProductScreen() {
         </ScrollView>
 
         {/* Specifications */}
-        <SectionTitle>Spec</SectionTitle>
+        <SectionTitle right={variant ? <Button title={editLabel('Detail')} size="sm" tone="secondary" onPress={() => editKism()} /> : undefined}>Spec</SectionTitle>
         <Card style={{ gap: 0 }}>
           {productSpecs.length === 0 && axisDefs.length === 0
             ? <Empty title="Koi spec nahi likha" hint={can('catalog.edit') ? 'Upar “Badlo” dabao — socket, watt, colour jaisi detail bharo.' : undefined} />
@@ -231,7 +239,7 @@ export default function ProductScreen() {
         </Card>
 
         {/* Fitment */}
-        <SectionTitle>Kis gaadi mein lagta hai</SectionTitle>
+        <SectionTitle right={variant ? <Button title={editLabel('Gaadi')} size="sm" tone="secondary" onPress={() => editKism('gaadi')} /> : undefined}>Kis gaadi mein lagta hai</SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>
           {product.is_universal_fit && effectiveFitments.length === 0 ? (
             <Empty title="Sab gaadi mein lagta hai" hint="Ye spec se bikta hai (socket, size), gaadi se nahi." />

@@ -19,17 +19,20 @@
  * no "kaam ki jagah" to pick and no screen for moving maal between places.
  */
 import { useQuery, useStatus } from '@powersync/react';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
 import { ROLE_DESCRIPTIONS, roleLabel } from '@domain';
 
+import { APP_BUILD } from '@/lib/build';
 import { cancelDailyPendingReminder, ensureDailyPendingReminder } from '@/lib/daily-reminder';
 import { useSession } from '@/lib/session';
 import { changeMyPassword } from '@/lib/staff';
 import { Avatar, Badge, Button, Card, Divider, IconBadge, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { confirm, notify, SwitchRow } from '@/ui/forms';
+import { runningVersion } from '@/ui/app-updates';
 import { space } from '@/ui/theme';
 
 export default function MoreScreen() {
@@ -387,6 +390,11 @@ export default function MoreScreen() {
       </Card>
 
       <Button title="Sign out" tone="secondary" onPress={confirmSignOut} />
+      {/* Which version this phone runs — so "naya feature nahi dikh raha"
+          is answered by looking, not guessing (9 Oct 2026). */}
+      <Text variant="small" color="textFaint" style={{ textAlign: 'center' }}>
+        Version: {runningVersion(Constants.expoConfig?.version ?? '1.0.0')} · build {APP_BUILD}
+      </Text>
     </Screen>
   );
 }

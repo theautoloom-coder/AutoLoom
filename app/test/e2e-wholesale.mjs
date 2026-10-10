@@ -131,6 +131,8 @@ browser = await chromium.launch();
 let entryId = '';
 // This run's own bulb item, made by the owner and changed later by staff.
 let bulbTag = '';
+// Two small staff entries the owner approves all at once.
+let bulkIds = [];
 
 // ---------------------------------------------------------------------------
 // Staff
@@ -278,8 +280,7 @@ let bulbTag = '';
     await go(page, '/requests', 6000);
     check('approval queue shows the entry', await visible(page, `${SUPPLIER} · 5 pcs`));
     check('owner sees it was changed after sending', await visible(page, 'Badla gaya'));
-    await page.getByText(`${SUPPLIER} · 5 pcs`).first().click();
-    await page.waitForTimeout(5000);
+    await go(page, `/purchase/approve?id=${entryId}`, 6000);
     check('approve screen says it changed after sending', await page.getByText(/Bhejne ke baad badla/).first().isVisible().catch(() => false));
     await page.getByLabel('Kharid rate').first().fill('1500');
     await page.waitForTimeout(800);
@@ -297,11 +298,13 @@ let bulbTag = '';
     if (!kism) throw new Error('no staff kism');
     const before = variantQty(kism);
     await go(page, '/requests', 6000);
+    // Owner, 10 Oct 2026: the entry opens in place in the list.
     await page.getByText(`${SUPPLIER2} · 2 pcs`).locator('visible=true').first().click();
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
+    check('the entry opens in place in the list', await visible(page, 'Poora kholo'));
     await page.getByLabel('Kharid rate').locator('visible=true').first().fill('300');
     await page.waitForTimeout(800);
-    await page.getByRole('button', { name: /Approve karo/i }).click();
+    await page.getByRole('button', { name: 'Approve karo', exact: true }).click();
     await yes(page);
     await page.waitForTimeout(9000);
     check('the new kism is in stock after approval', variantQty(kism) === before + 2, `${before} → ${variantQty(kism)}`);
@@ -550,6 +553,23 @@ let editReq = '';
     check('stock did not move before approval', godownQty() === before);
   });
 
+  await step('staff send two more entries', async () => {
+    for (const n of [1, 2]) {
+      await go(page, '/stock/add', 6000);
+      await pickFrom(page, 'Kis supplier se aaya?', SUPPLIER2.slice(0, 6), SUPPLIER2);
+      await stockItem(page, 'xtreme');
+      await page.getByText(new RegExp(`^${esc(H4_NAME)} · `)).locator('visible=true').first().click();
+      await lastVisible(page, 'Kitne aaye').fill(String(n));
+      await page.getByRole('button', { name: 'Line jodo' }).click();
+      await page.waitForTimeout(1000);
+      await page.getByRole('button', { name: /pcs owner ko bhejo/i }).click();
+      await page.waitForTimeout(6000);
+    }
+    bulkIds = sql(`select string_agg(id::text, ',') from (select id from purchases where status = 'draft' and submitted_at is not null
+                    and supplier_name = '${SUPPLIER2.replace(/'/g, "''")}' order by submitted_at desc limit 2) x`).split(',').filter(Boolean);
+    check('two entries wait for the owner', bulkIds.length === 2);
+  });
+
   await step('staff ask to put the stock right', async () => {
     const before = godownQty();
     await go(page, `/stock-check?variant=${H4}`, 7000);
@@ -599,9 +619,7 @@ let editReq = '';
   await step('owner approves the correction', async () => {
     if (!fixId) throw new Error('no correction to approve');
     const before = godownQty();
-    await go(page, '/requests', 6000);
-    await page.getByText(/^Sudhaar .* · 4 pcs$/).locator('visible=true').first().click();
-    await page.waitForTimeout(6000);
+    await go(page, `/purchase/approve?id=${fixId}`, 6000);
     await page.getByRole('button', { name: 'Sudhaar lagao' }).click();
     await yes(page);
     await page.waitForTimeout(9000);
@@ -625,6 +643,20 @@ let editReq = '';
     check('stock went up by 2 on approval', godownQty() === before + 2, `${before} → ${godownQty()}`);
   });
 
+
+  await step('owner approves the whole queue at once', async () => {
+    if (bulkIds.length !== 2) throw new Error('no entries for the bulk approval');
+    const before = godownQty();
+    const waiting = num(`select count(*) from purchases where doc_type = 'purchase' and status = 'draft' and submitted_at is not null`);
+    await go(page, '/requests', 6000);
+    check('each entry has its own approve button', await page.getByRole('button', { name: 'Approve', exact: true }).locator('visible=true').count() >= 2);
+    await page.getByRole('button', { name: new RegExp(`^Sab approve karo \\(${waiting}\\)$`) }).click();
+    await yes(page);
+    await page.waitForTimeout(8000 + waiting * 2500);
+    check('the whole queue is approved', num(`select count(*) from purchases where doc_type = 'purchase' and status = 'draft' and submitted_at is not null`) === 0);
+    check('both entries are posted', bulkIds.every((id) => sql(`select status from purchases where id = '${id}'`) === 'posted'));
+    check('their stock went up', godownQty() >= before + 3, `${before} → ${godownQty()}`);
+  });
 
   await step('owner approves a kism change', async () => {
     if (!editReq) throw new Error('no change to approve');

@@ -15,13 +15,23 @@
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
+import { View } from 'react-native';
+
+import { formatINR } from '@domain';
+
+import { approveEntry, queueSummary, refuseEntry } from '@/lib/approvals';
+import { postAdjustment } from '@/lib/posting';
+import { useSystem } from '@/lib/system';
 
 import { useSession } from '@/lib/session';
 import { formHref, parseProposal, type ChangeRequest } from '@/lib/requests';
-import { Badge, Button, Card, Divider, Empty, ListRow, Screen, SectionTitle, Text } from '@/ui';
+import { Badge, Button, Card, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { EntryReview } from '@/ui/entry-review';
+import { confirm, notify } from '@/ui/forms';
+import { space } from '@/ui/theme';
 
-type Row = ChangeRequest & { submitter: string | null };
+type ReqRow = ChangeRequest & { submitter: string | null };
 type Entry = {
   id: string; status: string; doc_no: string | null; doc_date: string; submitted_at: string | null; revised_at: string | null;
   notes: string | null; cancel_reason: string | null; decided_at: string | null;
@@ -58,7 +68,7 @@ function title(req: ChangeRequest): string {
   return [p.name, p.colour].filter(Boolean).join(' · ') || 'Naya item';
 }
 
-function subtitle(req: Row, mine: boolean): string {
+function subtitle(req: ReqRow, mine: boolean): string {
   const p = parseProposal(req);
   const bits = [
     p?.price != null ? `₹${p.price}` : null,
@@ -71,10 +81,17 @@ function subtitle(req: Row, mine: boolean): string {
 
 export default function RequestsScreen() {
   const router = useRouter();
+  const { db } = useSystem();
   const { can, actor } = useSession();
   const isReviewer = can('catalog.edit');
   const approver = can('purchase.approve');
+  const showCost = can('catalog.view_cost');
   const me = actor.userId ?? '';
+  // Owner, 10 Oct 2026: approve from the list, open an entry in place, and
+  // approve or refuse the whole queue at once.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [bulkWhy, setBulkWhy] = useState('');
+  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
 
   // Stock entries from staff: the approver sees all of them, staff their own.
   // submitted_at set = waiting; cleared = sent back for a fix.
@@ -122,10 +139,77 @@ export default function RequestsScreen() {
     [fixer ? 1 : 0, me, since],
   );
   const fixWaiting = (fixRows ?? []).filter((f) => f.status === 'draft');
+
+  /** One entry, straight from its row. Missing buy rates take the last known. */
+  async function quickApprove(e: Entry) {
+    const s = await queueSummary(db, [e.id]);
+    const ok = await confirm(`${entryTitle(e)} — approve karein?`, [
+      showCost ? `Kul lagbhag ${formatINR(s.value)}.` : null,
+      'Jis line ka kharid rate nahi bhara, us par pichhla rate lagega.',
+      s.unpriced ? `${s.unpriced} line ka rate kahin nahi mila — wo ₹0 par chadhegi; baad mein “Entry sudhaaro” se bharo.` : null,
+    ].filter(Boolean).join(' '));
+    if (!ok) return;
+    try {
+      let no = '';
+      await db.writeTransaction(async (tx) => { no = await approveEntry(tx, e.id, actor, { fillRates: true }); });
+      notify(`${no} approve — stock chadh gaya.`, 'ok');
+      if (openId === e.id) setOpenId(null);
+    } catch (err) {
+      notify(`Nahi hua: ${(err as Error).message}`, 'danger');
+    }
+  }
+
+  /** The whole queue: each entry on its own, so one bad one stops none of the rest. */
+  async function approveAll() {
+    const ids = waiting.map((w) => w.id);
+    const s = await queueSummary(db, ids);
+    const ok = await confirm(`Sab ${ids.length} entry approve karein?`, [
+      `${s.pcs} pcs${showCost ? ` · lagbhag ${formatINR(s.value)}` : ''}.`,
+      'Jin line ka kharid rate nahi bhara, un par pichhla rate lagega.',
+      s.unpriced ? `${s.unpriced} line ka rate kahin nahi mila — wo ₹0 par chadhengi; baad mein entry kholke “Entry sudhaaro”.` : null,
+    ].filter(Boolean).join(' '));
+    if (!ok) return;
+    const failed: string[] = [];
+    setBulk({ done: 0, total: ids.length });
+    for (const [i, id] of ids.entries()) {
+      try {
+        await db.writeTransaction(async (tx) => { await approveEntry(tx, id, actor, { fillRates: true }); });
+      } catch (err) {
+        const e = waiting.find((w) => w.id === id);
+        failed.push(`${e ? entryTitle(e) : id}: ${(err as Error).message}`);
+      }
+      setBulk({ done: i + 1, total: ids.length });
+    }
+    setBulk(null);
+    setOpenId(null);
+    if (failed.length) notify(`${ids.length - failed.length} approve hui, ${failed.length} nahi — ${failed[0]}`, 'danger');
+    else notify(`Sab ${ids.length} entry approve — stock chadh gaya.`, 'ok');
+  }
+
+  async function refuseAll() {
+    if (!bulkWhy.trim()) { notify('Sab mana karne ki wajah likho.', 'danger'); return; }
+    const ids = waiting.map((w) => w.id);
+    if (!(await confirm(`Sab ${ids.length} entry mana karein?`, 'Kisi ka stock nahi badhega. Staff ko wajah ke saath “Mana kiya” dikhega.'))) return;
+    await db.writeTransaction(async (tx) => { for (const id of ids) await refuseEntry(tx, id, bulkWhy, actor); });
+    setBulkWhy('');
+    setOpenId(null);
+    notify(`${ids.length} entry mana kar di.`, 'ok');
+  }
+
+  async function quickApproveFix(f: Fix) {
+    if (!(await confirm('Stock theek kar dein?', `${fixTitle(f)}${f.submitter ? ` — ${f.submitter}` : ''}.`))) return;
+    try {
+      let no = '';
+      await db.writeTransaction(async (tx) => { no = await postAdjustment(tx, f.id, actor); });
+      notify(`${no} — stock theek ho gaya.`, 'ok');
+    } catch (err) {
+      notify(`Nahi hua: ${(err as Error).message}`, 'danger');
+    }
+  }
   const fixDecided = (fixRows ?? []).filter((f) => f.status !== 'draft').slice(0, 20);
 
   // A reviewer sees the whole queue; everyone else sees only their own.
-  const { data: rows } = useQuery<Row>(
+  const { data: rows } = useQuery<ReqRow>(
     `SELECT cr.*, pr.full_name AS submitter
        FROM change_requests cr
        LEFT JOIN profiles pr ON pr.id = cr.submitted_by
@@ -139,7 +223,7 @@ export default function RequestsScreen() {
   const rejected = all.filter((r) => r.status === 'rejected');
   const done = all.filter((r) => r.status === 'approved' || r.status === 'cancelled');
 
-  const open = (r: Row) => {
+  const open = (r: ReqRow) => {
     // A reviewer reviews it. The submitter of a rejected one goes straight back
     // into the form to fix it — that is the only thing they can do with it.
     if (isReviewer) router.push(`/request/${r.id}`);
@@ -181,23 +265,39 @@ export default function RequestsScreen() {
               : 'Maal aaye to “+” → Stock Chadhao. Owner approve karega, tab stock mein dikhega.'}
           />
         ) : (
-          <Card style={{ gap: 0 }}>
-            {waiting.map((e, i) => (
-              <React.Fragment key={e.id}>
-                {i > 0 ? <Divider /> : null}
-                <ListRow
-                  title={entryTitle(e)}
-                  subtitle={[approver ? e.submitter : null, `${e.items} item`, e.doc_date, revised(e) ? `badla ${when(e.revised_at!)}` : null].filter(Boolean).join('  ·  ')}
-                  right={
-                    revised(e) && approver
-                      ? <Badge tone="danger">Badla gaya</Badge>
-                      : <Badge tone="warn">{approver ? 'Approve karo' : 'Badal sakte ho'}</Badge>
-                  }
-                  onPress={() => router.push(`/purchase/approve?id=${e.id}`)}
-                />
-              </React.Fragment>
-            ))}
-          </Card>
+          <>
+            {approver && waiting.length > 1 ? (
+              <Card style={{ gap: space.sm }}>
+                <Button
+                  title={bulk ? `Approve ho rahi hain… ${bulk.done}/${bulk.total}` : `Sab approve karo (${waiting.length})`}
+                  onPress={approveAll} loading={!!bulk} disabled={!!bulk} />
+                <Row gap={space.sm} align="flex-end">
+                  <Input containerStyle={{ flex: 1 }} value={bulkWhy} onChangeText={setBulkWhy} placeholder="Sab mana karne ki wajah" />
+                  <Button title={`Sab mana karo (${waiting.length})`} tone="danger" onPress={refuseAll} disabled={!!bulk} />
+                </Row>
+              </Card>
+            ) : null}
+            <Card style={{ gap: 0 }}>
+              {waiting.map((e, i) => (
+                <View key={e.id}>
+                  {i > 0 ? <Divider /> : null}
+                  <ListRow
+                    title={entryTitle(e)}
+                    subtitle={[approver ? e.submitter : null, `${e.items} item`, e.doc_date, revised(e) ? `badla ${when(e.revised_at!)}` : null].filter(Boolean).join('  ·  ')}
+                    right={approver ? (
+                      <Row gap={space.xs} align="center">
+                        {revised(e) ? <Badge tone="danger">Badla gaya</Badge> : null}
+                        <Button title="Approve" size="sm" onPress={() => quickApprove(e)} disabled={!!bulk} />
+                      </Row>
+                    ) : <Badge tone="warn">Badal sakte ho</Badge>}
+                    // The owner opens it here, in place; staff go to their entry to change it.
+                    onPress={() => (approver ? setOpenId(openId === e.id ? null : e.id) : router.push(`/purchase/approve?id=${e.id}`))}
+                  />
+                  {approver && openId === e.id ? <EntryReview id={e.id} onDone={() => setOpenId(null)} /> : null}
+                </View>
+              ))}
+            </Card>
+          </>
         )}
 
         {/* Stock put right: a count, a piece broken or gone. Nothing moves
@@ -218,7 +318,9 @@ export default function RequestsScreen() {
                 <ListRow
                   title={fixTitle(f)}
                   subtitle={[fixer ? f.submitter : null, f.notes, when(f.submitted_at ?? f.doc_date)].filter(Boolean).join('  ·  ')}
-                  right={<Badge tone="warn">{fixer ? 'Dekho' : 'Review mein'}</Badge>}
+                  right={fixer
+                    ? <Button title="Approve" size="sm" onPress={() => quickApproveFix(f)} />
+                    : <Badge tone="warn">Review mein</Badge>}
                   onPress={() => router.push(`/adjustment/${f.id}`)}
                 />
               </React.Fragment>

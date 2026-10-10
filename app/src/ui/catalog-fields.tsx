@@ -12,12 +12,17 @@
  * not by a new app.
  */
 import { useQuery } from '@powersync/react';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import type { ProposalFit, ProposalSpec } from '@/lib/requests';
+import { slug } from '@domain';
 
-import { Chip, Input, Row, Text } from './index';
+import type { ProposalFit, ProposalSpec } from '@/lib/requests';
+import { useSession } from '@/lib/session';
+import { useSystem } from '@/lib/system';
+import { insertRow } from '@/lib/writes';
+
+import { Button, Chip, Input, Row, Text } from './index';
 import { NumberField, SelectField } from './forms';
 import { space } from './theme';
 
@@ -66,7 +71,9 @@ export function useFamilySpecs(familyId: string | null | undefined) {
 /** The words a value reads as — "H4", "60 W", "Black, Beige". */
 export function displayOf(d: Def, v: SpecVal | undefined, options: Opt[]): string {
   if (!v) return '';
-  if (d.data_type === 'select') return options.find((o) => o.id === v.option_id)?.value ?? '';
+  // A value typed in because the list did not have it (staff, 9 Oct 2026:
+  // "spoiler mein grey colour nahi aa raha") reads as typed.
+  if (d.data_type === 'select') return options.find((o) => o.id === v.option_id)?.value ?? (v.text ?? '').trim();
   if (d.data_type === 'multiselect') return (v.option_ids ?? []).map((oid) => options.find((o) => o.id === oid)?.value).filter(Boolean).join(', ');
   if (d.data_type === 'number') return v.number != null ? `${v.number}${d.unit ? ` ${d.unit}` : ''}` : '';
   if (d.data_type === 'boolean') return v.bool == null ? '' : v.bool ? `${d.name}: Haan` : '';
@@ -83,7 +90,7 @@ export function buildSpecs(defs: Def[], optsByDef: Map<string, Opt[]>, values: R
       def_id: d.id, name: d.name, axis: !!d.is_variant_axis, in_name: !!d.show_in_variant_name, sort: d.sort_order, display,
       option_id: d.data_type === 'select' ? v.option_id ?? null : null,
       option_ids: d.data_type === 'multiselect' && v.option_ids?.length ? v.option_ids.join(',') : null,
-      text: d.data_type === 'text' || d.data_type === 'multiselect' ? display || null : null,
+      text: d.data_type === 'text' || d.data_type === 'multiselect' || (d.data_type === 'select' && !v.option_id) ? display || null : null,
       number: d.data_type === 'number' ? v.number ?? null : null,
       bool: d.data_type === 'boolean' ? v.bool ?? null : null,
       inherited: !!inheritedFrom && sameVal(v, inheritedFrom[d.id]),
@@ -94,6 +101,25 @@ export function buildSpecs(defs: Def[], optsByDef: Map<string, Opt[]>, values: R
 /** The field that tells one kism from the next — a bulb's socket. */
 export const keyDefOf = (defs: Def[]) => defs.find((d) => d.is_required && d.is_variant_axis) ?? null;
 
+/**
+ * A new option for a detail, made on the spot. Only someone who may change
+ * the catalogue gets one (spec_options is catalog.edit); for everyone else
+ * the value is kept as typed on the kism and the owner can add it to the
+ * list later — nobody is held up by a list that is missing a colour.
+ */
+export function useNewOption(): ((defId: string, value: string) => Promise<string | null>) | undefined {
+  const { db } = useSystem();
+  const { can } = useSession();
+  const make = useCallback(async (defId: string, value: string) => {
+    const v = value.trim();
+    if (!v) return null;
+    return insertRow(db, 'spec_options', {
+      spec_definition_id: defId, value: v, code: slug(v, 12) || v.toUpperCase().slice(0, 12), sort_order: 999, is_active: true,
+    });
+  }, [db]);
+  return can('catalog.edit') ? make : undefined;
+}
+
 /** Detail fields for a category: chips for short lists, a list for long ones. */
 export function SpecFields({ defs, optsByDef, values, onChange, required }: {
   defs: Def[];
@@ -103,21 +129,47 @@ export function SpecFields({ defs, optsByDef, values, onChange, required }: {
   /** Field ids that must be filled, marked with a *. */
   required?: Set<string>;
 }) {
+  const newOption = useNewOption();
+  const [adding, setAdding] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+
+  /** A value the list did not have: an option of it for the owner, typed text for staff. */
+  async function addValue(d: Def, typed: string) {
+    const val = typed.trim();
+    if (!val) return;
+    const options = optsByDef.get(d.id) ?? [];
+    const multi = d.data_type === 'multiselect';
+    const v = values[d.id] ?? {};
+    const match = options.find((o) => o.value.toLowerCase() === val.toLowerCase());
+    const id = match?.id ?? (newOption ? await newOption(d.id, val) : null);
+    if (id) onChange(d.id, multi ? { option_ids: [...new Set([...(v.option_ids ?? []), id])] } : { option_id: id, text: undefined });
+    else if (!multi) onChange(d.id, { option_id: null, text: val });
+    setAdding(null);
+    setDraft('');
+  }
+
   return (
     <>
       {defs.map((d) => {
         const v = values[d.id] ?? {};
         const options = optsByDef.get(d.id) ?? [];
         const label = `${d.name}${d.unit ? ` (${d.unit})` : ''}${required?.has(d.id) ? ' *' : ''}`;
+        const typed = d.data_type === 'select' && !v.option_id && v.text?.trim() ? v.text.trim() : null;
         if (d.data_type === 'select' && options.length > 14) {
           return (
-            <SelectField key={d.id} label={label} value={v.option_id ?? null} allowClear
-              options={options.map((o) => ({ value: o.id, label: o.value }))}
-              onChange={(oid) => onChange(d.id, { option_id: oid })} />
+            <View key={d.id} style={{ gap: space.xs }}>
+              <SelectField label={label} value={v.option_id ?? null} allowClear
+                options={options.map((o) => ({ value: o.id, label: o.value }))}
+                onChange={(oid) => onChange(d.id, { option_id: oid, text: undefined })}
+                onCreate={(text) => addValue(d, text)} />
+              {typed ? <Text variant="small" color="textMuted">Likha hua: {typed} — owner list mein jod dega</Text> : null}
+            </View>
           );
         }
         if (d.data_type === 'select' || d.data_type === 'multiselect') {
           const multi = d.data_type === 'multiselect';
+          // A typed value is offered to staff only where it can be kept: on a single choice.
+          const canAdd = !!newOption || !multi;
           return (
             <View key={d.id} style={{ gap: space.xs }}>
               <Text variant="label" color="textMuted">{label}</Text>
@@ -127,11 +179,20 @@ export function SpecFields({ defs, optsByDef, values, onChange, required }: {
                   return (
                     <Chip key={o.id} label={o.value} selected={on} onPress={() => onChange(d.id, multi
                       ? { option_ids: on ? (v.option_ids ?? []).filter((x) => x !== o.id) : [...(v.option_ids ?? []), o.id] }
-                      : { option_id: on ? null : o.id })} />
+                      : { option_id: on ? null : o.id, text: undefined })} />
                   );
                 })}
-                {options.length === 0 ? <Text variant="small" color="textFaint">Is detail ke options Category settings mein jodo.</Text> : null}
+                {typed ? <Chip label={`${typed}  ✕`} selected onPress={() => onChange(d.id, { option_id: null, text: undefined })} /> : null}
+                {canAdd && adding !== d.id ? <Chip label="+ Aur" onPress={() => { setAdding(d.id); setDraft(''); }} /> : null}
               </Row>
+              {adding === d.id ? (
+                <Row gap={space.sm} align="flex-end">
+                  <Input containerStyle={{ flex: 1 }} value={draft} onChangeText={setDraft} autoFocus
+                    placeholder={`Naya ${d.name.toLowerCase()} likho — jaise Grey`} onSubmitEditing={() => addValue(d, draft)} />
+                  <Button title="Jodo" size="sm" onPress={() => addValue(d, draft)} disabled={!draft.trim()} />
+                  <Button title="✕" tone="ghost" size="sm" onPress={() => setAdding(null)} />
+                </Row>
+              ) : null}
             </View>
           );
         }

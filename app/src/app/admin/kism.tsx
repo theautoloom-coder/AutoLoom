@@ -30,9 +30,9 @@ import {
 } from '@/lib/requests';
 import { insertRow, updateRow } from '@/lib/writes';
 import { uploadPhoto, type PickedPhoto } from '@/lib/photos';
-import { Button, Card, Chip, Input, Row, Screen, Text } from '@/ui';
+import { Button, Card, Input, Row, Screen, Text } from '@/ui';
 import { Disclosure, FormSection, NumberField, SelectField, notify } from '@/ui/forms';
-import { CarPicker, badYears, kismSignature } from '@/ui/catalog-fields';
+import { CarPicker, SpecFields, badYears, buildSpecs, kismSignature } from '@/ui/catalog-fields';
 import { PhotoPicker } from '@/ui/photo';
 import { space } from '@/ui/theme';
 
@@ -56,9 +56,6 @@ const toVal = (r: SpecRow): SpecVal => ({
   option_id: r.option_id, option_ids: r.option_ids ? r.option_ids.split(',').filter(Boolean) : undefined,
   text: r.value_text ?? undefined, number: r.value_number, bool: r.value_bool == null ? null : !!r.value_bool,
 });
-/** Two spec values that say the same thing, however they were stored. */
-const sameVal = (a?: SpecVal, b?: SpecVal) => JSON.stringify([a?.option_id ?? null, [...(a?.option_ids ?? [])].sort(), (a?.text ?? '').trim(), a?.number ?? null, a?.bool ?? null])
-  === JSON.stringify([b?.option_id ?? null, [...(b?.option_ids ?? [])].sort(), (b?.text ?? '').trim(), b?.number ?? null, b?.bool ?? null]);
 
 export default function KismForm() {
   const { id, variant: variantParam, product: productParam, request: requestId, name: nameParam, back, focus } =
@@ -300,25 +297,9 @@ export default function KismForm() {
 
   /** The specs as the proposal carries them, with the words people will read. */
   function builtSpecs(): ProposalSpec[] {
-    return (defs ?? []).map((d) => {
-      const v = specVals[d.id] ?? {};
-      const options = optsByDef.get(d.id) ?? [];
-      let display = '';
-      if (d.data_type === 'select') display = options.find((o) => o.id === v.option_id)?.value ?? '';
-      else if (d.data_type === 'multiselect') display = (v.option_ids ?? []).map((oid) => options.find((o) => o.id === oid)?.value).filter(Boolean).join(', ');
-      else if (d.data_type === 'number') display = v.number != null ? `${v.number}${d.unit ? ` ${d.unit}` : ''}` : '';
-      else if (d.data_type === 'boolean') display = v.bool == null ? '' : v.bool ? `${d.name}: Haan` : '';
-      else display = (v.text ?? '').trim();
-      return {
-        def_id: d.id, name: d.name, axis: !!d.is_variant_axis, in_name: !!d.show_in_variant_name, sort: d.sort_order, display,
-        option_id: d.data_type === 'select' ? v.option_id ?? null : null,
-        option_ids: d.data_type === 'multiselect' && v.option_ids?.length ? v.option_ids.join(',') : null,
-        text: d.data_type === 'text' || d.data_type === 'multiselect' ? display || null : null,
-        number: d.data_type === 'number' ? v.number ?? null : null,
-        bool: d.data_type === 'boolean' ? v.bool ?? null : null,
-        inherited: (!!kismOf || !!existing) && sameVal(v, baseVals[d.id]),
-      };
-    }).filter((s) => s.display);
+    // The shared builder: the same words, and a value typed in when the list
+    // did not have it, as everywhere else.
+    return buildSpecs(defs ?? [], optsByDef, specVals, kismOf || existing ? baseVals : undefined);
   }
 
   function buildProposal(): ItemProposal {
@@ -570,51 +551,8 @@ export default function KismForm() {
         {/* The family's own specs: what tells one bulb from another. */}
         {(defs ?? []).length > 0 ? (
           <FormSection title="Detail" hint={`Ye detail stock list, bill aur item ke page par dikhegi${preview !== 'Standard' ? ` — “${preview}”` : ''}.`}>
-            {(defs ?? []).map((d) => {
-              const v = specVals[d.id] ?? {};
-              const options = optsByDef.get(d.id) ?? [];
-              const label = `${d.name}${d.unit ? ` (${d.unit})` : ''}${mustFill(d) ? ' *' : ''}`;
-              if (d.data_type === 'select' && options.length > 14) {
-                return (
-                  <SelectField key={d.id} label={label} value={v.option_id ?? null} allowClear
-                    options={options.map((o) => ({ value: o.id, label: o.value }))}
-                    onChange={(oid) => setSpec(d.id, { option_id: oid })} />
-                );
-              }
-              if (d.data_type === 'select' || d.data_type === 'multiselect') {
-                const multi = d.data_type === 'multiselect';
-                return (
-                  <View key={d.id} style={{ gap: space.xs }}>
-                    <Text variant="label" color="textMuted">{label}</Text>
-                    <Row gap={space.xs} wrap>
-                      {options.map((o) => {
-                        const on = multi ? (v.option_ids ?? []).includes(o.id) : v.option_id === o.id;
-                        return (
-                          <Chip key={o.id} label={o.value} selected={on} onPress={() => setSpec(d.id, multi
-                            ? { option_ids: on ? (v.option_ids ?? []).filter((x) => x !== o.id) : [...(v.option_ids ?? []), o.id] }
-                            : { option_id: on ? null : o.id })} />
-                        );
-                      })}
-                    </Row>
-                  </View>
-                );
-              }
-              if (d.data_type === 'number') {
-                return <NumberField key={d.id} label={label} value={v.number ?? null} onChange={(n) => setSpec(d.id, { number: n })} />;
-              }
-              if (d.data_type === 'boolean') {
-                return (
-                  <View key={d.id} style={{ gap: space.xs }}>
-                    <Text variant="label" color="textMuted">{label}</Text>
-                    <Row gap={space.xs}>
-                      <Chip label="Haan" selected={v.bool === true} onPress={() => setSpec(d.id, { bool: v.bool === true ? null : true })} />
-                      <Chip label="Nahi" selected={v.bool === false} onPress={() => setSpec(d.id, { bool: v.bool === false ? null : false })} />
-                    </Row>
-                  </View>
-                );
-              }
-              return <Input key={d.id} label={label} value={v.text ?? ''} onChangeText={(text) => setSpec(d.id, { text })} autoCorrect={false} />;
-            })}
+            <SpecFields defs={defs ?? []} optsByDef={optsByDef} values={specVals} onChange={setSpec}
+              required={new Set((defs ?? []).filter(mustFill).map((d) => d.id))} />
           </FormSection>
         ) : (
           <FormSection title="Detail" hint="Is category mein tay detail nahi hai — type aur colour likh do.">

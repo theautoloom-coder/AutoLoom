@@ -111,6 +111,15 @@ async function setDetail(page, label, value) {
   await page.waitForTimeout(500);
 }
 const socket = (page, value) => setDetail(page, /^Socket \/ Base/, value);
+// A value the list does not have, typed in with that detail's "+ Aur".
+async function addOther(page, label, value) {
+  const box = page.locator('div', { has: page.getByText(label) }).filter({ has: page.getByRole('button') }).locator('visible=true').last();
+  await box.getByRole('button', { name: '+ Aur', exact: true }).click();
+  await page.waitForTimeout(500);
+  await page.getByPlaceholder(/^Naya .* likho/).locator('visible=true').first().fill(value);
+  await page.getByRole('button', { name: 'Jodo', exact: true }).locator('visible=true').first().click();
+  await page.waitForTimeout(800);
+}
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // The same item pickItem() clicks: the first X-tremeVision the "H4" search lists.
@@ -464,6 +473,19 @@ let bulkIds = [];
     check('the kism shows the item photo in the stock list', shown > 0);
   });
 
+  await step('owner adds a missing option on the spot', async () => {
+    const pid = sql(`select id from products where name = '${tag}'`);
+    if (!pid) throw new Error('no item');
+    await go(page, `/admin/item?id=${pid}`, 7000);
+    await addOther(page, /^Voltage/, '48V');
+    await page.getByRole('button', { name: 'Badlav kar do' }).click();
+    await page.waitForTimeout(8000);
+    check('the new option is in the list for everyone', num(`select count(*) from spec_options o join spec_definitions d on d.id = o.spec_definition_id
+      join products p on p.family_id = d.family_id where p.id = '${pid}' and d.code = 'voltage' and o.value = '48V'`) === 1);
+    check('the item carries it', sql(`select sv.display_value from spec_values sv join spec_definitions d on d.id = sv.spec_definition_id
+      where sv.product_id = '${pid}' and sv.variant_id is null and d.code = 'voltage'`) === '48V');
+  });
+
   // Owner, 7 Oct 2026: an item made once is not made again for another car.
   await step('the same item for another car is a new kism, not a new item', async () => {
     const pid = sql(`select id from products where name = '${tag}'`);
@@ -602,6 +624,9 @@ let editReq = '';
     // The wrong car out, the right one in, and a new rate.
     await page.getByText(/^Maruti Suzuki Swift.*✕$/).locator('visible=true').first().click();
     await pickFrom(page, 'Creta, Swift, Nexon…', 'Baleno', 'Maruti Suzuki Baleno');
+    // Staff, 9 Oct 2026: "spoiler mein grey colour nahi aa raha" — a value
+    // the list does not have is typed in, not waited for.
+    await addOther(page, /^Pack Size/, 'Set of 3');
     await page.getByLabel('Bechne ka rate').locator('visible=true').first().fill('1199');
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: /Badlav owner ko bhejo|Badlav bhejo/ }).click();
@@ -671,6 +696,8 @@ let editReq = '';
     check('the kism has the new rate', num(`select retail_price from product_variants where id = '${editKism}'`) === 1199);
     check('the kism goes on the right car now', sql(`select string_agg(vm.name, ',') from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
                                                      where pf.variant_id = '${editKism}'`) === 'Baleno');
+    check('a value staff typed is kept on the kism', sql(`select sv.display_value || '|' || coalesce(sv.option_id::text, 'none')
+       from spec_values sv join spec_definitions d on d.id = sv.spec_definition_id where sv.variant_id = '${editKism}' and d.code = 'pack'`) === 'Set of 3|none');
     check('the other kism kept its car', sql(`select string_agg(vm.name, ',') from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
                                                 where pf.variant_id = '${creta}'`) === 'Creta');
   });

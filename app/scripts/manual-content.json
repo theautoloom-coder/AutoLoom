@@ -112,10 +112,12 @@
       {
         "img": "approval.png",
         "title": "Approval ki list",
-        "what": "“Aur” → “Approval”, ya Stock / Ghar par “Approval baaki”. Staff ka aaya hua maal aur naye item ki request — dono yahan.",
+        "what": "“Aur” → “Approval”, ya Stock / Ghar par “Approval baaki”. Staff ka aaya hua maal, stock theek karne ki request aur naye item — sab ek list mein, din ke hisaab se.",
         "steps": [
-          "“Aaya hua maal — approve karo” mein entry par tap karo.",
-          "“Naye item” mein staff ki bheji item request — dekho, haan ya mana."
+          "Upar teen tab: “Baaki” (aapke haan ka intezaar), “Staff ke paas” (wapas bheji), “Ho chuka” (30 din ke faisle).",
+          "“Maal”, “Stock theek”, “Item” se ek tarah ki dekho; staff ke naam se sirf unki. “⇅” se naya ya purana pehle.",
+          "Har line par “Approve”. Tap karo to wahin neeche poori detail khulti hai.",
+          "“Sab approve karo” / “Sab mana karo” — jo filter mein dikh raha hai sirf us par lagta hai."
         ]
       },
       {
@@ -207,7 +209,7 @@
           "Item kholo → kism ke neeche “Stock theek karo”, ya “Nayi entry” → “Stock theek karo”.",
           "“Asal mein kitna hai” mein jitna sach mein hai wo likho — farak (+/−) dikh jaata hai. Wajah chuno.",
           "Staff: “Haan, owner ko bhejo”. Partner: “Haan, stock theek kar do” — turant lagta hai.",
-          "Partner: Approval → “Stock theek karna” → request kholo → “Approve karo” ya wajah likh ke “Mana karo”."
+          "Partner: Approval → “Stock theek” chip → request kholo → “Approve karo” ya wajah likh ke “Mana karo”."
         ]
       },
       {

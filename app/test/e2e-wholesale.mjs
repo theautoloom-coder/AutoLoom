@@ -690,12 +690,22 @@ let editReq = '';
     const waiting = num(`select count(*) from purchases where doc_type = 'purchase' and status = 'draft' and submitted_at is not null`);
     await go(page, '/requests', 6000);
     check('each entry has its own approve button', await page.getByRole('button', { name: 'Approve', exact: true }).locator('visible=true').count() >= 2);
+    // Owner, 11 Oct 2026: tabs, a filter by kind, and the queue laid out by day.
+    check('the queue is laid out by day', await page.getByText(/^Aaj · /i).first().isVisible().catch(() => false));
+    const items = num(`select count(*) from change_requests where status = 'pending'`);
+    await page.getByRole('button', { name: /^Maal · \d+$/ }).click();
+    await page.waitForTimeout(1200);
+    check('the kind filter leaves only maal', await page.getByText(`${askTag}-1`, { exact: true }).locator('visible=true').count() === 0);
     await page.getByRole('button', { name: new RegExp(`^Sab approve karo \\(${waiting}\\)$`) }).click();
     await yes(page);
     await page.waitForTimeout(8000 + waiting * 2500);
     check('the whole queue is approved', num(`select count(*) from purchases where doc_type = 'purchase' and status = 'draft' and submitted_at is not null`) === 0);
     check('both entries are posted', bulkIds.every((id) => sql(`select status from purchases where id = '${id}'`) === 'posted'));
     check('their stock went up', godownQty() >= before + 3, `${before} → ${godownQty()}`);
+    check('the filter kept the item requests out of it', num(`select count(*) from change_requests where status = 'pending'`) === items);
+    await page.getByRole('button', { name: /^Ho chuka · \d+$/ }).click();
+    await page.waitForTimeout(1500);
+    check('the decided tab shows them approved', await visible(page, `${SUPPLIER2} · 1 pcs`) && await visible(page, 'ne approve kiya', false));
   });
 
   await step('owner approves a kism change', async () => {
@@ -724,6 +734,8 @@ let editReq = '';
     await page.waitForTimeout(1500);
     check('a request opens in place in the list', await visible(page, 'Poora kholo') && await visible(page, `₹1000`));
     const pendingNow = num(`select count(*) from change_requests where status = 'pending'`);
+    await page.getByRole('button', { name: /^Item · \d+$/ }).click();
+    await page.waitForTimeout(800);
     await page.getByRole('button', { name: new RegExp(`^Sab approve karo \\(${pendingNow}\\)$`) }).click();
     await yes(page);
     await page.waitForTimeout(8000 + pendingNow * 2500);

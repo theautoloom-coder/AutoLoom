@@ -66,6 +66,13 @@ export async function refuseEntry(tx: Exec, id: string, reason: string, actor: A
   });
 }
 
+/** Refuse one waiting shelf correction, with the reason: the stock stays as it is. */
+export async function refuseFix(tx: Exec, id: string, reason: string, actor: Actor): Promise<void> {
+  await updateRow(tx, 'stock_adjustments', id, {
+    status: 'cancelled', cancel_reason: reason.trim(), cancelled_at: new Date().toISOString(), cancelled_by: actor.userId,
+  });
+}
+
 /**
  * Approve one staff request — a new item, a new kism, or a change. Reads
  * what the approval needs (the SKUs taken, the category's prefix) at the

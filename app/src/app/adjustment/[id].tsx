@@ -15,6 +15,7 @@ import { View } from 'react-native';
 
 import { formatINR } from '@domain';
 
+import { refuseFix } from '@/lib/approvals';
 import { postAdjustment, reverseMovements } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
@@ -87,9 +88,7 @@ export default function AdjustmentDetail() {
   async function refuse() {
     if (!a) return;
     if (!why.trim()) { notify('Mana karne ki wajah likho.', 'danger'); return; }
-    await updateRow(db, 'stock_adjustments', a.id, {
-      status: 'cancelled', cancel_reason: why.trim(), cancelled_at: new Date().toISOString(), cancelled_by: actor.userId,
-    });
+    await refuseFix(db, a.id, why, actor);
     notify('Mana kar diya — stock waisa hi hai.', 'ok');
     router.back();
   }

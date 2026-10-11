@@ -184,7 +184,7 @@ if (await signIn(OWNER, OWNER_PW, 'Owner')) {
 console.log('\n=== 4. Staff theek karke dobara bhejta hai ===');
 await signOut();
 if (await signIn(STAFF_EMAIL, STAFF_PW, 'Staff')) {
-  await page.goto(`${base}/requests`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${base}/requests?tab=wapas`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(8000);
   const t = await body();
   const sawReason = t.includes('Kharid rate likho');

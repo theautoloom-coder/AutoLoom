@@ -213,7 +213,7 @@ export default function MoreScreen() {
               : myWaiting > 0
               ? `${myWaiting} review mein — approve hone tak badal sakte ho`
               : 'Aaya hua maal aur naye item — owner ke haan ka intezaar'}
-            onPress={() => router.push('/requests')}
+            onPress={() => router.push(myRejected > 0 ? '/requests?tab=wapas' : '/requests')}
             right={myRejected > 0 ? <Badge tone="danger">{String(myRejected)}</Badge> : myWaiting > 0 ? <Badge tone="warn">{String(myWaiting)}</Badge> : undefined}
           />
         ) : null}

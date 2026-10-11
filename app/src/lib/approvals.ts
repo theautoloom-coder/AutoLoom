@@ -10,6 +10,7 @@
 import type { Transaction } from '@powersync/react-native';
 
 import { postCorrection, postPurchase } from './posting';
+import { approveRequest, parseProposal, type ChangeRequest } from './requests';
 import { updateRow, type Actor } from './writes';
 
 type Exec = Pick<Transaction, 'execute'>;
@@ -63,6 +64,28 @@ export async function refuseEntry(tx: Exec, id: string, reason: string, actor: A
   await updateRow(tx, 'purchases', id, {
     status: 'cancelled', cancel_reason: reason.trim(), cancelled_at: new Date().toISOString(), cancelled_by: actor.userId,
   });
+}
+
+/**
+ * Approve one staff request — a new item, a new kism, or a change. Reads
+ * what the approval needs (the SKUs taken, the category's prefix) at the
+ * moment of approving, so a run of approvals never hands two kisms one SKU.
+ * A new item whose name an item already has is refused: approving a queue
+ * at once must not make the same item twice.
+ */
+export async function approveChangeRequest(
+  db: { getAll: <T>(sql: string, params?: unknown[]) => Promise<T[]> } & Parameters<typeof approveRequest>[0],
+  req: ChangeRequest, actor: Actor, locationId: string | null,
+): Promise<string> {
+  const p = parseProposal(req);
+  if (!p) throw new Error('Request ka data padha nahi ja saka');
+  if (!p.product_id && !p.edit_variant_id && !p.edit_product_id) {
+    const same = await db.getAll<{ id: string }>('SELECT id FROM products WHERE lower(trim(name)) = ? AND is_active = 1 LIMIT 1', [p.name.trim().toLowerCase()]);
+    if (same.length) throw new Error(`“${p.name.trim()}” naam ka item pehle se hai`);
+  }
+  const skus = await db.getAll<{ sku: string }>('SELECT sku FROM product_variants');
+  const fam = p.family_id ? (await db.getAll<{ sku_prefix: string }>('SELECT sku_prefix FROM product_families WHERE id = ?', [p.family_id]))[0] : null;
+  return approveRequest(db, req, { actor, locationId, takenSkus: new Set(skus.map((r) => r.sku)), skuPrefix: fam?.sku_prefix ?? null });
 }
 
 /** For the confirm: pieces, value at known rates, and lines with no rate anywhere. */

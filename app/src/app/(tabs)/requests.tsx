@@ -20,14 +20,15 @@ import { View } from 'react-native';
 
 import { formatINR } from '@domain';
 
-import { approveEntry, queueSummary, refuseEntry } from '@/lib/approvals';
+import { approveChangeRequest, approveEntry, queueSummary, refuseEntry } from '@/lib/approvals';
 import { postAdjustment } from '@/lib/posting';
 import { useSystem } from '@/lib/system';
 
 import { useSession } from '@/lib/session';
-import { formHref, parseProposal, type ChangeRequest } from '@/lib/requests';
+import { formHref, parseProposal, rejectRequest, type ChangeRequest } from '@/lib/requests';
 import { Badge, Button, Card, Divider, Empty, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { EntryReview } from '@/ui/entry-review';
+import { RequestSummary } from '@/ui/request-summary';
 import { confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
 
@@ -82,7 +83,7 @@ function subtitle(req: ReqRow, mine: boolean): string {
 export default function RequestsScreen() {
   const router = useRouter();
   const { db } = useSystem();
-  const { can, actor } = useSession();
+  const { can, actor, locationId } = useSession();
   const isReviewer = can('catalog.edit');
   const approver = can('purchase.approve');
   const showCost = can('catalog.view_cost');
@@ -92,13 +93,22 @@ export default function RequestsScreen() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [bulkWhy, setBulkWhy] = useState('');
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
+  // The same for staff requests: new items, new kisms, changes (11 Oct 2026).
+  const [openReq, setOpenReq] = useState<string | null>(null);
+  const [reqWhy, setReqWhy] = useState('');
+  const [bulkReqWhy, setBulkReqWhy] = useState('');
+  const [bulkReq, setBulkReq] = useState<{ done: number; total: number } | null>(null);
 
   // Stock entries from staff: the approver sees all of them, staff their own.
   // submitted_at set = waiting; cleared = sent back for a fix.
   // Everything a staff member sent, wherever it is now: waiting (and still
   // theirs to change), back with them, or decided in the last 30 days —
   // approved or refused, with who decided and why.
-  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  // Fixed for the life of the screen. Computed on every render it was a new
+  // value each time, every query using it restarted on each render and, once
+  // the screen re-rendered often enough, never finished: the stock requests
+  // sat on "loading" and showed as none (11 Oct 2026).
+  const [since] = useState(() => new Date(Date.now() - 30 * 86400000).toISOString());
   const { data: entryRows } = useQuery<Entry>(
     `SELECT p.id, p.status, p.doc_no, p.doc_date, p.submitted_at, p.revised_at, p.notes, p.cancel_reason,
             COALESCE(p.posted_at, p.cancelled_at) AS decided_at,
@@ -222,6 +232,56 @@ export default function RequestsScreen() {
   const pending = all.filter((r) => r.status === 'pending');
   const rejected = all.filter((r) => r.status === 'rejected');
   const done = all.filter((r) => r.status === 'approved' || r.status === 'cancelled');
+
+  async function quickApproveReq(r: ReqRow) {
+    if (!(await confirm('Approve karein?', `${title(r)}${r.submitter ? ` — ${r.submitter}` : ''}.`))) return;
+    try {
+      await approveChangeRequest(db, r, actor, locationId ?? null);
+      notify(`${title(r)} — approve ho gaya.`, 'ok');
+      if (openReq === r.id) setOpenReq(null);
+    } catch (err) {
+      notify(`Nahi hua: ${(err as Error).message}`, 'danger');
+    }
+  }
+
+  async function rejectReq(r: ReqRow) {
+    if (!reqWhy.trim()) { notify('Wajah likho — usi se staff theek karke bhej payega.', 'danger'); return; }
+    await rejectRequest(db, r.id, reqWhy);
+    setReqWhy('');
+    setOpenReq(null);
+    notify('Wapas bhej diya.', 'ok');
+  }
+
+  /** Every waiting request, each on its own, so one bad one stops none of the rest. */
+  async function approveAllReqs() {
+    const list = [...pending];
+    if (!(await confirm(`Sab ${list.length} request approve karein?`,
+      'Naye item catalogue mein aa jayenge aur badlav lag jayenge. Jis naye item ka naam pehle se hai, wo chhod diya jayega.'))) return;
+    const failed: string[] = [];
+    setBulkReq({ done: 0, total: list.length });
+    for (const [i, r] of list.entries()) {
+      try {
+        await approveChangeRequest(db, r, actor, locationId ?? null);
+      } catch (err) {
+        failed.push(`${title(r)}: ${(err as Error).message}`);
+      }
+      setBulkReq({ done: i + 1, total: list.length });
+    }
+    setBulkReq(null);
+    setOpenReq(null);
+    if (failed.length) notify(`${list.length - failed.length} approve hui, ${failed.length} nahi — ${failed[0]}`, 'danger');
+    else notify(`Sab ${list.length} request approve ho gayi.`, 'ok');
+  }
+
+  async function rejectAllReqs() {
+    if (!bulkReqWhy.trim()) { notify('Sab wapas bhejne ki wajah likho.', 'danger'); return; }
+    const list = [...pending];
+    if (!(await confirm(`Sab ${list.length} request wapas bhejein?`, 'Staff ko wajah dikhegi — theek karke dobara bhej sakte hain.'))) return;
+    for (const r of list) await rejectRequest(db, r.id, bulkReqWhy);
+    setBulkReqWhy('');
+    setOpenReq(null);
+    notify(`${list.length} request wapas bhej di.`, 'ok');
+  }
 
   const open = (r: ReqRow) => {
     // A reviewer reviews it. The submitter of a rejected one goes straight back
@@ -412,19 +472,51 @@ export default function RequestsScreen() {
             }
           />
         ) : (
-          <Card style={{ gap: 0 }}>
-            {pending.map((r, i) => (
-              <React.Fragment key={r.id}>
-                {i > 0 ? <Divider /> : null}
-                <ListRow
-                title={title(r)}
-                subtitle={subtitle(r, !isReviewer)}
-                right={r.revision > 1 ? <Badge tone="info">{`${r.revision}x`}</Badge> : <Badge tone="warn">Baaki hai</Badge>}
-                onPress={() => open(r)}
-              />
-              </React.Fragment>
-            ))}
-          </Card>
+          <>
+            {isReviewer && pending.length > 1 ? (
+              <Card style={{ gap: space.sm }}>
+                <Button
+                  title={bulkReq ? `Approve ho rahi hain… ${bulkReq.done}/${bulkReq.total}` : `Sab approve karo (${pending.length})`}
+                  onPress={approveAllReqs} loading={!!bulkReq} disabled={!!bulkReq} />
+                <Row gap={space.sm} align="flex-end">
+                  <Input containerStyle={{ flex: 1 }} value={bulkReqWhy} onChangeText={setBulkReqWhy} placeholder="Sab wapas bhejne ki wajah" />
+                  <Button title={`Sab wapas bhejo (${pending.length})`} tone="danger" onPress={rejectAllReqs} disabled={!!bulkReq} />
+                </Row>
+              </Card>
+            ) : null}
+            <Card style={{ gap: 0 }}>
+              {pending.map((r, i) => (
+                <View key={r.id}>
+                  {i > 0 ? <Divider /> : null}
+                  <ListRow
+                    title={title(r)}
+                    subtitle={subtitle(r, !isReviewer)}
+                    right={isReviewer ? (
+                      <Row gap={space.xs} align="center">
+                        {r.revision > 1 ? <Badge tone="info">{`${r.revision}x`}</Badge> : null}
+                        <Button title="Approve" size="sm" onPress={() => quickApproveReq(r)} disabled={!!bulkReq} />
+                      </Row>
+                    ) : r.revision > 1 ? <Badge tone="info">{`${r.revision}x`}</Badge> : <Badge tone="warn">Baaki hai</Badge>}
+                    // The owner opens it here, in place; staff go to their request.
+                    onPress={() => (isReviewer ? (setOpenReq(openReq === r.id ? null : r.id), setReqWhy('')) : open(r))}
+                  />
+                  {isReviewer && openReq === r.id ? (
+                    <View style={{ gap: space.sm, paddingVertical: space.sm }}>
+                      <RequestSummary req={r} bare />
+                      <Row gap={space.sm}>
+                        <Button title="Approve karo" onPress={() => quickApproveReq(r)} style={{ flex: 1 }} />
+                        <Button title="Poora kholo" tone="ghost" onPress={() => open(r)} />
+                      </Row>
+                      <Row gap={space.sm} align="flex-end">
+                        <Input containerStyle={{ flex: 1 }} value={reqWhy} onChangeText={setReqWhy} placeholder="Wapas bhejne ki wajah" />
+                        <Button title="Wapas bhejo" tone="danger" size="sm" onPress={() => rejectReq(r)} />
+                      </Row>
+                    </View>
+                  ) : null}
+                </View>
+              ))}
+            </Card>
+          </>
         )}
 
         {isReviewer && rejected.length > 0 ? (

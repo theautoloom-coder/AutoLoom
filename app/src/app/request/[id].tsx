@@ -11,18 +11,19 @@ import { statusLabel } from '@domain';
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
+
+import { approveChangeRequest } from '@/lib/approvals';
 
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
-import {
-  approveRequest, cancelRequest, fitsOf, formHref, parseProposal, rejectRequest, variantNameOf, type ChangeRequest, type ProposalFit,
-} from '@/lib/requests';
+import { cancelRequest, formHref, parseProposal, rejectRequest, type ChangeRequest } from '@/lib/requests';
 import { Badge, Button, Card, Divider, Input, KV, Row, Screen, SectionTitle, Text } from '@/ui';
+import { RequestSummary } from '@/ui/request-summary';
 import { confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
 
-type Row = ChangeRequest & { submitter: string | null; reviewer: string | null };
+type ReqRow = ChangeRequest & { submitter: string | null; reviewer: string | null };
 
 const stamp = (iso: string | null) => {
   if (!iso) return '—';
@@ -39,7 +40,7 @@ export default function RequestReview() {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const { data: rows } = useQuery<Row>(
+  const { data: rows } = useQuery<ReqRow>(
     `SELECT cr.*,
             sub.full_name AS submitter,
             rev.full_name AS reviewer
@@ -51,51 +52,8 @@ export default function RequestReview() {
   );
   const req = rows?.[0] ?? null;
 
-  // The SKU generator needs the set that already exists, and the prefix comes
-  // from the category the submitter chose.
-  const { data: skuRows } = useQuery<{ sku: string }>('SELECT sku FROM product_variants');
-  const takenSkus = useMemo(() => new Set((skuRows ?? []).map((r) => r.sku)), [skuRows]);
-
   const p = req ? parseProposal(req) : null;
-  const { data: famRows } = useQuery<{ sku_prefix: string; name: string }>(
-    'SELECT sku_prefix, name FROM product_families WHERE id = ? LIMIT 1',
-    [p?.family_id ?? ''],
-  );
-  const family = famRows?.[0] ?? null;
-  // A change to what exists (owner, 8 Oct 2026): what it was beside what is
-  // asked, detail by detail, the changed ones marked.
   const isEdit = !!(p?.edit_variant_id || p?.edit_product_id);
-  const { data: defRows } = useQuery<{ id: string; name: string; sort_order: number }>(
-    'SELECT id, name, sort_order FROM spec_definitions WHERE family_id = ? ORDER BY sort_order', [isEdit ? p?.family_id ?? '' : '']);
-  const { data: modelRows } = useQuery<{ id: string; name: string }>(
-    'SELECT id, name FROM vehicle_models WHERE ? = 1', [isEdit ? 1 : 0]);
-  const carsOf = (fits: ProposalFit[] | undefined) => (fits ?? []).map((f) => {
-    const m = (modelRows ?? []).find((x) => x.id === f.model_id)?.name ?? f.label ?? 'Gaadi';
-    return `${m}${f.year_from ? ` ${f.year_from}${f.year_to ? (f.year_to === f.year_from ? '' : `–${f.year_to}`) : '+'}` : ''}`;
-  }).join(', ') || 'Sab gaadi';
-  const diff: { k: string; was: string; now: string }[] = [];
-  if (p && isEdit) {
-    const b = p.before ?? {};
-    if (p.edit_variant_id) diff.push({ k: 'Kism ka naam', was: b.name ?? '—', now: variantNameOf(p) });
-    else {
-      diff.push({ k: 'Item ka naam', was: b.name ?? '—', now: p.name });
-      diff.push({ k: 'Category', was: b.family_name ?? '—', now: family?.name ?? p.family_name ?? '—' });
-    }
-    const was = new Map((b.specs ?? []).map((x) => [x.def_id, x.display]));
-    const now = new Map((p.specs ?? []).map((x) => [x.def_id, x.display]));
-    for (const d of defRows ?? []) {
-      if (!was.has(d.id) && !now.has(d.id)) continue;
-      diff.push({ k: d.name, was: was.get(d.id) || '—', now: now.get(d.id) || '—' });
-    }
-    if (p.edit_variant_id) diff.push({ k: 'Gaadi', was: carsOf(b.fits), now: p.universal ? 'Sab gaadi' : carsOf(fitsOf(p)) });
-    else diff.push({ k: 'Har gaadi mein', was: b.universal ? 'Haan' : 'Nahi', now: p.universal ? 'Haan' : 'Nahi' });
-    diff.push({ k: 'Bechne ka rate', was: b.price != null ? `₹${b.price}` : '—', now: p.price != null ? `₹${p.price}` : '—' });
-    if (p.edit_variant_id) {
-      diff.push({ k: 'Set mein', was: String(b.pack_size ?? 1), now: String(p.pack_size ?? 1) });
-      diff.push({ k: 'Warranty (mahine)', was: String(b.warranty_months ?? 0), now: String(p.warranty_months ?? 0) });
-    }
-  }
-  const changed = diff.filter((d) => d.was !== d.now);
 
   if (!req) {
     return (
@@ -111,13 +69,11 @@ export default function RequestReview() {
   async function approve() {
     if (!req || !p) return;
     if (!(await confirm('Approve karein?', isEdit
-      ? `${changed.length} badlav lag jayenge — ${p.edit_variant_id ? 'sirf isi kism par' : 'item par'}.`
+      ? `Badlav lag jayega — ${p.edit_variant_id ? 'sirf isi kism par' : 'item par'}.`
       : `"${p.name}" catalogue mein daal diya jayega.`))) return;
     setBusy(true);
     try {
-      await approveRequest(db, req, {
-        actor, locationId, takenSkus, skuPrefix: family?.sku_prefix ?? null,
-      });
+      await approveChangeRequest(db, req, actor, locationId ?? null);
       notify(isEdit ? 'Approve ho gaya — badlav lag gaya.' : 'Approve ho gaya. Item catalogue mein aa gaya.', 'ok');
       router.replace('/requests');
     } catch (e) {
@@ -194,44 +150,7 @@ export default function RequestReview() {
           </Card>
         ) : null}
 
-        {isEdit ? (
-          <>
-            <Text color="textMuted">{p?.product_name ?? p?.name}{p?.edit_variant_id && p.before?.name ? ` · ${p.before.name}` : ''}</Text>
-            <SectionTitle right={<Text variant="small" color="textFaint">{changed.length} badle</Text>}>Pehle → ab</SectionTitle>
-            <Card style={{ gap: space.xs }}>
-              {diff.map((d) => (
-                <Row key={d.k} style={{ justifyContent: 'space-between' }} gap={space.sm} align="flex-start">
-                  <Text variant="small" color="textMuted" style={{ flex: 1 }}>{d.k}</Text>
-                  {d.was === d.now
-                    ? <Text variant="small" color="textFaint" style={{ flex: 2, textAlign: 'right' }}>{d.now}</Text>
-                    : <Text variant="small" style={{ flex: 2, textAlign: 'right' }}><Text variant="small" color="danger">{d.was}</Text>{'  →  '}<Text variant="small" color="ok">{d.now}</Text></Text>}
-                </Row>
-              ))}
-            </Card>
-          </>
-        ) : null}
-
-        {isEdit ? null : <SectionTitle>Kya maanga hai</SectionTitle>}
-        {isEdit ? null : <Card>
-          <KV k="Category" v={family?.name ?? '—'} />
-          <KV k="Item" v={p?.name ?? '—'} />
-          {p?.product_id ? <KV k="Kya hai" v="Is item ki nayi kism — item pehle se hai" /> : null}
-          {(p?.specs ?? []).length
-            ? (p?.specs ?? []).map((sp) => <KV key={sp.def_id} k={sp.name} v={sp.display} />)
-            : (<>
-                <KV k="Type" v={p?.type || '—'} />
-                <KV k="Colour" v={p?.colour || '—'} />
-              </>)}
-          <KV k="Gaadi" v={p?.universal ? 'Sab gaadi' : (p?.fits ?? []).map((f) => f.label).filter(Boolean).join(', ') || [p?.car_text, p?.year_text].filter(Boolean).join(' ') || 'Sab gaadi'} />
-          <Divider />
-          <KV k="Qty" v={String(p?.qty ?? 0)} mono />
-          <KV k="Bechne ka rate" v={p?.price != null ? `₹${p.price}` : '—'} mono />
-          {can('catalog.view_cost') ? <KV k="Kharid rate" v={p?.cost != null ? `₹${p.cost}` : '—'} mono /> : null}
-          {p?.pack_size && p.pack_size > 1 ? (
-            <KV k="Set mein" v={`${p.pack_size} ${p.pack_label || 'pcs'}`} mono />
-          ) : null}
-          {p?.warranty_months ? <KV k="Warranty" v={`${p.warranty_months} mahine`} mono /> : null}
-        </Card>}
+        <RequestSummary req={req} />
 
         <SectionTitle>Kisne, kab</SectionTitle>
         <Card>

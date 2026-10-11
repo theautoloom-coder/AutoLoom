@@ -142,6 +142,8 @@ let entryId = '';
 let bulbTag = '';
 // Two small staff entries the owner approves all at once.
 let bulkIds = [];
+// Two new items staff ask for; the owner approves them all at once.
+const askTag = `E2E Ask ${Date.now().toString().slice(-5)}`;
 
 // ---------------------------------------------------------------------------
 // Staff
@@ -592,6 +594,19 @@ let editReq = '';
     check('two entries wait for the owner', bulkIds.length === 2);
   });
 
+  await step('staff ask for two new items', async () => {
+    const fam = sql(`select name from product_families where code = 'SPLR'`) || sql(`select name from product_families where is_active order by sort_order limit 1`);
+    for (const n of [1, 2]) {
+      await go(page, '/admin/item', 6000);
+      await pickFrom(page, 'LED Bulb / Mats / Seat cover…', fam.slice(0, 5), fam);
+      await page.getByLabel('Item ka naam').fill(`${askTag}-${n}`);
+      await page.getByLabel('Bechne ka rate').fill(String(1000 * n));
+      await page.getByRole('button', { name: 'Owner ko bhejo' }).click();
+      await page.waitForTimeout(6000);
+    }
+    check('both item requests wait for the owner', num(`select count(*) from change_requests where status = 'pending' and payload like '%${askTag}%'`) === 2);
+  });
+
   await step('staff ask to put the stock right', async () => {
     const before = godownQty();
     await go(page, `/stock-check?variant=${H4}`, 7000);
@@ -701,6 +716,21 @@ let editReq = '';
     check('the other kism kept its car', sql(`select string_agg(vm.name, ',') from product_fitments pf join vehicle_models vm on vm.id = pf.model_id
                                                 where pf.variant_id = '${creta}'`) === 'Creta');
   });
+
+  // Owner, 11 Oct 2026: new item requests approved from the list, all at once.
+  await step('owner approves all item requests at once', async () => {
+    await go(page, '/requests', 7000);
+    await page.getByText(`${askTag}-1`, { exact: true }).locator('visible=true').first().click();
+    await page.waitForTimeout(1500);
+    check('a request opens in place in the list', await visible(page, 'Poora kholo') && await visible(page, `₹1000`));
+    const pendingNow = num(`select count(*) from change_requests where status = 'pending'`);
+    await page.getByRole('button', { name: new RegExp(`^Sab approve karo \\(${pendingNow}\\)$`) }).click();
+    await yes(page);
+    await page.waitForTimeout(8000 + pendingNow * 2500);
+    check('both requests are approved', num(`select count(*) from change_requests where status = 'approved' and payload like '%${askTag}%'`) === 2);
+    check('both items are in the catalogue', num(`select count(*) from products where name like '${askTag}-%'`) === 2);
+  });
+
 
   await ctx.close();
 }

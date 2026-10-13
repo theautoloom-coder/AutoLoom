@@ -10,10 +10,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatINR } from '@domain';
 
-import { SEARCH_VARIANTS, tokenize } from '@/lib/queries';
+import { SEARCH_VARIANTS, tokenClause, tokenize } from '@/lib/queries';
 import { Badge, Button, Divider, Empty, IconButton, Input, ListRow, Row, ScreenScroll, Text, useTheme } from './index';
 import { ItemPhoto } from './photo';
 import { radius, shadow, space } from './theme';
+
+/** Results shown at a time, and how many more each "Aur dikhao" adds. */
+const PAGE = 30;
 
 export type PickedVariant = {
   id: string; sku: string; barcode: string | null; variant_name: string; product_id: string; product_name: string; brand_name: string | null; family_name: string | null;
@@ -22,8 +25,8 @@ export type PickedVariant = {
   photo_path?: string | null;
 };
 
-const PICK_SQL = (tokens: string[]) => {
-  const base = SEARCH_VARIANTS(tokens, 30);
+const PICK_SQL = (tokens: string[], limit: number) => {
+  const base = SEARCH_VARIANTS(tokens, limit);
   return {
     sql: base.sql.replace(
       'FROM product_variants pv',
@@ -44,20 +47,38 @@ const PICK_SQL = (tokens: string[]) => {
  * forward was to abandon the bill with the customer standing there. The
  * document is a draft and survives, so making the item and coming back is safe.
  */
-export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice, locationId, autoFocus = true }: { onPick: (v: PickedVariant) => void; onCreate?: (text: string) => void; canCreate?: boolean; showCost?: boolean; showPrice?: boolean; locationId?: string | null; autoFocus?: boolean }) {
+export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice, locationId, autoFocus = true, note, noteTone = 'ok', onType }: {
+  onPick: (v: PickedVariant) => void; onCreate?: (text: string) => void; canCreate?: boolean; showCost?: boolean; showPrice?: boolean; locationId?: string | null; autoFocus?: boolean;
+  /** Shown under the box while it is empty: what the last pick did. With the keyboard up the line it made is out of sight. */
+  note?: string | null;
+  noteTone?: 'ok' | 'textMuted';
+  onType?: () => void;
+}) {
   const [q, setQ] = useState('');
+  // Owner, 13 Oct 2026: a bill would not take the other items. The list
+  // stopped at 30 and said nothing: "mat" finds 66 kisms in the shop, 53 of
+  // one item, and the rest — two whole items — were never on screen. Now it
+  // says how many more there are, and shows them on asking.
+  const [limit, setLimit] = useState(PAGE);
   const inputRef = useRef<TextInput>(null);
   const screen = useContext(ScreenScroll);
   const tokens = useMemo(() => tokenize(q), [q]);
-  const pq = PICK_SQL(tokens.length ? tokens : [' ']);
-  const { data: hits } = useQuery<PickedVariant>(pq.sql, pq.params);
+  const pq = PICK_SQL(tokens.length ? tokens : [' '], limit + 1);
+  const { data: found } = useQuery<PickedVariant>(pq.sql, pq.params);
+  const hits = (found ?? []).slice(0, limit);
+  const more = (found ?? []).length > limit;
+  const cq = tokenClause('pv.search_text', tokens.length ? tokens : [' ']);
+  const { data: counted } = useQuery<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM product_variants pv JOIN products p ON p.id = pv.product_id
+      WHERE pv.is_active = 1 AND p.is_active = 1 AND ${cq.sql} AND ? = 1`, [...cq.params, more ? 1 : 0]);
+  const total = more ? Number(counted?.[0]?.n ?? 0) : hits.length;
   const { data: locQty } = useQuery<{ variant_id: string; qty: number }>(
     'SELECT variant_id, qty FROM stock_on_hand WHERE location_id = ?', [locationId ?? '']);
   const locMap = useMemo(() => new Map((locQty ?? []).map((l) => [l.variant_id, l.qty])), [locQty]);
 
   function submit() {
     // A scanner types the barcode and presses Enter: pick the exact match at once.
-    const exact = (hits ?? []).find((h) => h.barcode === q.trim() || h.sku.toLowerCase() === q.trim().toLowerCase());
+    const exact = (found ?? []).find((h) => h.barcode === q.trim() || h.sku.toLowerCase() === q.trim().toLowerCase());
     if (exact) {
       onPick(exact);
       setQ('');
@@ -72,7 +93,7 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
           ref={inputRef}
           containerStyle={{ flex: 1 }}
           value={q}
-          onChangeText={setQ}
+          onChangeText={(s) => { setQ(s); setLimit(PAGE); onType?.(); }}
           placeholder="Scan karo ya SKU / naam likho"
           autoCapitalize="none"
           autoCorrect={false}
@@ -84,9 +105,10 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
         />
         {Platform.OS !== 'web' ? <ScanButton onScanned={(code) => { setQ(code); setTimeout(submit, 50); }} /> : null}
       </Row>
+      {note && tokens.length === 0 ? <Text variant="small" color={noteTone}>{note}</Text> : null}
       {tokens.length > 0 ? (
         <View>
-          {(hits ?? []).map((h) => (
+          {hits.map((h) => (
             <ListRow
               key={h.id}
               left={<ItemPhoto path={h.photo_path} name={h.product_name} size={40} />}
@@ -106,7 +128,15 @@ export function VariantPicker({ onPick, onCreate, canCreate, showCost, showPrice
               }
             />
           ))}
-          {(hits ?? []).length === 0 ? (
+          {more ? (
+            <View style={{ gap: 6, paddingVertical: 8 }}>
+              <Text variant="small" color="textMuted">
+                {total > hits.length ? `${total - hits.length} aur mile` : 'Aur bhi mile'} — gaadi, colour ya kism bhi likho, jaise “mat fronx”.
+              </Text>
+              <Button title="Aur dikhao" tone="secondary" size="sm" onPress={() => setLimit(limit + PAGE)} />
+            </View>
+          ) : null}
+          {hits.length === 0 ? (
             onCreate && q.trim() ? (
               <View style={{ gap: 8, paddingVertical: 8 }}>
                 <Empty title={`"${q.trim()}" nahi mila`} />

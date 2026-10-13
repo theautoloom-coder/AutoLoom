@@ -61,7 +61,7 @@ for (const email of ['accounts@autoloom.local', 'sales@autoloom.local', 'warehou
   if (email === 'sales@autoloom.local') {
     await page.goto(base + '/invoice/edit', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(6000);
-    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('xtreme');
     await page.waitForTimeout(2500);
     const pickerText = await page.locator('body').innerText();
     check('item search hides the buy rate', !/lagat ₹/.test(pickerText));

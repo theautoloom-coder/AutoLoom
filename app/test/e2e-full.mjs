@@ -97,7 +97,7 @@ console.log('\n▸ Bill Banao');
   await go('/invoice/edit', 6500);
   // A new bill opens on the cash customer (Walk-in) already.
   await page.waitForTimeout(1500);
-  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('xtreme');
   await page.waitForTimeout(2800);
   await page.getByText(/X-tremeVision/i).first().click();
   await page.waitForTimeout(2500);
@@ -155,7 +155,7 @@ console.log('\n▸ Kharab Likho');
   const before = kharab();
   const losses = num("select count(*) from stock_movements where movement_type='damage'");
   await go('/kharab-maal', 6500);
-  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('xtreme');
   await page.waitForTimeout(2800);
   await page.getByText(/X-tremeVision/i).first().click();
   await page.waitForTimeout(2500);

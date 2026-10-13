@@ -27,7 +27,7 @@ export default function ProductsAdmin() {
     ORDER BY p.is_active DESC, f.sort_order, p.name`, [family ?? '']);
 
   const tokens = useMemo(() => tokenize(q), [q]);
-  const sq = SEARCH_VARIANTS(tokens.length ? tokens : [' '], 30);
+  const sq = SEARCH_VARIANTS(tokens.length ? tokens : [' '], 200);
   const { data: hits } = useQuery<VariantHit>(sq.sql, sq.params);
 
   return (

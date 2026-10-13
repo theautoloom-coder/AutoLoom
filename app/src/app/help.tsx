@@ -59,6 +59,7 @@ const TOPICS: Topic[] = [
       'Neeche laal “Nayi entry” dabao, phir “Bill Banao”.',
       '“Kaun le raha hai” mein pehle se “Cash Grahak” hota hai — turant paisa dene wala. Khata wali dukaan ya banda ho to uska naam chuno; naya ho to naam likh ke “+ Naya banao”.',
       'Maal scan karo ya naam likho — socket, watt, gaadi sab list mein dikhta hai. Qty aur rate dekh lo.',
+      'Aur maal? Usi dabbe mein agla naam likho — har item alag line mein judta hai, naya wala sabse upar. Item na dikhe to gaadi ya colour bhi likho (“mat fronx”), ya neeche “Aur dikhao”.',
       '“Paisa kaise aaya” — Cash, Online / UPI, Card, Bank. Khata wale grahak ke liye “Udhaar” bhi.',
       '“Bill bana do” dabao. Stock kam ho gaya, udhaar ho to khaate mein chadh gaya.',
       'Bill ban gaya to “WhatsApp parchi” se grahak ko bhej do.',

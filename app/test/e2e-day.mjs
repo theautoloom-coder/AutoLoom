@@ -120,7 +120,7 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
     await page.waitForTimeout(900);
     await page.getByText('XYZ Accessories', { exact: true }).locator('visible=true').first().click();
     await page.waitForTimeout(1200);
-    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('xtreme');
     await page.waitForTimeout(2500);
     await page.getByText(/X-tremeVision/i).first().click();
     await page.waitForTimeout(2000);
@@ -140,6 +140,44 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
     check('after the payment, back on the same bill', page.url() === url, page.url().replace(base, ''));
     const paid = await page.getByText(/poora mila/i).first().isVisible().catch(() => false);
     check('the bill now shows it is paid', paid);
+  });
+  // Owner, 13 Oct 2026: "ek bill mein multiple items nahi ho pa rahe".
+  await step('one bill, three items', async () => {
+    await go(page, '/invoice/edit', 6500);
+    const box = page.getByPlaceholder('Scan karo ya SKU / naam likho');
+    // A wide search used to stop at 30 rows without a word: the rest of the
+    // shop's items were simply not there to pick.
+    const h4 = num(`select count(*) from product_variants pv join products p on p.id = pv.product_id where pv.is_active and p.is_active and pv.search_text like '%h4%'`);
+    if (h4 > 30) {
+      await box.fill('h4');
+      await page.waitForTimeout(2500);
+      const left = async () => Number((await page.getByText(/aur mile — gaadi/).first().innerText().catch(() => '0')).match(/^(\d+)/)?.[1] ?? 0);
+      const before = await left();
+      check('a wide search says how many more there are', before === h4 - 30, `${before} of ${h4}`);
+      await page.getByRole('button', { name: 'Aur dikhao' }).click();
+      await page.waitForTimeout(2000);
+      check('and shows them on asking', (await left()) === Math.max(h4 - 60, 0), `${await left()} left`);
+    }
+    const picks = [['xtreme', /X-tremeVision/i], ['mat set', /^7D Mat Set · Coffee$/], ['elegant creta black', /^Elegant 7D Luxury Car Mat · Creta 2024\+ Black$/]];
+    for (const [n, [term, row]] of picks.entries()) {
+      await box.fill(term);
+      await page.waitForTimeout(2500);
+      await page.getByText(row).first().click();
+      await page.waitForTimeout(1800);
+      check(`item ${n + 1} is added and said so`, await page.getByText(new RegExp(`jud gaya · Maal · ${n + 1}$`)).first().isVisible().catch(() => false));
+    }
+    check('the box says the next item goes in it', await page.getByText(/Aur maal\? Yahin naam likho/).first().isVisible().catch(() => false)
+      || await page.getByText(/jud gaya · Maal · 3/).first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: 'Line hatao' }).first().click();
+    check('removing a line asks first', await page.getByText('Ye maal bill se hatayein?').isVisible().catch(() => false));
+    await page.getByRole('button', { name: /Rehne do/i }).first().click();
+    await page.waitForTimeout(800);
+    const draft = sql(`select id from sales_invoices where status = 'draft' and doc_type = 'invoice' order by created_at desc limit 1`);
+    await postBill(page, 'Cash');
+    await page.waitForTimeout(9000);
+    check('the bill is posted', sql(`select status from sales_invoices where id = '${draft}'`) === 'posted');
+    check('with all three items', num(`select count(*) from sales_invoice_lines where invoice_id = '${draft}'`) === 3);
+    check('and three stock movements', num(`select count(*) from stock_movements where ref_id = '${draft}'`) === 3);
   });
   await step('staff can propose a new item', async () => {
     await go(page, '/requests', 4000);
@@ -191,7 +229,7 @@ console.log('\n▸ staff (godown): stock-in with a new supplier typed in, ginti'
     const posted = num("select count(*) from stock_adjustments where status='posted' and reason='audit'");
     const asked = num("select count(*) from stock_adjustments where status='draft' and submitted_at is not null");
     await go(page, '/stock-check', 6000);
-    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+    await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('xtreme');
     await page.waitForTimeout(2500);
     await page.getByText(/X-tremeVision/i).first().click();
     await page.waitForTimeout(2000);

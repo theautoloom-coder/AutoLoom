@@ -70,7 +70,7 @@ async function pickFrom(page, placeholderText, search, option) {
   await page.getByText(option, { exact: true }).locator('visible=true').first().click();
   await page.waitForTimeout(1200);
 }
-async function pickItem(page, q = 'H4') {
+async function pickItem(page, q = 'xtreme') {
   await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill(q);
   await page.waitForTimeout(2500);
   // Visible only: on the web the screen underneath stays mounted, and the
@@ -129,7 +129,14 @@ const H4_NAME = sql(`select variant_name from product_variants where id = '${H4}
 const H4_ITEM = sql(`select product_id from product_variants where id = '${H4}'`);
 const SUPPLIER = sql(`select name from suppliers where is_active and name not ilike 'e2e%' order by name limit 1`);
 const SUPPLIER2 = sql(`select name from suppliers where is_active and name not ilike 'e2e%' order by name offset 1 limit 1`);
-const yesterday = sql(`select (current_date - 1)::text`);
+// The shop's day as the app counts it — the local clock. The database's
+// current_date is UTC, a day behind in the first hours after Indian midnight.
+const dayAgo = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const yesterday = dayAgo(1);
 const variantQty = (id) => num(`select coalesce(sum(m.qty),0) from stock_movements m join locations l on l.id = m.location_id where m.variant_id = '${id}' and l.type <> 'damaged'`);
 const STAFF = 'sales@autoloom.local';
 const OWNER = 'owner@autoloom.local';
@@ -221,7 +228,7 @@ const askTag = `E2E Ask ${Date.now().toString().slice(-5)}`;
     check('the kism carries its car', num(`select count(*) from product_fitments pf join vehicle_models vm on vm.id = pf.model_id where pf.variant_id = '${kism}' and vm.name = 'Swift'`) === 1);
     const e2 = sql(`select p.id from purchases p join purchase_lines l on l.purchase_id = p.id where l.variant_id = '${kism}' and p.status = 'draft' and p.submitted_at is not null order by p.submitted_at desc limit 1`);
     check('the entry waits for the owner with the kism on it', !!e2);
-    check('the entry keeps the day the maal came', sql(`select doc_date::text from purchases where id = '${e2}'`) === sql(`select (current_date - 2)::text`));
+    check('the entry keeps the day the maal came', sql(`select doc_date::text from purchases where id = '${e2}'`) === dayAgo(2));
   });
 
   await step('staff puts kharab maal aside', async () => {

@@ -92,7 +92,7 @@ async function bill(mode) {
     await page.getByText('XYZ Accessories', { exact: true }).locator('visible=true').first().click();
   }
   await page.waitForTimeout(1500);
-  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('H4');
+  await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('xtreme');
   await page.waitForTimeout(2800);
   await page.getByText(/X-tremeVision/i).first().click();
   await page.waitForTimeout(2500);

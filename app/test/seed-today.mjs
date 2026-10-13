@@ -57,7 +57,7 @@ await page.waitForTimeout(6000);
 await page.waitForTimeout(2000);
 
 const search = page.getByPlaceholder('Scan karo ya SKU / naam likho');
-await search.fill('H4');
+await search.fill('xtreme');
 await page.waitForTimeout(3000);
 await page.getByText(/X-tremeVision/i).first().click();
 await page.waitForTimeout(2500);

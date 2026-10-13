@@ -56,13 +56,15 @@ export default function InvoiceEdit() {
   const [id, setId] = useState<string | null>(paramId ?? null);
   const [creating, setCreating] = useState(false);
   const [posting, setPosting] = useState(false);
+  /** What the last pick did, said where the eye is — under the search box. */
+  const [justAdded, setJustAdded] = useState<string | null>(null);
 
   const { data: rows } = useQuery<Inv>('SELECT * FROM sales_invoices WHERE id = ?', [id ?? '']);
   const doc = rows?.[0] ?? null;
   const { data: lines } = useQuery<Line>(
     `SELECT l.*, pv.sku, pv.avg_cost, pv.min_selling_price, pv.last_purchase_cost, pv.retail_price, pv.dealer_price, pv.wholesale_price,
             COALESCE((SELECT qty FROM stock_on_hand sl WHERE sl.variant_id = l.variant_id AND sl.location_id = i.location_id), 0) AS here
-     FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id JOIN product_variants pv ON pv.id = l.variant_id WHERE l.invoice_id = ? ORDER BY l.line_no`, [id ?? '']);
+     FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id JOIN product_variants pv ON pv.id = l.variant_id WHERE l.invoice_id = ? ORDER BY l.line_no DESC`, [id ?? '']);
   // The cash customer first — most bills at a wholesaler that are not on a
   // khata are a walk-in paying on the spot — then every khata by name.
   const { data: customers, isLoading: customersLoading } = useQuery<Customer>(`SELECT c.id, c.name, c.mobile, c.state_code, c.gstin, c.price_list_id, c.credit_limit, c.credit_days, c.customer_type, COALESCE(c.is_cash, 0) AS is_cash, COALESCE(pb.balance,0) AS balance FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id WHERE c.is_active=1 ORDER BY COALESCE(c.is_cash, 0) DESC, c.name`);
@@ -195,13 +197,30 @@ export default function InvoiceEdit() {
 
   async function addLine(v: PickedVariant) {
     if (!id) return;
-    const existing = (lines ?? []).find((l) => l.variant_id === v.id);
-    if (existing) { await updateRow(db, 'sales_invoice_lines', existing.id, { qty: existing.qty + 1 }); return; }
+    // Asked of the database, not of `lines`: two picks in quick succession
+    // both saw the list from before either landed — the same item twice made
+    // two lines, and a line removed earlier left two lines with one number.
+    const now = await db.getAll<{ id: string; qty: number; line_no: number }>(
+      'SELECT id, qty, line_no FROM sales_invoice_lines WHERE invoice_id = ? AND variant_id = ?', [id, v.id]);
+    const name = `${v.product_name} ${v.variant_name}`;
+    if (now[0]) {
+      await updateRow(db, 'sales_invoice_lines', now[0].id, { qty: now[0].qty + 1 });
+      setJustAdded(`${name} — qty ${now[0].qty + 1} ho gayi`);
+      return;
+    }
+    const top = await db.getOptional<{ n: number | null }>('SELECT MAX(line_no) AS n FROM sales_invoice_lines WHERE invoice_id = ?', [id]);
     const p = await priceFor(doc?.customer_id ?? null, v);
     await insertRow(db, 'sales_invoice_lines', {
-      invoice_id: id, line_no: (lines?.length ?? 0) + 1, variant_id: v.id, description: `${v.product_name} ${v.variant_name}`, hsn_code: v.hsn_code ?? null, qty: 1, unit_code: v.unit_code ?? null,
+      invoice_id: id, line_no: (top?.n ?? 0) + 1, variant_id: v.id, description: `${v.product_name} ${v.variant_name}`, hsn_code: v.hsn_code ?? null, qty: 1, unit_code: v.unit_code ?? null,
       mrp: v.mrp, list_price: p.price, rate: p.price, discount_pct: 0, discount_amt: 0, tax_rate_pct: gst ? (v.tax_rate_pct ?? 0) : 0, price_source: p.source,
     });
+    setJustAdded(`${name} jud gaya`);
+  }
+
+  /** A line goes only when asked twice: × sits where a thumb scrolling the bill lands. */
+  async function removeLine(l: Line) {
+    if (!(await confirm('Ye maal bill se hatayein?', `${l.description} · ${l.qty} × ${formatINR(l.rate)}`))) return;
+    await deleteRow(db, 'sales_invoice_lines', l.id);
   }
 
   // The cost and margin warnings name the buy rate and the margin. Staff are
@@ -216,10 +235,9 @@ export default function InvoiceEdit() {
     const r = rate ?? 0;
     const check = checkPrice(r, l, {});
     let approvedBy: string | null = null;
-    if (check.needsApproval) {
-      if (can('sale.override_price')) approvedBy = profile?.id ?? null;
-      else notify(`${priceWarning(check)} Owner ya admin se approve karwao.`);
-    }
+    // Staff are told under the box itself, and again if they try to post. A
+    // toast here fired on every key: typing 1500 warned at 1, 15 and 150.
+    if (check.needsApproval && can('sale.override_price')) approvedBy = profile?.id ?? null;
     await updateRow(db, 'sales_invoice_lines', l.id, { rate: r, price_source: Math.abs(r - (l.list_price ?? -1)) < 0.005 ? l.price_source : 'manual', override_approved_by: approvedBy });
   }
 
@@ -317,7 +335,7 @@ export default function InvoiceEdit() {
           </View>
           <Text variant="mono" color="textFaint">{statusLabel(doc.status)}</Text>
         </Row>
-        {isCN && original?.[0] ? <Text variant="small" color="textMuted">Bill {original[0].doc_no} ke against. Qty utni hi rakho jitna maal sach mein wapas aaya. Jo toota ya kharab hai use "Kharab / toota hua" mark karo — wo bechne wale stock mein wapas nahi jayega.</Text> : null}
+        {isCN && original?.[0] ? <Text variant="small" color="textMuted">Bill {original[0].doc_no} ke against. Qty utni hi rakho jitna maal sach mein wapas aaya. Jo toota ya kharab hai us par “Kharab · supplier ko jayega” chuno — wo bechne wale stock mein wapas nahi jayega.</Text> : null}
 
         <FormSection title="Grahak">
           <SelectField label={isCN ? 'Kaun lauta raha hai' : 'Kaun le raha hai'} value={doc.customer_id} options={(customers ?? []).map((c) => ({ value: c.id, label: c.name, sublabel: c.is_cash ? 'Turant paisa — koi udhaar nahi' : `${customerTypeLabel(c.customer_type)}${c.balance ? ` · ${formatINR(c.balance)} baaki` : ''}` }))} onChange={chooseCustomer} onCreate={(text) => router.push({ pathname: '/customer/edit', params: { name: text, forBill: '1' } })} />
@@ -332,6 +350,12 @@ export default function InvoiceEdit() {
 
         <SectionTitle>Maal · {(lines ?? []).length}</SectionTitle>
         {!isCN ? <Card><VariantPicker onPick={addLine} showPrice locationId={doc.location_id} autoFocus={false}
+                // Owner, 13 Oct 2026: "ek bill mein multiple items nahi ho pa rahe".
+                // The box empties after a pick and said nothing; now it says
+                // what was added, and that the next item goes in the same box.
+                note={justAdded ? `✓ ${justAdded} · Maal · ${(lines ?? []).length}`
+                  : (lines ?? []).length ? 'Aur maal? Yahin naam likho — har item alag line mein judega.' : null}
+                noteTone={justAdded ? 'ok' : 'textMuted'} onType={() => setJustAdded(null)}
                 canCreate={can('catalog.edit')}
                 onCreate={(text) =>
                   router.push(
@@ -343,7 +367,7 @@ export default function InvoiceEdit() {
           const tl = totals.taxed[i];
           const check = needsFloorCheck(l) ? checkPrice(l.rate, l, {}) : { ok: true, severity: 'ok' as const, message: null, needsApproval: false };
           return (
-            <LineCard key={l.id} title={l.description} subtitle={`${l.sku} · stock mein ${l.here}${gst ? ` · GST ${l.tax_rate_pct}%` : ''}`} onRemove={() => deleteRow(db, 'sales_invoice_lines', l.id)}
+            <LineCard key={l.id} title={l.description} subtitle={`${l.sku} · stock mein ${l.here}${gst ? ` · GST ${l.tax_rate_pct}%` : ''}`} onRemove={() => removeLine(l)}
               right={l.price_source && l.price_source !== 'manual' ? <Badge tone={l.price_source === 'last' ? 'info' : 'accent'}>{sourceLabel[l.price_source] ?? l.price_source}</Badge> : l.override_approved_by ? <Badge tone="warn">rate manzoor</Badge> : null}>
               <Row gap={12} wrap>
                 <View style={{ flex: 1, minWidth: 90 }}><NumberField label={`Qty${l.unit_code ? ` (${l.unit_code})` : ''}`} value={l.qty} onChange={(v) => updateRow(db, 'sales_invoice_lines', l.id, { qty: v ?? 0 })} decimals={3} error={!isCN && !negativeOk && l.qty > l.here ? `Yahan sirf ${l.here} pade hain` : null} /></View>

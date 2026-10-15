@@ -5,9 +5,13 @@ import { View } from 'react-native';
 
 import { formatINR } from '@domain';
 
+import { cancelPayment } from '@/lib/posting';
 import { useSession } from '@/lib/session';
+import { useSystem } from '@/lib/system';
 import { dayLabel } from '@/lib/words';
-import { Badge, Button, Card, Divider, Empty, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { Badge, Button, Card, Empty, KV, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
+import { confirm, notify } from '@/ui/forms';
+import { LedgerList } from '@/ui/ledger';
 import { space } from '@/ui/theme';
 
 type Supplier = {
@@ -15,7 +19,10 @@ type Supplier = {
   gstin: string | null; address_line1: string | null; address_line2: string | null; city: string | null; state_name: string | null; pincode: string | null;
   payment_terms_days: number; notes: string | null; balance: number;
 };
-type Ledger = { id: string; entry_date: string; doc_type: string; doc_no: string | null; debit: number; credit: number; narration: string | null };
+type Ledger = {
+  id: string; entry_date: string; doc_type: string; doc_id: string | null; doc_no: string | null; debit: number; credit: number; narration: string | null;
+  pur_status: string | null; pur_type: string | null; open_fix: string | null; returned: number; pay_status: string | null;
+};
 type Purchase = { id: string; doc_no: string | null; doc_date: string; supplier_invoice_no: string | null; grand_total: number; paid_total: number; status: string; doc_type: string };
 type Top = { id: string; sku: string; variant_name: string; product_name: string; qty: number; last_rate: number; last_date: string };
 
@@ -24,11 +31,25 @@ const DOC_LABEL: Record<string, string> = { opening: 'Purana baaki', purchase: '
 export default function SupplierScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { can } = useSession();
+  const { db } = useSystem();
+  const { can, actor } = useSession();
   const { data: rows } = useQuery<Supplier>(
     `SELECT s.*, COALESCE(pb.balance, 0) AS balance FROM suppliers s LEFT JOIN party_balance_live pb ON pb.party_type = 'supplier' AND pb.party_id = s.id WHERE s.id = ?`, [id]);
   const s = rows?.[0];
-  const { data: ledger } = useQuery<Ledger>(`SELECT id, entry_date, doc_type, doc_no, debit, credit, narration FROM ledger_entries WHERE party_type = 'supplier' AND party_id = ? ORDER BY entry_date DESC, created_at DESC LIMIT 200`, [id]);
+  // Each khata line with the entry or payment it came from — whether the entry
+  // still stands, has a correction open, or sent maal back (then it cannot be
+  // corrected) — so the line can open it and offer what can be done to it.
+  const { data: ledger } = useQuery<Ledger>(`
+    SELECT le.id, le.entry_date, le.doc_type, le.doc_id, le.doc_no, le.debit, le.credit, le.narration,
+           pu.status AS pur_status, pu.doc_type AS pur_type,
+           (SELECT x.id FROM purchases x WHERE x.corrects_purchase_id = pu.id AND x.status = 'draft' LIMIT 1) AS open_fix,
+           (SELECT COUNT(*) FROM purchases d WHERE d.against_purchase_id = pu.id AND d.doc_type = 'debit_note' AND d.status = 'posted') AS returned,
+           pm.status AS pay_status
+    FROM ledger_entries le
+    LEFT JOIN purchases pu ON pu.id = le.doc_id
+    LEFT JOIN payments pm ON pm.id = le.doc_id
+    WHERE le.party_type = 'supplier' AND le.party_id = ?
+    ORDER BY le.entry_date DESC, le.created_at DESC LIMIT 200`, [id]);
   const { data: purchases } = useQuery<Purchase>(`SELECT id, doc_no, doc_date, supplier_invoice_no, grand_total, paid_total, status, doc_type FROM purchases WHERE supplier_id = ? ORDER BY doc_date DESC, created_at DESC LIMIT 50`, [id]);
   const { data: top } = useQuery<Top>(`
     SELECT pv.id, pv.sku, pv.variant_name, p.name AS product_name, SUM(pl.qty) AS qty, MAX(pl.rate) AS last_rate, MAX(pu.doc_date) AS last_date
@@ -40,9 +61,27 @@ export default function SupplierScreen() {
 
   if (!s) return <Screen><Empty art="search" title="Ye supplier is phone par nahi mila" /></Screen>;
 
-  let running = 0;
-  const asc = [...(ledger ?? [])].reverse().map((e) => { running += e.credit - e.debit; return { ...e, running }; });
-  const desc = asc.reverse();
+  // What is owed, built from the oldest line up.
+  const desc = [...(ledger ?? [])].reverse()
+    .reduce<(Ledger & { running: number })[]>((acc, e) => {
+      acc.push({ ...e, running: (acc[acc.length - 1]?.running ?? 0) + e.credit - e.debit });
+      return acc;
+    }, [])
+    .reverse();
+  const fixer = can('purchase.approve');
+  const payTaker = can('sale.cancel') && can('payment.pay_supplier');
+
+  /** A payment written wrongly: take it back, then write the right one with "Paisa do". */
+  async function takeBack(e: { doc_id: string | null; doc_no: string | null; debit: number }) {
+    if (!e.doc_id) return;
+    if (!(await confirm('Ye payment wapas lein?', `${e.doc_no ?? 'Payment'} · ${formatINR(e.debit)} — galat likha tha to wapas lo, phir sahi “Paisa do” likho.`))) return;
+    try {
+      await db.writeTransaction(async (tx) => { await cancelPayment(tx, e.doc_id!, 'Galat entry — khate se wapas li', actor); });
+      notify('Payment wapas le li — khata theek ho gaya.', 'ok');
+    } catch (err) {
+      notify((err as Error).message, 'danger');
+    }
+  }
 
   return (
     <>
@@ -92,6 +131,7 @@ export default function SupplierScreen() {
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {(purchases ?? []).map((p) => (
                 <ListRow key={p.id} title={p.doc_no ?? 'Adhoori entry'} subtitle={`${dayLabel(p.doc_date)}${p.supplier_invoice_no ? ` · unka bill ${p.supplier_invoice_no}` : ''}`}
+                  onPress={() => router.push(`/purchase/${p.id}`)}
                   right={<View style={{ alignItems: 'flex-end' }}><Text mono>{formatINR(p.grand_total)}</Text><Badge tone={p.status === 'cancelled' ? 'danger' : p.doc_type === 'debit_note' ? 'info' : p.paid_total >= p.grand_total ? 'ok' : 'warn'}>{p.status === 'cancelled' ? 'cancel' : p.status === 'draft' ? 'adhoora' : p.doc_type === 'debit_note' ? 'wapas bheja' : p.paid_total >= p.grand_total ? 'chuka diya' : 'dena baaki'}</Badge></View>} />
               ))}
               {(purchases ?? []).length === 0 ? <Empty title="Abhi tak kuch nahi kharida" /> : null}
@@ -106,25 +146,33 @@ export default function SupplierScreen() {
             </Card>
 
             <SectionTitle>Khata</SectionTitle>
+            {/* + when the shop owes more, − when it paid. A line opens the
+                entry or payment it came from; an entry can be corrected and a
+                payment taken back from right here. */}
             <Card style={{ gap: 0 }}>
-              {desc.length === 0 ? <Empty title="Khata khaali hai" /> : null}
-              {desc.map((e) => (
-                <React.Fragment key={e.id}>
-                  {/* Two columns, as on the customer page: + when the shop
-                      owes more, − when it paid; the running total under it. */}
-                  <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">
-                    <View style={{ flex: 1 }}>
-                      <Text variant="small" style={{ fontWeight: '600' }}>{DOC_LABEL[e.doc_type] ?? e.doc_type}{e.doc_no ? ` ${e.doc_no}` : ''}</Text>
-                      <Text variant="small" color="textFaint">{dayLabel(e.entry_date)}{e.narration && !(e.doc_no && e.narration.endsWith(e.doc_no)) ? ` · ${e.narration}` : ''}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text variant="small" mono style={{ fontWeight: '600' }} color={e.credit ? 'warn' : 'ok'}>{e.credit ? `+ ${formatINR(e.credit)}` : `− ${formatINR(e.debit)}`}</Text>
-                      <Text variant="small" mono color="textFaint">dena {formatINR(e.running)}</Text>
-                    </View>
-                  </Row>
-                  <Divider />
-                </React.Fragment>
-              ))}
+              <LedgerList lines={desc.map((e) => {
+                const isEntry = e.doc_type === 'purchase' && e.pur_type === 'purchase';
+                const isPay = e.doc_type === 'payment_out' && !!e.pay_status;
+                return {
+                  key: e.id,
+                  title: `${DOC_LABEL[e.doc_type] ?? e.doc_type}${e.doc_no ? ` ${e.doc_no}` : ''}`,
+                  sub: `${dayLabel(e.entry_date)}${e.narration && !(e.doc_no && e.narration.endsWith(e.doc_no)) ? ` · ${e.narration}` : ''}`,
+                  amount: e.credit ? `+ ${formatINR(e.credit)}` : `− ${formatINR(e.debit)}`,
+                  up: !!e.credit,
+                  running: `dena ${formatINR(e.running)}`,
+                  onPress: e.pur_type && e.doc_id ? () => router.push(`/purchase/${e.doc_id}`) : e.pay_status ? () => router.push('/payments') : undefined,
+                  badge: isEntry && e.pur_status === 'cancelled' ? <Badge tone="danger">cancel</Badge>
+                    : isPay && e.pay_status !== 'posted' ? <Badge tone="danger">wapas li</Badge>
+                    : isEntry && e.open_fix ? <Badge tone="warn">sudhaar khula</Badge> : null,
+                  action: isEntry && e.pur_status === 'posted' && !e.returned && can('purchase.create') ? (
+                    <Button size="sm" tone="secondary"
+                      title={e.open_fix ? 'Sudhaar kholo' : fixer ? 'Entry sudhaaro' : 'Sudhaar bhejo'}
+                      onPress={() => router.push(e.open_fix ? `/purchase/edit?id=${e.open_fix}` : `/purchase/edit?correct=${e.doc_id}`)} />
+                  ) : isPay && e.pay_status === 'posted' && payTaker ? (
+                    <Button size="sm" tone="ghost" title="Galat hai — wapas lo" onPress={() => takeBack(e)} />
+                  ) : null,
+                };
+              })} />
             </Card>
           </>
         ) : null}

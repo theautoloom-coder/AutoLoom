@@ -443,11 +443,23 @@ export const CUSTOMER = {
     WHERE c.id = ?`,
 };
 
+/**
+ * A grahak's khata, each line with what it came from — the bill and whether
+ * it still stands or has a change open, the payment and whether it was taken
+ * back — so the line can open it and offer what can be done to it.
+ */
 export const CUSTOMER_LEDGER = {
   sql: `
-    SELECT id, entry_date, doc_type, doc_no, debit, credit, narration, created_at
-    FROM ledger_entries WHERE party_type = 'customer' AND party_id = ?
-    ORDER BY entry_date DESC, created_at DESC LIMIT 200`,
+    SELECT le.id, le.entry_date, le.doc_type, le.doc_id, le.doc_no, le.debit, le.credit, le.narration, le.created_at,
+           si.status AS bill_status, si.doc_type AS bill_type,
+           (SELECT x.id FROM sales_invoices x WHERE x.corrects_invoice_id = si.id AND x.status = 'draft' LIMIT 1) AS open_change,
+           (SELECT COUNT(*) FROM sales_invoices r WHERE r.against_invoice_id = si.id AND r.status <> 'cancelled') AS returned,
+           pm.status AS pay_status
+    FROM ledger_entries le
+    LEFT JOIN sales_invoices si ON si.id = le.doc_id
+    LEFT JOIN payments pm ON pm.id = le.doc_id
+    WHERE le.party_type = 'customer' AND le.party_id = ?
+    ORDER BY le.entry_date DESC, le.created_at DESC LIMIT 200`,
 };
 
 export const CUSTOMER_TOP_PRODUCTS = (sinceDate: string) => ({

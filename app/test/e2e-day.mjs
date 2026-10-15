@@ -373,6 +373,35 @@ console.log('\n▸ owner: pay a supplier; staff edits a grahak');
     check('the money moved with it', num(`select paid_total from sales_invoices where id = '${cid}'`) === num(`select grand_total from sales_invoices where id = '${cid}'`));
   });
 
+  // Owner, 15 Oct 2026: "grahak wale ledger mein jaake kuch bhi edit nahi kar pa raha".
+  await step('a bill is changed from the grahak’s khata', async () => {
+    const cust = sql(`select id from customers where name = 'XYZ Accessories'`);
+    await go(page, `/customer/${cust}`, 6000);
+    const change = page.getByRole('button', { name: 'Bill badlo' }).first();
+    check('the khata offers to change a bill', await change.isVisible().catch(() => false));
+    await page.getByText(/^Bill NOI\//).first().click();
+    await page.waitForTimeout(4000);
+    check('a khata line opens its bill', /\/invoice\/[0-9a-f-]{20,}$/.test(page.url()), page.url().replace(base, ''));
+    await go(page, `/customer/${cust}`, 6000);
+    const before = num(`select count(*) from sales_invoices where corrects_invoice_id is not null and status = 'draft'`);
+    await page.getByRole('button', { name: 'Bill badlo' }).first().click();
+    await page.waitForTimeout(5000);
+    check('it opens the change, every part of the bill editable', /\/invoice\/edit\?id=/.test(page.url()) && await page.getByText(/ka badlav$/).first().isVisible().catch(() => false));
+    check('a change was opened for it', num(`select count(*) from sales_invoices where corrects_invoice_id is not null and status = 'draft'`) === before + 1);
+    await page.getByRole('button', { name: 'Chhod do' }).click();
+    await confirmYes(page);
+    await page.waitForTimeout(3000);
+    check('left alone, the change is gone and the bill stays', num(`select count(*) from sales_invoices where corrects_invoice_id is not null and status = 'draft'`) === before);
+  });
+  await step('a stock entry opens from the supplier’s page', async () => {
+    const sup = sql(`select supplier_id from purchases where status = 'posted' and doc_type = 'purchase' order by created_at desc limit 1`);
+    await go(page, `/supplier/${sup}`, 6000);
+    check('the khata offers to correct an entry', await page.getByRole('button', { name: 'Entry sudhaaro' }).first().isVisible().catch(() => false));
+    await page.getByText(/^PUR\//).first().click();
+    await page.waitForTimeout(4000);
+    check('an entry line opens the entry', /\/purchase\/[0-9a-f-]{20,}$/.test(page.url()), page.url().replace(base, ''));
+  });
+
   await step('supplier payment', async () => {
     // party_balance_live is the phone's view; the server keeps party_balances.
     const sid = sql("select party_id from party_balances where party_type='supplier' and balance > 100 limit 1");

@@ -72,8 +72,7 @@ const TOPICS: Topic[] = [
     icon: 'create-outline',
     accent: 'blue',
     steps: [
-      'Bill kholo — Bill tab se, ya Khata → grahak → bill.',
-      'Owner: “Bill badlo”. Staff: “Galti hai — badlav bhejo”.',
+      'Khata → grahak → neeche “Khata” mein us bill ki line ke neeche “Bill badlo” (staff: “Badlav bhejo”). Ya bill kholo — Bill tab se, ya khata ki line par tap — aur wahan “Bill badlo”.',
       'Bill ki copy khulti hai — grahak, tareekh, maal, qty, rate, payment, sab badal sakte ho. Badli line ke neeche “Pehle … → ab …” dikhta hai, nayi line par “Naya”.',
       'Owner: “Badlav lagao” — purana bill cancel hokar badla hua bill naye number se lagta hai.',
       'Staff: “Owner ko bhejo”. Owner Approval → “Bill badlav” mein dekh ke lagata hai, ya wajah likh ke mana karta hai. Tab tak purana bill hi chalta hai.',

@@ -5,13 +5,16 @@ import { View } from 'react-native';
 
 import { checkCredit, formatINR, formatRegistration, toDateString } from '@domain';
 
+import { cancelPayment, openInvoiceCorrection } from '@/lib/posting';
 import { CUSTOMER, CUSTOMER_LEDGER, CUSTOMER_TOP_PRODUCTS } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { useSystem } from '@/lib/system';
 import { useShopSettings } from '@/lib/use-settings';
 import { openWhatsApp, reminderMessage, statementMessage } from '@/lib/whatsapp';
 import { customerTypeLabel, dayLabel } from '@/lib/words';
-import { notify } from '@/ui/forms';
-import { Badge, Button, Card, Divider, Empty, KV, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
+import { confirm, notify } from '@/ui/forms';
+import { Badge, Button, Card, Empty, KV, ListRow, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
+import { LedgerList } from '@/ui/ledger';
 import { space, type as typeScale } from '@/ui/theme';
 
 type Customer = {
@@ -19,7 +22,10 @@ type Customer = {
   email: string | null; gstin: string | null; address_line1: string | null; address_line2: string | null; city: string | null; state_name: string | null;
   pincode: string | null; customer_type: string; credit_limit: number; credit_days: number; price_list_name: string | null; balance: number; notes: string | null;
 };
-type Ledger = { id: string; entry_date: string; doc_type: string; doc_no: string | null; debit: number; credit: number; narration: string | null };
+type Ledger = {
+  id: string; entry_date: string; doc_type: string; doc_id: string | null; doc_no: string | null; debit: number; credit: number; narration: string | null;
+  bill_status: string | null; bill_type: string | null; open_change: string | null; returned: number; pay_status: string | null;
+};
 type Top = { id: string; sku: string; variant_name: string; product_name: string; qty: number; last_rate: number };
 type Warranty = { invoice_id: string; doc_no: string; doc_date: string; variant_id: string; description: string; warranty_months: number; days_left: number };
 type Vehicle = { id: string; registration_no: string; color: string | null; make_name: string | null; model_name: string | null; generation_name: string | null; model_id: string | null };
@@ -36,7 +42,8 @@ const DOC_LABEL: Record<string, string> = {
 export default function CustomerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { can } = useSession();
+  const { db } = useSystem();
+  const { can, actor, profile } = useSession();
   const shop = useShopSettings();
   const t = useTheme();
 
@@ -83,13 +90,38 @@ export default function CustomerScreen() {
   }
 
   const credit = checkCredit({ outstanding: c.balance, creditLimit: c.credit_limit, invoiceAmount: 0 });
-  let running = 0;
-  const ledgerAsc = [...(ledger ?? [])].reverse().map((e) => {
-    running += e.debit - e.credit;
-    return { ...e, running };
-  });
-  const ledgerDesc = ledgerAsc.reverse();
+  // The running baaki, built from the oldest line up.
+  const ledgerDesc = [...(ledger ?? [])].reverse()
+    .reduce<(Ledger & { running: number })[]>((acc, e) => {
+      acc.push({ ...e, running: (acc[acc.length - 1]?.running ?? 0) + e.debit - e.credit });
+      return acc;
+    }, [])
+    .reverse();
 
+  /** A bill from the khata: open a change to it (owner, 15 Oct 2026) — the bill stays until the change is put in. */
+  async function changeBill(billId: string) {
+    try {
+      let cid = '';
+      await db.writeTransaction(async (tx) => { cid = await openInvoiceCorrection(tx, billId, actor, profile?.id ?? null); });
+      router.push(`/invoice/edit?id=${cid}`);
+    } catch (e) {
+      notify((e as Error).message, 'danger');
+    }
+  }
+
+  /** A payment written wrongly: take it back, then write the right one with "Paisa aa gaya". */
+  async function takeBack(e: { doc_id: string | null; doc_no: string | null; credit: number }) {
+    if (!e.doc_id) return;
+    if (!(await confirm('Ye paisa wapas lein?', `${e.doc_no ?? 'Payment'} · ${formatINR(e.credit)} — galat likha tha to wapas lo, phir sahi “Paisa aa gaya” likho. Is paise se chukaye bill phir baaki dikhenge.`))) return;
+    try {
+      await db.writeTransaction(async (tx) => { await cancelPayment(tx, e.doc_id!, 'Galat entry — khate se wapas li', actor); });
+      notify('Paisa wapas le liya — khata theek ho gaya.', 'ok');
+    } catch (err) {
+      notify((err as Error).message, 'danger');
+    }
+  }
+  const billChanger = can('sale.cancel');
+  const payTaker = can('sale.cancel') && can('payment.receive');
   /**
    * The whole khata, not just the total. A dealer asking *poora hisaab bhejo*
    * wants the working; the reminder only sends the closing figure, so the owner
@@ -252,37 +284,36 @@ export default function CustomerScreen() {
             </Card>
 
             <SectionTitle>Khata</SectionTitle>
-            {/* Two columns, not four. Debit, credit and balance at fixed
-                widths left the entry about 50dp on a phone, where "Paisa
-                aaya" broke as "Pai / sa". One signed amount — + when the
-                grahak owes more, − when money came in — and the running
-                baaki under it carry the same facts in the room there is. */}
+            {/* + when the grahak owes more, − when money came in. A line opens
+                the bill or payment it came from; a bill can be changed and a
+                payment taken back from right here. */}
             <Card style={{ gap: 0 }}>
-              {ledgerDesc.length === 0 ? <Empty title="Khata khaali hai" /> : null}
-              {ledgerDesc.map((e) => (
-                <React.Fragment key={e.id}>
-                  <Row gap={space.sm} style={{ paddingVertical: 8 }} align="flex-start">
-                    <View style={{ flex: 1 }}>
-                      <Text variant="small" style={{ fontWeight: '600' }}>
-                        {DOC_LABEL[e.doc_type] ?? e.doc_type}
-                        {e.doc_no ? ` ${e.doc_no}` : ''}
-                      </Text>
-                      <Text variant="small" color="textFaint">
-                        {dayLabel(e.entry_date)}
-                        {/* "Bill NOI/…" under "Bill NOI/…" says nothing twice. */}
-                        {e.narration && !(e.doc_no && e.narration.endsWith(e.doc_no)) ? ` · ${e.narration}` : ''}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text variant="small" mono style={{ fontWeight: '600' }} color={e.debit ? 'warn' : 'ok'}>
-                        {e.debit ? `+ ${formatINR(e.debit)}` : `− ${formatINR(e.credit)}`}
-                      </Text>
-                      <Text variant="small" mono color="textFaint">baaki {formatINR(e.running)}</Text>
-                    </View>
-                  </Row>
-                  <Divider />
-                </React.Fragment>
-              ))}
+              <LedgerList lines={ledgerDesc.map((e) => {
+                const isBill = e.doc_type === 'sales_invoice' && e.bill_type === 'invoice';
+                const isPay = e.doc_type === 'payment_in' && !!e.pay_status;
+                return {
+                  key: e.id,
+                  title: `${DOC_LABEL[e.doc_type] ?? e.doc_type}${e.doc_no ? ` ${e.doc_no}` : ''}`,
+                  // "Bill NOI/…" under "Bill NOI/…" says nothing twice.
+                  sub: `${dayLabel(e.entry_date)}${e.narration && !(e.doc_no && e.narration.endsWith(e.doc_no)) ? ` · ${e.narration}` : ''}`,
+                  amount: e.debit ? `+ ${formatINR(e.debit)}` : `− ${formatINR(e.credit)}`,
+                  up: !!e.debit,
+                  running: `baaki ${formatINR(e.running)}`,
+                  onPress: e.bill_type && e.doc_id ? () => router.push(`/invoice/${e.doc_id}`) : e.pay_status ? () => router.push('/payments') : undefined,
+                  badge: isBill && e.bill_status === 'cancelled' ? <Badge tone="danger">cancel</Badge>
+                    : isPay && e.pay_status !== 'posted' ? <Badge tone="danger">wapas liya</Badge>
+                    : isBill && e.open_change ? <Badge tone="warn">badlav khula</Badge>
+                    : isBill && e.returned ? <Badge tone="info">wapasi hui</Badge> : null,
+                  // A bill whose maal came back cannot change: the return is written against it.
+                  action: isBill && e.bill_status === 'posted' && !e.returned && can('sale.create') ? (
+                    <Button size="sm" tone="secondary"
+                      title={e.open_change ? 'Badlav kholo' : billChanger ? 'Bill badlo' : 'Badlav bhejo'}
+                      onPress={() => (e.open_change ? router.push(`/invoice/edit?id=${e.open_change}`) : changeBill(e.doc_id!))} />
+                  ) : isPay && e.pay_status === 'posted' && payTaker ? (
+                    <Button size="sm" tone="ghost" title="Galat hai — wapas lo" onPress={() => takeBack(e)} />
+                  ) : null,
+                };
+              })} />
             </Card>
           </>
         ) : null}

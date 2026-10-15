@@ -694,6 +694,9 @@ export const sales_invoices = new Table(
     device_id: column.text,
     created_at: column.text,
     updated_at: column.text,
+    corrects_invoice_id: column.text,
+    submitted_at: column.text,
+    submitted_by: column.text,
   },
   { indexes: { customer: ['customer_id'], date: ['doc_date'], status: ['status'] } }
 );

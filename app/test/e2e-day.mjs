@@ -40,6 +40,8 @@ const ENGLISH = /\b(the|and|for|with|your|please|select|choose|enter|add|edit|de
 const english = new Map();
 
 let browser;
+// The three-item bill staff make, and later send a change to (owner, 15 Oct 2026).
+let threeBill = '';
 async function session(email) {
   const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
   const page = await ctx.newPage();
@@ -178,6 +180,28 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
     check('the bill is posted', sql(`select status from sales_invoices where id = '${draft}'`) === 'posted');
     check('with all three items', num(`select count(*) from sales_invoice_lines where invoice_id = '${draft}'`) === 3);
     check('and three stock movements', num(`select count(*) from stock_movements where ref_id = '${draft}'`) === 3);
+    threeBill = draft;
+  });
+  // Owner, 15 Oct 2026: "bill banane ke baad edit ka option ho — sab options;
+  // approval ke baad bhi, re-approval ke process se".
+  await step('staff send a change to a bill already made', async () => {
+    if (!threeBill) throw new Error('no bill to change');
+    await go(page, `/invoice/${threeBill}`, 5000);
+    check('the bill says its date', await page.getByText(/· Aaj · \d+ \w+ ·/).first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: 'Galti hai — badlav bhejo' }).click();
+    await page.waitForTimeout(6000);
+    check('the change opens on the bill as it was', await page.getByText(/ka badlav$/).first().isVisible().catch(() => false));
+    await page.getByLabel(/^Qty/).first().fill('4');
+    await page.waitForTimeout(1500);
+    check('a changed line says what it was', await page.getByText(/^Pehle 1 × .* → ab 4 ×/).first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: 'Line hatao' }).last().click();
+    await confirmYes(page);
+    await page.waitForTimeout(1500);
+    check('a removed line is listed', await page.getByText(/^Bill se hataye:/).first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: 'Owner ko bhejo' }).click();
+    await page.waitForTimeout(7000);
+    check('the change waits for the owner', num(`select count(*) from sales_invoices where corrects_invoice_id = '${threeBill}' and status = 'draft' and submitted_at is not null`) === 1);
+    check('the bill itself is untouched until then', sql(`select status from sales_invoices where id = '${threeBill}'`) === 'posted');
   });
   await step('staff can propose a new item', async () => {
     await go(page, '/requests', 4000);
@@ -329,6 +353,26 @@ console.log('\n▸ purchase: return to the supplier');
 console.log('\n▸ owner: pay a supplier; staff edits a grahak');
 {
   const { ctx, page } = await session('owner@autoloom.local');
+  await step('owner puts in the change staff sent to a bill', async () => {
+    if (!threeBill) throw new Error('no bill was changed');
+    const cid = sql(`select id from sales_invoices where corrects_invoice_id = '${threeBill}' and status = 'draft' and submitted_at is not null limit 1`);
+    if (!cid) throw new Error('no change waiting');
+    await go(page, '/requests', 6000);
+    await page.getByRole('button', { name: /^Bill badlav · \d+$/ }).click();
+    await page.waitForTimeout(1200);
+    check('the change waits in the approval list', await page.getByText(/^Badlav NOI\//).first().isVisible().catch(() => false));
+    await page.getByRole('button', { name: 'Approve', exact: true }).first().click();
+    await confirmYes(page);
+    await page.waitForTimeout(9000);
+    check('the old bill is cancelled', sql(`select status from sales_invoices where id = '${threeBill}'`) === 'cancelled');
+    check('the changed bill is made, with a number', sql(`select status || ' ' || coalesce(doc_no, '-') from sales_invoices where id = '${cid}'`).startsWith('posted NOI/'));
+    check('it has two lines, one of them 4 pcs', sql(`select string_agg(qty::int::text, ',' order by qty) from sales_invoice_lines where invoice_id = '${cid}'`) === '1,4');
+    check('the old bill’s maal came back and the new one’s left',
+      num(`select coalesce(sum(qty), 0) from stock_movements where ref_id = '${threeBill}'`) === 0
+      && num(`select coalesce(sum(qty), 0) from stock_movements where ref_id = '${cid}'`) === -5);
+    check('the money moved with it', num(`select paid_total from sales_invoices where id = '${cid}'`) === num(`select grand_total from sales_invoices where id = '${cid}'`));
+  });
+
   await step('supplier payment', async () => {
     // party_balance_live is the phone's view; the server keeps party_balances.
     const sid = sql("select party_id from party_balances where party_type='supplier' and balance > 100 limit 1");

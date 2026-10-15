@@ -292,7 +292,7 @@ export const VARIANT_STOCK_BY_LOCATION = {
 
 export const VARIANT_PURCHASE_HISTORY = {
   sql: `
-    SELECT pl.id, pu.doc_date, pu.doc_no, s.name AS supplier_name, pl.qty, pl.rate, pl.landed_unit_cost
+    SELECT pl.id, pu.id AS purchase_id, pu.doc_date, pu.doc_no, s.name AS supplier_name, pl.qty, pl.rate, pl.landed_unit_cost
     FROM purchase_lines pl
     JOIN purchases pu ON pu.id = pl.purchase_id AND pu.status = 'posted' AND pu.doc_type = 'purchase'
     JOIN suppliers s ON s.id = pu.supplier_id

@@ -68,6 +68,19 @@ const TOPICS: Topic[] = [
     go: { label: 'Bill Banao', href: '/invoice/edit' },
   },
   {
+    q: 'Bill ban gaya, galti nikli — kaise badlein?',
+    icon: 'create-outline',
+    accent: 'blue',
+    steps: [
+      'Bill kholo — Bill tab se, ya Khata → grahak → bill.',
+      'Owner: “Bill badlo”. Staff: “Galti hai — badlav bhejo”.',
+      'Bill ki copy khulti hai — grahak, tareekh, maal, qty, rate, payment, sab badal sakte ho. Badli line ke neeche “Pehle … → ab …” dikhta hai, nayi line par “Naya”.',
+      'Owner: “Badlav lagao” — purana bill cancel hokar badla hua bill naye number se lagta hai.',
+      'Staff: “Owner ko bhejo”. Owner Approval → “Bill badlav” mein dekh ke lagata hai, ya wajah likh ke mana karta hai. Tab tak purana bill hi chalta hai.',
+    ],
+    note: 'Stock, grahak ka khata aur liya hua paisa apne aap theek ho jaate hain: pehle liya paisa naye bill par jaata hai, bill chhota hua to bacha paisa grahak ke khaate mein jama rehta hai. Jis bill ki wapasi likhi ja chuki hai use badal nahi sakte.',
+  },
+  {
     q: 'Stock Chadhao — supplier se maal aaya',
     icon: 'arrow-down-circle-outline',
     accent: 'green',

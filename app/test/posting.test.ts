@@ -8,7 +8,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Transaction } from '@powersync/react-native';
 
 import {
-  allocateDocNo, cancelInvoice, cancelPayment, cancelPurchase, closeAudit, closeJobCard, dispatchTransfer, postAdjustment, postCorrection, postInvoice, postPayment, postPurchase, receiveTransfer, returnStillOpen, snapshotAudit,
+  allocateDocNo, cancelInvoice, cancelPayment, cancelPurchase, closeAudit, closeJobCard, dispatchTransfer, openInvoiceCorrection, postAdjustment, postCorrection, postInvoice,
+  postInvoiceCorrection, postPayment, postPurchase, receiveTransfer, refuseInvoiceCorrection, returnStillOpen, snapshotAudit,
 } from '../src/lib/posting';
 import { insertRow, type Actor } from '../src/lib/writes';
 import { createDb, many, one, row, type FakeDb } from './harness';
@@ -395,6 +396,79 @@ describe('correcting an approved stock entry', () => {
     await db.writeTransaction((tx) => postPurchase(tx as unknown as Transaction, dn, actor));
     const late = await correction(other, [{ variant: ID.h4, qty: 4, rate: 100 }]);
     await expect(db.writeTransaction((tx) => postCorrection(tx as unknown as Transaction, late, actor))).rejects.toThrow(/wapas/);
+  });
+});
+
+// Owner, 15 Oct 2026: a bill can be changed after it is made.
+describe('changing a bill after it is made', () => {
+  async function postedBill(qty: number, mode: string) {
+    const iid = await draftInvoice(ID.cust, [{ variant: ID.h4, qty, rate: 1900 }], mode);
+    await db.writeTransaction((t) => postInvoice(t as unknown as Transaction, iid, actor, { creditOverrideBy: 'owner-1' }));
+    return iid;
+  }
+  async function change(iid: string, qty: number) {
+    const cid = await db.writeTransaction((t) => openInvoiceCorrection(t as unknown as Transaction, iid, actor, 'user-1'));
+    db.raw.prepare('UPDATE sales_invoice_lines SET qty = ? WHERE invoice_id = ?').run(qty, cid);
+    return cid;
+  }
+
+  it('cancels the old bill and posts the changed one; a cash bill gets a receipt only for what was added', async () => {
+    const iid = await postedBill(2, 'cash');
+    expect(stock(ID.h4, ID.main)).toBe(18);
+    const cid = await change(iid, 3);
+    expect(one<{ status: string; doc_date: string; payment_mode: string }>(db, 'SELECT status, doc_date, payment_mode FROM sales_invoices WHERE id = ?', cid))
+      .toEqual({ status: 'draft', doc_date: '2026-09-15', payment_mode: 'cash' });
+
+    const no = await db.writeTransaction((t) => postInvoiceCorrection(t as unknown as Transaction, cid, actor));
+    expect(no).toBe('NOI/A/26-27/0002');
+    expect(one<{ status: string }>(db, 'SELECT status FROM sales_invoices WHERE id = ?', iid).status).toBe('cancelled');
+    expect(one<{ status: string; notes: string; grand_total: number; paid_total: number }>(db, 'SELECT status, notes, grand_total, paid_total FROM sales_invoices WHERE id = ?', cid))
+      .toEqual({ status: 'posted', notes: 'NOI/A/26-27/0001 ka badlav', grand_total: 6726, paid_total: 6726 });
+    expect(stock(ID.h4, ID.main)).toBe(17);
+    expect(balance('customer', ID.cust)).toBe(0);
+    expect(many(db, "SELECT amount FROM payments WHERE status = 'posted' ORDER BY doc_no")).toEqual([{ amount: 4484 }, { amount: 2242 }]);
+    expect(many(db, 'SELECT doc_id, amount FROM payment_allocations ORDER BY amount DESC')).toEqual([{ doc_id: cid, amount: 4484 }, { doc_id: cid, amount: 2242 }]);
+  });
+
+  it('a smaller bill leaves the money over on the grahak’s khata', async () => {
+    const iid = await postedBill(3, 'cash');
+    const cid = await change(iid, 2);
+    await db.writeTransaction((t) => postInvoiceCorrection(t as unknown as Transaction, cid, actor));
+    expect(one<{ grand_total: number; paid_total: number }>(db, 'SELECT grand_total, paid_total FROM sales_invoices WHERE id = ?', cid)).toEqual({ grand_total: 4484, paid_total: 4484 });
+    expect(many(db, "SELECT amount FROM payments WHERE status = 'posted'")).toEqual([{ amount: 6726 }]);
+    expect(balance('customer', ID.cust)).toBe(-2242);
+    expect(stock(ID.h4, ID.main)).toBe(18);
+  });
+
+  it('an udhaar bill changes the khata and takes no money', async () => {
+    const iid = await postedBill(2, 'credit');
+    const cid = await change(iid, 1);
+    await db.writeTransaction((t) => postInvoiceCorrection(t as unknown as Transaction, cid, actor));
+    expect(many(db, 'SELECT id FROM payments')).toEqual([]);
+    expect(balance('customer', ID.cust)).toBe(2242);
+  });
+
+  it('opens one change per bill, and refuses a stale change or a bill with a return', async () => {
+    const iid = await postedBill(2, 'cash');
+    const first = await db.writeTransaction((t) => openInvoiceCorrection(t as unknown as Transaction, iid, actor, null));
+    const again = await db.writeTransaction((t) => openInvoiceCorrection(t as unknown as Transaction, iid, actor, null));
+    expect(again).toBe(first);
+    const stale = await insertRow(asTx(db), 'sales_invoices', { doc_type: 'invoice', doc_date: '2026-09-15', customer_id: ID.cust, location_id: ID.main, is_interstate: false, other_charges: 0, payment_mode: 'cash', credit_days: 0, status: 'draft', corrects_invoice_id: iid }, actor);
+    await db.writeTransaction((t) => postInvoiceCorrection(t as unknown as Transaction, first, actor));
+    await expect(db.writeTransaction((t) => postInvoiceCorrection(t as unknown as Transaction, stale, actor))).rejects.toThrow(/purana/);
+
+    const other = await postedBill(1, 'cash');
+    await insertRow(asTx(db), 'sales_invoices', { doc_type: 'credit_note', doc_date: '2026-09-16', customer_id: ID.cust, location_id: ID.main, is_interstate: false, other_charges: 0, status: 'draft', against_invoice_id: other }, actor);
+    await expect(db.writeTransaction((t) => openInvoiceCorrection(t as unknown as Transaction, other, actor, null))).rejects.toThrow(/wapasi/);
+  });
+
+  it('a change sent back says why, and the bill stays as it was', async () => {
+    const iid = await postedBill(2, 'cash');
+    const cid = await change(iid, 5);
+    await refuseInvoiceCorrection(asTx(db), cid, ' Rate galat hai ', actor);
+    expect(one<{ status: string; cancel_reason: string }>(db, 'SELECT status, cancel_reason FROM sales_invoices WHERE id = ?', cid)).toEqual({ status: 'cancelled', cancel_reason: 'Rate galat hai' });
+    expect(one<{ status: string }>(db, 'SELECT status FROM sales_invoices WHERE id = ?', iid).status).toBe('posted');
+    expect(stock(ID.h4, ID.main)).toBe(18);
   });
 });
 

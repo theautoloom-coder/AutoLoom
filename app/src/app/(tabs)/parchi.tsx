@@ -131,16 +131,17 @@ const RANGE_FEED = `
  * day. Only drafts with maal in them; an empty one is nothing to come back to.
  */
 const DRAFTS = `
-  SELECT i.id, i.created_at AS at, COALESCE(c.name, 'Grahak nahi chuna') AS who,
+  SELECT i.id, i.created_at AS at, COALESCE(c.name, 'Grahak nahi chuna') AS who, co.doc_no AS corrects_no,
          (SELECT COUNT(*) FROM sales_invoice_lines il WHERE il.invoice_id = i.id) AS items,
          (SELECT COALESCE(SUM(il.qty * il.rate), 0) FROM sales_invoice_lines il WHERE il.invoice_id = i.id) AS amount,
          (SELECT il.description FROM sales_invoice_lines il WHERE il.invoice_id = i.id ORDER BY il.line_no LIMIT 1) AS item
     FROM sales_invoices i LEFT JOIN customers c ON c.id = i.customer_id
+    LEFT JOIN sales_invoices co ON co.id = i.corrects_invoice_id
    WHERE i.status = 'draft' AND i.doc_type = 'invoice'
      AND EXISTS (SELECT 1 FROM sales_invoice_lines il WHERE il.invoice_id = i.id)
    ORDER BY i.created_at DESC
    LIMIT 20`;
-type Draft = { id: string; at: string; who: string; items: number; amount: number; item: string | null };
+type Draft = { id: string; at: string; who: string; items: number; amount: number; item: string | null; corrects_no: string | null };
 
 type RangeKey = 'aaj' | 'kal' | 'week' | 'mahina' | 'custom';
 
@@ -152,13 +153,14 @@ function shiftDays(iso: string, days: number): string {
   return toDateString(d);
 }
 
-/** "Aaj", "Kal", then the date spelled out. Nobody reads 2026-09-28. */
+/** "Aaj · 15 October", "Kal · 14 October", then the date spelled out. Nobody reads 2026-09-28. */
 function dayLabel(iso: string, today: string): string {
-  if (iso === today) return 'Aaj';
-  if (iso === shiftDays(today, -1)) return 'Kal';
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+  const date = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+  if (iso === today) return `Aaj · ${date}`;
+  if (iso === shiftDays(today, -1)) return `Kal · ${date}`;
+  return date;
 }
 
 /**
@@ -267,7 +269,9 @@ export default function ParchiScreen() {
                     </Row>
                   }
                   title={d.who}
-                  subtitle={`${d.item ?? ''}${d.items > 1 ? ` +${d.items - 1} aur` : ''} · poora karna baaki`}
+                  subtitle={d.corrects_no
+                    ? `${d.corrects_no} ka badlav · ${d.items} item`
+                    : `${d.item ?? ''}${d.items > 1 ? ` +${d.items - 1} aur` : ''} · poora karna baaki`}
                   onPress={() => router.push(`/invoice/edit?id=${d.id}`)}
                   right={<Text mono>{formatINR(d.amount)}</Text>}
                 />

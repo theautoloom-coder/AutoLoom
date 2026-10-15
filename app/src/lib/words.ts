@@ -40,16 +40,21 @@ export const BODY_TYPE: Record<string, string> = {
   hatchback: 'Hatchback', sedan: 'Sedan', suv: 'SUV', muv: 'MUV / Van', pickup: 'Pickup', 'three-wheeler': 'E-rickshaw / 3-pahiya',
 };
 
-/** 'Aaj', 'Kal', '3 Oct', or '3 Oct 2025' when it is not this year. */
+/**
+ * 'Aaj · 15 Oct', 'Kal · 14 Oct', '3 Oct', or '3 Oct 2025' when it is not
+ * this year. The date rides along with Aaj and Kal (owner, 15 Oct 2026: "date
+ * nahi dikhti") — a bill or an entry opened tomorrow still says its day.
+ */
 export function dayLabel(iso: string | null | undefined, today = new Date()): string {
   if (!iso) return '';
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
   if (Number.isNaN(d.getTime())) return iso;
   const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const days = Math.round((start(today) - start(d)) / 86_400_000);
-  if (days === 0) return 'Aaj';
-  if (days === 1) return 'Kal';
-  return d.toLocaleDateString('en-IN', d.getFullYear() === today.getFullYear()
+  const date = d.toLocaleDateString('en-IN', d.getFullYear() === today.getFullYear()
     ? { day: 'numeric', month: 'short' }
     : { day: 'numeric', month: 'short', year: 'numeric' });
+  if (days === 0) return `Aaj · ${date}`;
+  if (days === 1) return `Kal · ${date}`;
+  return date;
 }

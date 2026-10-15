@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { formatINR } from '@domain';
 
 import { invoiceHtml, shareInvoiceHtml, type InvoiceForPrint } from '@/lib/invoice-html';
-import { cancelInvoice } from '@/lib/posting';
+import { cancelInvoice, openInvoiceCorrection } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { useShopSettings } from '@/lib/use-settings';
@@ -16,7 +16,8 @@ import { Badge, Button, Card, Divider, Empty, KV, ListRow, Row, Screen, SectionT
 import { confirm, notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
 
-type I = InvoiceForPrint & { id: string; customer_id: string; customer_mobile: string | null; location_name: string; cancel_reason: string | null; credit_flag: number; against_invoice_id: string | null; salesperson_name: string | null; balance: number };
+type I = InvoiceForPrint & { id: string; customer_id: string; customer_mobile: string | null; location_name: string; cancel_reason: string | null; credit_flag: number; against_invoice_id: string | null; salesperson_name: string | null; balance: number;
+  corrects_invoice_id: string | null; corrects_no: string | null };
 type L = { id: string; description: string; hsn_code: string | null; qty: number; unit_code: string | null; rate: number; discount_pct: number; discount_amt: number; taxable_value: number; tax_rate_pct: number; cgst: number; sgst: number; igst: number; line_total: number; sku: string; variant_id: string; product_id: string; price_source: string | null; unit_cost_at_sale: number; return_condition: string | null; return_note: string | null };
 type Pay = { id: string; doc_no: string; payment_date: string; amount: number; mode: string; remarks: string | null; proof_path: string | null };
 
@@ -24,20 +25,25 @@ export default function InvoiceDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { db } = useSystem();
-  const { can, actor } = useSession();
+  const { can, actor, profile } = useSession();
   const shop = useShopSettings();
   const [busy, setBusy] = useState(false);
 
   const { data: rows } = useQuery<Omit<I, 'lines' | 'company' | 'customer' | 'vehicle'>>(`
-    SELECT i.*, l.name AS location_name, o.doc_no AS against_no, pr.full_name AS salesperson_name, c.mobile AS customer_mobile, COALESCE(pb.balance,0) AS balance
+    SELECT i.*, l.name AS location_name, o.doc_no AS against_no, pr.full_name AS salesperson_name, c.mobile AS customer_mobile, COALESCE(pb.balance,0) AS balance,
+           co.doc_no AS corrects_no
     FROM sales_invoices i JOIN locations l ON l.id = i.location_id JOIN customers c ON c.id = i.customer_id LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id
-    LEFT JOIN sales_invoices o ON o.id = i.against_invoice_id LEFT JOIN profiles pr ON pr.id = i.salesperson_id WHERE i.id = ?`, [id]);
+    LEFT JOIN sales_invoices o ON o.id = i.against_invoice_id LEFT JOIN profiles pr ON pr.id = i.salesperson_id
+    LEFT JOIN sales_invoices co ON co.id = i.corrects_invoice_id WHERE i.id = ?`, [id]);
   const inv = rows?.[0];
   const { data: lines } = useQuery<L>('SELECT l.*, pv.sku, pv.product_id FROM sales_invoice_lines l JOIN product_variants pv ON pv.id = l.variant_id WHERE l.invoice_id = ? ORDER BY l.line_no', [id]);
   const { data: cust } = useQuery<InvoiceForPrint['customer'] & { id: string }>('SELECT id, business_name, address_line1, address_line2, city, state_name, pincode, mobile FROM customers WHERE id = ?', [inv?.customer_id ?? '']);
   const { data: veh } = useQuery<{ registration_no: string; model_name: string | null }>('SELECT cv.registration_no, vm.name AS model_name FROM customer_vehicles cv LEFT JOIN vehicle_models vm ON vm.id = cv.model_id WHERE cv.id = ?', [(inv as { customer_vehicle_id?: string } | undefined)?.customer_vehicle_id ?? '']);
   const { data: company } = useQuery<InvoiceForPrint['company']>('SELECT * FROM company_settings LIMIT 1');
   const { data: payments } = useQuery<Pay>(`SELECT py.id, py.doc_no, py.payment_date, pa.amount, py.mode, py.remarks, py.proof_path FROM payment_allocations pa JOIN payments py ON py.id = pa.payment_id WHERE pa.doc_id = ? AND py.status = 'posted' ORDER BY py.payment_date`, [id]);
+  // Changes to this bill (owner, 15 Oct 2026): one open, one put in, or the last one sent back.
+  const { data: changes } = useQuery<{ id: string; status: string; doc_no: string | null; submitted_at: string | null; cancel_reason: string | null }>(
+    'SELECT id, status, doc_no, submitted_at, cancel_reason FROM sales_invoices WHERE corrects_invoice_id = ? ORDER BY created_at DESC', [id]);
   const { data: notes } = useQuery<{ id: string; doc_no: string | null; doc_date: string; grand_total: number; status: string }>('SELECT id, doc_no, doc_date, grand_total, status FROM sales_invoices WHERE against_invoice_id = ? ORDER BY doc_date', [id]);
 
   async function share() {
@@ -55,6 +61,18 @@ export default function InvoiceDetail() {
     await openWhatsApp(inv.customer_mobile, msg);
   }
 
+  /** Open a change to this bill — a copy to change freely; the bill stays as it is until it is put in. */
+  async function change() {
+    if (!inv) return;
+    try {
+      let cid = '';
+      await db.writeTransaction(async (tx) => { cid = await openInvoiceCorrection(tx, inv.id, actor, profile?.id ?? null); });
+      router.push(`/invoice/edit?id=${cid}`);
+    } catch (e) {
+      notify((e as Error).message, 'danger');
+    }
+  }
+
   async function cancel() {
     if (!inv) return;
     const reason = typeof globalThis.prompt === 'function' ? globalThis.prompt('Cancel kyun kar rahe ho?') : 'Cancel kiya';
@@ -69,6 +87,11 @@ export default function InvoiceDetail() {
   const hasTax = inv.cgst_total + inv.sgst_total + inv.igst_total > 0;
   const showCost = can('reports.view_margin');
   const margin = (lines ?? []).reduce((a, l) => a + (l.rate * (1 - l.discount_pct / 100) - l.unit_cost_at_sale) * l.qty, 0);
+  const changer = can('sale.cancel');
+  const openChange = (changes ?? []).find((c) => c.status === 'draft');
+  const replacedBy = (changes ?? []).find((c) => c.status === 'posted');
+  const lastRefused = (changes ?? [])[0]?.status === 'cancelled' ? (changes ?? [])[0] : null;
+  const returned = (notes ?? []).some((n) => n.status !== 'cancelled');
 
   return (
     <>
@@ -79,11 +102,22 @@ export default function InvoiceDetail() {
             <Badge tone={inv.status === 'cancelled' ? 'danger' : inv.status === 'posted' ? (due > 0 && !isCN ? 'warn' : 'ok') : 'neutral'}>{inv.status === 'posted' ? (isCN ? 'wapasi ho gayi' : due > 0 ? 'baaki hai' : 'poora mila') : inv.status === 'cancelled' ? 'cancel' : 'adhoora'}</Badge>
             {isCN ? <Badge tone="info">{inv.against_no} ki wapasi</Badge> : null}
             {inv.credit_flag ? <Badge tone="warn">udhaar limit se upar</Badge> : null}
+            {inv.corrects_no ? <Badge tone="info">{`${inv.corrects_no} ka badlav`}</Badge> : null}
           </Row>
           <Text variant="display" style={{ marginTop: space.xs }}>{inv.customer_name}</Text>
           <Text color="textMuted" onPress={() => router.push(`/customer/${inv.customer_id}`)}>{inv.doc_no ?? 'Adhoora bill'} · {dayLabel(inv.doc_date)} · {inv.location_name}{inv.salesperson_name ? ` · ${inv.salesperson_name}` : ''}</Text>
         </View>
-        {inv.status === 'cancelled' ? <Card tone="alt"><Text color="danger">Cancel hua: {inv.cancel_reason}</Text></Card> : null}
+        {inv.status === 'cancelled' ? (
+          <Card tone="alt">
+            <Text color="danger">{inv.corrects_invoice_id && !inv.doc_no ? `Ye badlav mana hua: ${inv.cancel_reason ?? '—'}` : `Cancel hua: ${inv.cancel_reason}`}</Text>
+          </Card>
+        ) : null}
+        {replacedBy ? (
+          <Card tone="alt" style={{ gap: space.xs }}>
+            <Text>Is bill ki jagah {replacedBy.doc_no} ne li — badlav ke baad.</Text>
+            <Button title={`${replacedBy.doc_no} kholo`} size="sm" tone="secondary" onPress={() => router.replace(`/invoice/${replacedBy.id}`)} />
+          </Card>
+        ) : null}
 
         <Card tone="navy">
           <Row gap={space.lg} wrap>
@@ -106,6 +140,30 @@ export default function InvoiceDetail() {
           {inv.status === 'posted' && !isCN && can('sale.return') ? <Button title="Maal wapas" tone="secondary" onPress={() => router.push(`/invoice/edit?against=${inv.id}`)} /> : null}
           {inv.status === 'posted' && can('sale.cancel') ? <Button title="Bill cancel karo" tone="danger" onPress={cancel} loading={busy} /> : null}
         </Row>
+
+        {/* Owner, 15 Oct 2026: "bill banane ke baad edit ka option ho — sab
+            options; approval ke baad bhi, re-approval ke process se". */}
+        {inv.status === 'posted' && !isCN && can('sale.create') ? (
+          openChange ? (
+            <Card keyline spine="accent" style={{ gap: space.xs }}>
+              <Text variant="heading">Badlav {openChange.submitted_at ? 'owner ke review mein hai' : 'adhoora pada hai'}</Text>
+              <Text variant="small" color="textMuted">Lagte hi ye bill cancel hokar badla hua bill lagega — stock, khata aur paisa sab theek.</Text>
+              <Button title={changer && openChange.submitted_at ? 'Badlav dekho aur lagao' : 'Badlav kholo'} size="sm" onPress={() => router.push(`/invoice/edit?id=${openChange.id}`)} />
+            </Card>
+          ) : returned ? (
+            <Text variant="small" color="textFaint">Is bill ki wapasi likhi ja chuki hai — ab ise badal nahi sakte.</Text>
+          ) : (
+            <Card style={{ gap: space.xs }}>
+              <Text variant="small" color="textMuted">
+                {changer
+                  ? 'Kuch galat hai? Grahak, tareekh, maal, qty, rate, payment — sab badal sakte ho. Purana bill cancel hokar badla hua lagega.'
+                  : 'Kuch galat hai? Grahak, tareekh, maal, qty, rate, payment — sab badal ke bhejo. Owner approve karega tab bill badlega.'}
+              </Text>
+              {lastRefused ? <Text variant="small" color="danger">Pichhla badlav mana hua: {lastRefused.cancel_reason ?? '—'}</Text> : null}
+              <Button title={changer ? 'Bill badlo' : 'Galti hai — badlav bhejo'} tone="secondary" size="sm" onPress={change} />
+            </Card>
+          )
+        ) : null}
 
         <SectionTitle>Maal</SectionTitle>
         <Card style={{ gap: 0, paddingVertical: 4 }}>

@@ -29,6 +29,9 @@ declare
   kid     uuid := gen_random_uuid();
   aid     uuid := gen_random_uuid();
   cid     uuid := gen_random_uuid();
+  bill    uuid := gen_random_uuid();
+  made    uuid;
+  cust    uuid;
   pass    int := 0;
   fail    int := 0;
   ok      boolean;
@@ -257,6 +260,28 @@ begin
     raise notice 'PASS  an approved entry is locked for staff'; pass := pass + 1;
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
+
+  -- 7c. A change to a bill already made (owner, 15 Oct 2026): staff send it,
+  --     only an owner or admin puts it in.
+  select id, customer_id into made, cust from public.sales_invoices where status = 'posted' and doc_type = 'invoice' limit 1;
+  perform set_config('request.jwt.claims', json_build_object('sub', staff, 'role', 'authenticated')::text, true);
+  insert into public.sales_invoices (id, doc_type, customer_id, location_id, status, corrects_invoice_id, submitted_at, submitted_by)
+  values (bill, 'invoice', cust, godown, 'draft', made, now(), staff);
+  raise notice 'PASS  staff can send a change to a bill'; pass := pass + 1;
+  begin
+    update public.sales_invoices set status = 'posted', doc_no = 'TEST/B1' where id = bill;
+    raise notice 'FAIL  staff put in their own change to a bill'; fail := fail + 1;
+  exception when insufficient_privilege then
+    raise notice 'PASS  staff cannot put in a change to a bill'; pass := pass + 1;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
+  update public.sales_invoices set status = 'posted', doc_no = 'TEST/B1' where id = bill;
+  select status = 'posted' into ok from public.sales_invoices where id = bill;
+  if ok then
+    raise notice 'PASS  the owner puts a change to a bill in'; pass := pass + 1;
+  else
+    raise notice 'FAIL  the owner could not put a change in'; fail := fail + 1;
+  end if;
 
   -- 8. ...and writes partner money.
   insert into public.payments (direction, party_type, party_id, amount, mode, status)

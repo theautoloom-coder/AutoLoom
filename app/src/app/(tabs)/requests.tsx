@@ -18,6 +18,9 @@
  * on the owner, back with staff, decided — narrowed by kind and by who sent
  * it, newest or oldest first, and laid out day by day. The bulk buttons act on
  * exactly what the filters show: "Ramesh ka saara maal approve" is two taps.
+ *
+ * A fourth kind since 15 Oct 2026: a change a staff member sent to a bill
+ * already made. Putting it in cancels the old bill and posts the changed one.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -27,7 +30,7 @@ import { ScrollView, View } from 'react-native';
 import { formatINR } from '@domain';
 
 import { approveChangeRequest, approveEntry, queueSummary, refuseEntry, refuseFix } from '@/lib/approvals';
-import { postAdjustment } from '@/lib/posting';
+import { postAdjustment, postInvoiceCorrection, refuseInvoiceCorrection } from '@/lib/posting';
 import { useSystem } from '@/lib/system';
 
 import { useSession } from '@/lib/session';
@@ -51,7 +54,14 @@ type Fix = {
   items: number; up: number; down: number;
 };
 
-type Kind = 'maal' | 'fix' | 'item';
+/** A change to a bill already made, sent by staff: what it was, what it would be. */
+type BillChange = {
+  id: string; status: string; doc_no: string | null; doc_date: string; submitted_at: string | null; cancel_reason: string | null;
+  decided_at: string | null; was_no: string | null; was_total: number; total: number; customer: string | null;
+  submitter: string | null; decider: string | null; items: number;
+};
+
+type Kind = 'maal' | 'fix' | 'item' | 'bill';
 /** Waiting on the owner; back with the staff member; decided. */
 type Tab = 'baaki' | 'wapas' | 'hua';
 /** One thing in the queue, whatever its kind, placed on the timeline at `t`. */
@@ -59,14 +69,16 @@ type Q = { key: string; id: string; tab: Tab; t: number; who: string } & (
   | { kind: 'maal'; row: Entry }
   | { kind: 'fix'; row: Fix }
   | { kind: 'item'; row: ReqRow }
+  | { kind: 'bill'; row: BillChange }
 );
 
 const KIND: Record<Kind, { label: string; icon: IconName; accent: string }> = {
   maal: { label: 'Maal', icon: 'cube-outline', accent: 'blue' },
   fix: { label: 'Stock theek', icon: 'swap-vertical-outline', accent: 'amber' },
   item: { label: 'Item', icon: 'pricetag-outline', accent: 'violet' },
+  bill: { label: 'Bill badlav', icon: 'receipt-outline', accent: 'rose' },
 };
-const KINDS: Kind[] = ['maal', 'fix', 'item'];
+const KINDS: Kind[] = ['maal', 'fix', 'item', 'bill'];
 const PAGE = 40;
 // A sideways row of chips takes its own height; left to flex, a short list let it
 // stretch every chip down the screen.
@@ -118,7 +130,8 @@ function title(req: ChangeRequest): string {
   return [p.name, p.colour].filter(Boolean).join(' · ') || 'Naya item';
 }
 
-const titleOf = (q: Q) => (q.kind === 'maal' ? entryTitle(q.row) : q.kind === 'fix' ? fixTitle(q.row) : title(q.row));
+const billTitle = (b: BillChange) => `Badlav ${b.was_no ?? 'bill'} · ${b.customer ?? 'Grahak'}`;
+const titleOf = (q: Q) => (q.kind === 'maal' ? entryTitle(q.row) : q.kind === 'fix' ? fixTitle(q.row) : q.kind === 'bill' ? billTitle(q.row) : title(q.row));
 
 export default function RequestsScreen() {
   const router = useRouter();
@@ -128,11 +141,12 @@ export default function RequestsScreen() {
   const isReviewer = can('catalog.edit');
   const approver = can('purchase.approve');
   const fixer = can('stock.adjust');
+  const changer = can('sale.cancel');
   const showCost = can('catalog.view_cost');
   const me = actor.userId ?? '';
   /** Whether this person decides this kind — and so sees everyone's, not only their own. */
-  const decides = (k: Kind) => (k === 'maal' ? approver : k === 'fix' ? fixer : isReviewer);
-  const owner = approver || fixer || isReviewer;
+  const decides = (k: Kind) => (k === 'maal' ? approver : k === 'fix' ? fixer : k === 'bill' ? changer : isReviewer);
+  const owner = approver || fixer || isReviewer || changer;
 
   const [tab, setTab] = useState<Tab>(params.tab === 'wapas' || params.tab === 'hua' ? params.tab : 'baaki');
   const [kind, setKind] = useState<Kind | null>(null);
@@ -201,6 +215,26 @@ export default function RequestsScreen() {
     [isReviewer ? 1 : 0, me, since],
   );
 
+  // Changes staff sent to bills already made: waiting, put in, or refused.
+  const { data: billRows } = useQuery<BillChange>(
+    `SELECT i.id, i.status, i.doc_no, i.doc_date, i.submitted_at, i.cancel_reason,
+            CASE WHEN i.status = 'draft' THEN NULL ELSE COALESCE(i.posted_at, i.cancelled_at, i.updated_at) END AS decided_at,
+            o.doc_no AS was_no, COALESCE(o.grand_total, 0) AS was_total, c.name AS customer, pr.full_name AS submitter, dp.full_name AS decider,
+            CASE WHEN i.status = 'posted' THEN i.grand_total
+                 ELSE COALESCE(i.other_charges, 0) + (SELECT COALESCE(SUM(l.qty * l.rate * (1 - COALESCE(l.discount_pct, 0) / 100.0)), 0)
+                                                        FROM sales_invoice_lines l WHERE l.invoice_id = i.id) END AS total,
+            (SELECT COUNT(*) FROM sales_invoice_lines l WHERE l.invoice_id = i.id) AS items
+       FROM sales_invoices i
+       LEFT JOIN sales_invoices o ON o.id = i.corrects_invoice_id
+       LEFT JOIN customers c ON c.id = i.customer_id
+       LEFT JOIN profiles pr ON pr.id = i.submitted_by
+       LEFT JOIN profiles dp ON dp.id = i.cancelled_by
+      WHERE i.corrects_invoice_id IS NOT NULL AND i.submitted_by IS NOT NULL
+        AND (?1 = 1 OR i.submitted_by = ?2)
+        AND (i.status = 'draft' OR COALESCE(i.posted_at, i.cancelled_at, i.updated_at) >= ?3)`,
+    [changer ? 1 : 0, me, since],
+  );
+
   // Each on the timeline where it now matters: when it was sent while it
   // waits, when it was decided once it is.
   const all = useMemo<Q[]>(() => {
@@ -219,8 +253,12 @@ export default function RequestsScreen() {
       const at = tb === 'baaki' ? r.submitted_at : r.reviewed_at ?? r.updated_at ?? r.submitted_at;
       out.push({ key: `item:${r.id}`, id: r.id, kind: 'item', row: r, tab: tb, t: ms(at), who: r.submitter ?? 'Staff' });
     }
+    for (const b of billRows ?? []) {
+      const tb: Tab = b.status === 'draft' ? 'baaki' : 'hua';
+      out.push({ key: `bill:${b.id}`, id: b.id, kind: 'bill', row: b, tab: tb, t: ms((tb === 'hua' ? b.decided_at : b.submitted_at) ?? b.doc_date), who: b.submitter ?? 'Staff' });
+    }
     return out;
-  }, [entryRows, fixRows, reqRows]);
+  }, [entryRows, fixRows, reqRows, billRows]);
 
   const count = (tb: Tab) => all.filter((q) => q.tab === tb).length;
   const inTab = all.filter((q) => q.tab === tab);
@@ -290,6 +328,20 @@ export default function RequestsScreen() {
     }
   }
 
+  async function quickApproveBill(b: BillChange) {
+    if (!(await confirm('Badlav laga dein?', [
+      `${b.was_no ?? 'Purana bill'} cancel hoga aur badla hua bill lagega — ab ${formatINR(b.total)}${b.submitter ? ` · ${b.submitter} ne bheja` : ''}.`,
+      'Pehle liya paisa naye bill par chala jayega; zyada hua to grahak ke khaate mein jama rahega.',
+    ].join(' ')))) return;
+    try {
+      let no = '';
+      await db.writeTransaction(async (tx) => { no = await postInvoiceCorrection(tx, b.id, actor); });
+      notify(`Badlav lag gaya — ${no} ne ${b.was_no ?? 'purane bill'} ki jagah li.`, 'ok');
+    } catch (err) {
+      notify(`Nahi hua: ${(err as Error).message}`, 'danger');
+    }
+  }
+
   async function rejectReq(r: ReqRow) {
     if (!reqWhy.trim()) { notify('Wajah likho — usi se staff theek karke bhej payega.', 'danger'); return; }
     await rejectRequest(db, r.id, reqWhy);
@@ -303,11 +355,13 @@ export default function RequestsScreen() {
     const ent = qs.filter((q) => q.kind === 'maal');
     const fx = qs.filter((q) => q.kind === 'fix').length;
     const rq = qs.filter((q) => q.kind === 'item').length;
+    const bl = qs.filter((q) => q.kind === 'bill').length;
     const s = ent.length ? await queueSummary(db, ent.map((q) => q.id)) : null;
     const ok = await confirm(`Sab ${qs.length} approve karein?`, [
       s ? `${ent.length} maal entry · ${s.pcs} pcs${showCost ? ` · lagbhag ${formatINR(s.value)}` : ''}.` : null,
       fx ? `${fx} stock theek.` : null,
       rq ? `${rq} naye item / badlav.` : null,
+      bl ? `${bl} bill badlav — purana bill cancel hokar badla hua lagega.` : null,
       s ? 'Jin line ka kharid rate nahi bhara, un par pichhla rate lagega.' : null,
       s?.unpriced ? `${s.unpriced} line ka rate kahin nahi mila — wo ₹0 par chadhengi; baad mein entry kholke “Entry sudhaaro”.` : null,
       rq ? 'Jis naye item ka naam pehle se hai, wo chhod diya jayega.' : null,
@@ -319,6 +373,7 @@ export default function RequestsScreen() {
       try {
         if (q.kind === 'maal') await db.writeTransaction(async (tx) => { await approveEntry(tx, q.id, actor, { fillRates: true }); });
         else if (q.kind === 'fix') await db.writeTransaction(async (tx) => { await postAdjustment(tx, q.id, actor); });
+        else if (q.kind === 'bill') await db.writeTransaction(async (tx) => { await postInvoiceCorrection(tx, q.id, actor); });
         else await approveChangeRequest(db, q.row, actor, locationId ?? null);
       } catch (err) {
         failed.push(`${titleOf(q)}: ${(err as Error).message}`);
@@ -342,6 +397,7 @@ export default function RequestsScreen() {
       for (const q of qs) {
         if (q.kind === 'maal') await refuseEntry(tx, q.id, bulkWhy, actor);
         else if (q.kind === 'fix') await refuseFix(tx, q.id, bulkWhy, actor);
+        else if (q.kind === 'bill') await refuseInvoiceCorrection(tx, q.id, bulkWhy, actor);
         else await rejectRequest(tx, q.id, bulkWhy);
       }
     });
@@ -364,9 +420,10 @@ export default function RequestsScreen() {
     if (q.kind === 'maal') {
       const e = q.row;
       if (q.tab === 'hua') {
+        // Owner, 15 Oct 2026: once approved, the day the maal came was nowhere.
         return [by, e.status === 'posted'
           ? `${e.decider ?? 'Owner'} ne approve kiya${e.doc_no ? ` · ${e.doc_no}` : ''}`
-          : `${e.decider ?? 'Owner'} ne mana kiya: ${e.cancel_reason ?? '—'}`, at].filter(Boolean).join('  ·  ');
+          : `${e.decider ?? 'Owner'} ne mana kiya: ${e.cancel_reason ?? '—'}`, `aaya ${shortDate(e.doc_date)}`, at].filter(Boolean).join('  ·  ');
       }
       const revised = q.tab === 'baaki' && !!e.revised_at && !!e.submitted_at && e.revised_at > e.submitted_at;
       return [by, `${e.items} item`, `aaya ${shortDate(e.doc_date)}`, q.tab === 'wapas' ? e.notes : null,
@@ -379,6 +436,14 @@ export default function RequestsScreen() {
           .filter(Boolean).join('  ·  ');
       }
       return [by, f.notes, at].filter(Boolean).join('  ·  ');
+    }
+    if (q.kind === 'bill') {
+      const b = q.row;
+      if (q.tab === 'hua') {
+        return [by, b.status === 'posted' ? `lag gaya${b.doc_no ? ` · ${b.doc_no}` : ''}` : `${b.decider ?? 'Owner'} ne mana kiya: ${b.cancel_reason ?? '—'}`,
+          `bill ${shortDate(b.doc_date)}`, at].filter(Boolean).join('  ·  ');
+      }
+      return [by, `pehle ${formatINR(b.was_total)} → ab ${formatINR(b.total)}`, `${b.items} item`, `bill ${shortDate(b.doc_date)}`, at].filter(Boolean).join('  ·  ');
     }
     const r = q.row;
     const p = parseProposal(r);
@@ -399,7 +464,7 @@ export default function RequestsScreen() {
     const revised = q.kind === 'maal' && !!q.row.revised_at && !!q.row.submitted_at && q.row.revised_at > q.row.submitted_at;
     const times = q.kind === 'item' && q.row.revision > 1 ? <Badge tone="info">{`${q.row.revision}x`}</Badge> : null;
     if (!decides(q.kind)) return times ?? <Badge tone="warn">{q.kind === 'maal' ? 'Badal sakte ho' : 'Review mein'}</Badge>;
-    const approve = () => (q.kind === 'maal' ? quickApprove(q.row) : q.kind === 'fix' ? quickApproveFix(q.row) : quickApproveReq(q.row));
+    const approve = () => (q.kind === 'maal' ? quickApprove(q.row) : q.kind === 'fix' ? quickApproveFix(q.row) : q.kind === 'bill' ? quickApproveBill(q.row) : quickApproveReq(q.row));
     return (
       <Row gap={space.xs} align="center">
         {revised ? <Badge tone="danger">Badla gaya</Badge> : times}
@@ -411,10 +476,11 @@ export default function RequestsScreen() {
   function press(q: Q) {
     // The owner opens maal and item requests here, in place; everything else
     // goes to its own screen.
-    const inPlace = q.tab === 'baaki' && decides(q.kind) && q.kind !== 'fix';
+    const inPlace = q.tab === 'baaki' && decides(q.kind) && (q.kind === 'maal' || q.kind === 'item');
     if (inPlace) { setOpenKey(openKey === q.key ? null : q.key); setReqWhy(''); return; }
     if (q.kind === 'maal') router.push(q.tab === 'hua' ? `/purchase/${q.id}` : `/purchase/approve?id=${q.id}`);
     else if (q.kind === 'fix') router.push(`/adjustment/${q.id}`);
+    else if (q.kind === 'bill') router.push(q.tab === 'baaki' ? `/invoice/edit?id=${q.id}` : `/invoice/${q.id}`);
     else openReq(q.row);
   }
 

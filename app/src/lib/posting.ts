@@ -521,7 +521,7 @@ export async function cancelPayment(tx: Transaction, paymentId: string, reason: 
 // -----------------------------------------------------------------------------
 // Sales invoices and credit notes
 // -----------------------------------------------------------------------------
-export async function postInvoice(tx: Transaction, invoiceId: string, actor: Actor, opts: { creditOverrideBy?: string | null } = {}): Promise<string> {
+export async function postInvoice(tx: Transaction, invoiceId: string, actor: Actor, opts: { creditOverrideBy?: string | null; receipt?: boolean } = {}): Promise<string> {
   const inv = await one<{ id: string; doc_type: 'invoice' | 'credit_note'; status: string; customer_id: string; location_id: string; is_interstate: number; other_charges: number; doc_date: string; payment_mode: string | null; credit_days: number; against_invoice_id: string | null }>(
     tx, 'SELECT * FROM sales_invoices WHERE id = ?', [invoiceId]);
   if (!inv) throw new Error('Invoice not found');
@@ -586,11 +586,110 @@ export async function postInvoice(tx: Transaction, invoiceId: string, actor: Act
     debit: isInvoice ? totals.grand_total : 0, credit: isInvoice ? 0 : totals.grand_total, narration: isInvoice ? `Bill ${docNo}` : `Maal wapas ${docNo}`,
   }, actor);
 
-  // A cash / UPI / card / bank sale is paid on the spot: record the receipt against this invoice.
-  if (isInvoice && inv.payment_mode && !['credit', 'mixed'].includes(inv.payment_mode) && totals.grand_total > 0) {
+  // A cash / UPI / card / bank sale is paid on the spot: record the receipt
+  // against this invoice. A bill put right takes over the old bill's money
+  // first and writes its own receipt only for what is still missing.
+  if (opts.receipt !== false && isInvoice && inv.payment_mode && !['credit', 'mixed'].includes(inv.payment_mode) && totals.grand_total > 0) {
     await postPayment(tx, { direction: 'in', party_id: inv.customer_id, amount: totals.grand_total, mode: inv.payment_mode, payment_date: inv.doc_date, notes: `Against ${docNo}`, allocations: [{ doc_id: invoiceId, doc_type: 'sales_invoice', amount: totals.grand_total }] }, actor);
   }
   return docNo;
+}
+
+/**
+ * Open a change to a posted bill (owner, 15 Oct 2026: "bill banane ke baad
+ * edit ka option ho — sab options"). A draft copy of the bill — grahak,
+ * tareekh, payment, every line — to change freely; the bill itself stays as
+ * it is until the change is put in. One open change per bill: asking again
+ * opens the one already there.
+ */
+export async function openInvoiceCorrection(tx: Transaction, invoiceId: string, actor: Actor, salespersonId: string | null): Promise<string> {
+  const open = await one<{ id: string }>(tx,
+    "SELECT id FROM sales_invoices WHERE corrects_invoice_id = ? AND status = 'draft' ORDER BY created_at DESC LIMIT 1", [invoiceId]);
+  if (open) return open.id;
+  const o = await one<{ id: string; status: string; doc_type: string; doc_no: string; doc_date: string; customer_id: string; customer_vehicle_id: string | null; location_id: string;
+    price_list_id: string | null; is_interstate: number; place_of_supply_state: string | null; other_charges: number; payment_mode: string | null; credit_days: number; notes: string | null }>(
+    tx, 'SELECT * FROM sales_invoices WHERE id = ?', [invoiceId]);
+  if (!o || o.status !== 'posted' || o.doc_type !== 'invoice') throw new Error('Sirf bana hua bill badla ja sakta hai');
+  await refuseIfReturned(tx, o.id, o.doc_no);
+  const id = await insertRow(tx, 'sales_invoices', {
+    doc_type: 'invoice', status: 'draft', corrects_invoice_id: o.id, doc_date: o.doc_date, customer_id: o.customer_id, customer_vehicle_id: o.customer_vehicle_id,
+    location_id: o.location_id, price_list_id: o.price_list_id, is_interstate: !!o.is_interstate, place_of_supply_state: o.place_of_supply_state,
+    other_charges: o.other_charges ?? 0, payment_mode: o.payment_mode, credit_days: o.credit_days ?? 0, notes: o.notes, salesperson_id: salespersonId,
+  }, actor);
+  const lines = await all<DraftLine & { line_no: number; list_price: number | null; price_source: string | null; override_approved_by: string | null; mrp: number | null; hsn_code: string | null; unit_code: string | null }>(
+    tx, 'SELECT * FROM sales_invoice_lines WHERE invoice_id = ? ORDER BY line_no', [o.id]);
+  for (const l of lines) {
+    await insertRow(tx, 'sales_invoice_lines', {
+      invoice_id: id, line_no: l.line_no, variant_id: l.variant_id, description: l.description, hsn_code: l.hsn_code, qty: l.qty, unit_code: l.unit_code,
+      mrp: l.mrp, list_price: l.list_price, rate: l.rate, discount_pct: l.discount_pct, discount_amt: 0, tax_rate_pct: l.tax_rate_pct,
+      price_source: l.price_source, override_approved_by: l.override_approved_by,
+    });
+  }
+  return id;
+}
+
+/** A bill whose maal has come back cannot be changed: the return is written against its lines. */
+async function refuseIfReturned(tx: Executor, invoiceId: string, docNo: string): Promise<void> {
+  const notes = await one<{ n: number }>(tx, "SELECT COUNT(*) AS n FROM sales_invoices WHERE against_invoice_id = ? AND status <> 'cancelled'", [invoiceId]);
+  if ((notes?.n ?? 0) > 0) throw new Error(`${docNo} ki wapasi likhi ja chuki hai — ise badal nahi sakte. Pehle wapasi cancel karo.`);
+}
+
+/**
+ * Put a change to a bill in. The old bill is cancelled — its maal back on the
+ * shelf, its khata entry reversed — and the changed one posted in its place,
+ * with a number of its own. Money taken against the old bill moves to the new
+ * one, up to what the new one is worth; whatever is over stays on the grahak's
+ * khata as theirs. A bill paid on the spot gets a receipt only for what the
+ * change added.
+ */
+export async function postInvoiceCorrection(tx: Transaction, correctionId: string, actor: Actor): Promise<string> {
+  const c = await one<{ id: string; status: string; corrects_invoice_id: string | null; payment_mode: string | null; customer_id: string; doc_date: string; notes: string | null }>(
+    tx, 'SELECT id, status, corrects_invoice_id, payment_mode, customer_id, doc_date, notes FROM sales_invoices WHERE id = ?', [correctionId]);
+  if (!c?.corrects_invoice_id) throw new Error('Ye bill ka badlav nahi hai');
+  if (c.status !== 'draft') throw new Error('Ye badlav pehle hi ho chuka hai');
+  const o = await one<{ id: string; status: string; doc_type: string; doc_no: string }>(
+    tx, 'SELECT id, status, doc_type, doc_no FROM sales_invoices WHERE id = ?', [c.corrects_invoice_id]);
+  if (!o || o.status !== 'posted' || o.doc_type !== 'invoice') {
+    throw new Error('Jo bill badalna tha wo ab badal chuka hai — ye badlav purana ho gaya.');
+  }
+  await refuseIfReturned(tx, o.id, o.doc_no);
+
+  // The allocation first, the paid_total after — the server's allocation
+  // trigger moves paid_total itself (see cancelPayment).
+  const allocs = await all<{ id: string; payment_id: string; amount: number }>(
+    tx, "SELECT id, payment_id, amount FROM payment_allocations WHERE doc_id = ? AND doc_type = 'sales_invoice'", [o.id]);
+  for (const a of allocs) await deleteRow(tx, 'payment_allocations', a.id);
+  if (allocs.length) await updateRow(tx, 'sales_invoices', o.id, { paid_total: 0 });
+
+  await cancelInvoice(tx, o.id, 'Badlav — naye bill ne jagah li', actor);
+  if (!c.notes?.includes(o.doc_no)) {
+    await updateRow(tx, 'sales_invoices', c.id, { notes: [`${o.doc_no} ka badlav`, c.notes].filter(Boolean).join(' · ') });
+  }
+  // The owner or admin putting it in is the one who says yes to its udhaar.
+  const docNo = await postInvoice(tx, c.id, actor, { creditOverrideBy: actor.userId, receipt: false });
+
+  const fresh = await one<{ grand_total: number }>(tx, 'SELECT grand_total FROM sales_invoices WHERE id = ?', [c.id]);
+  let room = fresh?.grand_total ?? 0;
+  let paid = 0;
+  for (const a of allocs) {
+    const amount = round(Math.min(a.amount, room));
+    if (amount <= 0) break;
+    await insertRow(tx, 'payment_allocations', { payment_id: a.payment_id, doc_type: 'sales_invoice', doc_id: c.id, amount });
+    room = round(room - amount);
+    paid = round(paid + amount);
+  }
+  if (paid) await updateRow(tx, 'sales_invoices', c.id, { paid_total: paid });
+  if (room > 0 && c.payment_mode && !['credit', 'mixed'].includes(c.payment_mode)) {
+    await postPayment(tx, { direction: 'in', party_id: c.customer_id, amount: room, mode: c.payment_mode, payment_date: c.doc_date, notes: `Against ${docNo}`, allocations: [{ doc_id: c.id, doc_type: 'sales_invoice', amount: room }] }, actor);
+  }
+  return docNo;
+}
+
+/** Say no to a change a staff member sent; they see why, and the bill stays as it was. */
+export async function refuseInvoiceCorrection(tx: Executor, correctionId: string, reason: string, actor: Actor): Promise<void> {
+  await updateRow(tx, 'sales_invoices', correctionId, {
+    status: 'cancelled', cancel_reason: reason.trim(), cancelled_at: new Date().toISOString(), cancelled_by: actor.userId,
+  });
 }
 
 export async function cancelInvoice(tx: Transaction, invoiceId: string, reason: string, actor: Actor): Promise<void> {

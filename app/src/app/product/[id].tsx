@@ -27,6 +27,7 @@ import {
   tokenize,
 } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { dayLabel } from '@/lib/words';
 import { useSystem } from '@/lib/system';
 import { insertRow, updateRow } from '@/lib/writes';
 import { NumberField, notify } from '@/ui/forms';
@@ -50,7 +51,7 @@ type SpecRow = {
 };
 type Fitment = { id: string; variant_id: string | null; position: string | null; year_from: number | null; year_to: number | null; model_id: string; model_name: string; make_name: string; generation_name: string | null; gen_from: number | null; gen_to: number | null };
 type LocStock = { location_id: string; code: string; name: string; type: string; qty: number };
-type PurchaseHist = { id: string; doc_date: string; doc_no: string; supplier_name: string; qty: number; rate: number; landed_unit_cost: number };
+type PurchaseHist = { id: string; purchase_id: string; doc_date: string; doc_no: string; supplier_name: string; qty: number; rate: number; landed_unit_cost: number };
 type SalesHist = { id: string; doc_date: string; doc_no: string; customer_name: string; qty: number; rate: number; price_source: string | null };
 type CustomerHit = { id: string; name: string; business_name: string | null; mobile: string | null; customer_type: string };
 
@@ -461,21 +462,21 @@ export default function ProductScreen() {
           </>
         ) : null}
 
-        {/* History */}
-        {showCost ? (
-          <>
-            <SectionTitle>Kharid ka hisaab · {variant?.variant_name}</SectionTitle>
-            <Card style={{ gap: 0, paddingVertical: 4 }}>
-              {purchases && purchases.length > 0 ? (
-                purchases.map((p) => (
-                  <ListRow key={p.id} title={p.supplier_name} subtitle={`${p.doc_no} · ${p.doc_date}`} right={<Text mono>{p.qty} @ {formatINR(p.rate)}</Text>} />
-                ))
-              ) : (
-                <Empty art="search" title="Koi purchase nahi mila" hint="Shuruaati stock import se aaya tha." />
-              )}
-            </Card>
-          </>
-        ) : null}
+        {/* History. Staff see when the maal came without its rate — once
+            approved, the day it came was nowhere for them (owner, 15 Oct 2026),
+            and the entry is one tap away to send a correction. */}
+        <SectionTitle>{showCost ? 'Kharid ka hisaab' : 'Maal kab aaya'} · {variant?.variant_name}</SectionTitle>
+        <Card style={{ gap: 0, paddingVertical: 4 }}>
+          {purchases && purchases.length > 0 ? (
+            purchases.map((p) => (
+              <ListRow key={p.id} title={p.supplier_name} subtitle={`${p.doc_no} · ${dayLabel(p.doc_date)}`}
+                right={<Text mono>{showCost ? `${p.qty} @ ${formatINR(p.rate)}` : `${p.qty} pcs`}</Text>}
+                onPress={() => router.push(`/purchase/${p.purchase_id}`)} />
+            ))
+          ) : (
+            <Empty art="search" title="Koi entry nahi mili" hint="Shuruaati stock import se aaya tha." />
+          )}
+        </Card>
 
         {showPrice ? (
           <>
@@ -483,7 +484,7 @@ export default function ProductScreen() {
             <Card style={{ gap: 0, paddingVertical: 4 }}>
               {sales && sales.length > 0 ? (
                 sales.map((s) => (
-                  <ListRow key={s.id} title={s.customer_name} subtitle={`${s.doc_no} · ${s.doc_date}`} right={<Text mono>{s.qty} @ {formatINR(s.rate)}</Text>} />
+                  <ListRow key={s.id} title={s.customer_name} subtitle={`${s.doc_no} · ${dayLabel(s.doc_date)}`} right={<Text mono>{s.qty} @ {formatINR(s.rate)}</Text>} />
                 ))
               ) : (
                 <Empty title="Abhi tak nahi bika" />

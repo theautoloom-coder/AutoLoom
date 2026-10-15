@@ -6,6 +6,11 @@
  *   customer prefilled, else the admin price) → cash / online / udhaar → post.
  *
  * GST is only applied when the owner turns it on in Settings.
+ *
+ * A bill already made is changed here too (owner, 15 Oct 2026: "bill banane
+ * ke baad edit ka option ho — sab options; approval ke baad bhi, re-approval
+ * ke process se"). The draft is a copy of the bill (corrects_invoice_id): the
+ * owner puts it in at once, a staff member sends it and the owner decides.
  */
 import { useQuery } from '@powersync/react';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,20 +21,21 @@ import { checkCredit, checkPrice, formatINR, isDateString, isInterstate, resolve
 
 import { takeBack } from '@/lib/hand-back';
 import { CUSTOMER_LAST_RATE, CUSTOMER_PRICE_CONTEXT } from '@/lib/queries';
-import { postInvoice, totalLines, type DraftLine } from '@/lib/posting';
+import { postInvoice, postInvoiceCorrection, refuseInvoiceCorrection, totalLines, type DraftLine } from '@/lib/posting';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { useShopSettings } from '@/lib/use-settings';
-import { customerTypeLabel } from '@/lib/words';
+import { customerTypeLabel, payModeLabel } from '@/lib/words';
 import { deleteRow, insertRow, updateRow } from '@/lib/writes';
 import { Badge, Button, Card, Chip, Divider, Input, KV, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
 import { FormSection, NumberField, SelectField, confirm, notify } from '@/ui/forms';
 import { LineCard, VariantPicker, type PickedVariant } from '@/ui/lines';
 import { space } from '@/ui/theme';
 import { PreparingDraft } from '@/ui/pending';
-import { DateField } from '@/ui/date-field';
+import { DateField, dateWords } from '@/ui/date-field';
 
-type Inv = { id: string; doc_type: 'invoice' | 'credit_note'; status: string; customer_id: string | null; customer_vehicle_id: string | null; location_id: string | null; price_list_id: string | null; doc_date: string; is_interstate: number; place_of_supply_state: string | null; other_charges: number; payment_mode: string | null; credit_days: number; notes: string | null; against_invoice_id: string | null; salesperson_id: string | null };
+type Inv = { id: string; doc_type: 'invoice' | 'credit_note'; status: string; customer_id: string | null; customer_vehicle_id: string | null; location_id: string | null; price_list_id: string | null; doc_date: string; is_interstate: number; place_of_supply_state: string | null; other_charges: number; payment_mode: string | null; credit_days: number; notes: string | null; against_invoice_id: string | null; salesperson_id: string | null;
+  corrects_invoice_id: string | null; submitted_at: string | null; submitted_by: string | null };
 type Line = DraftLine & { invoice_id: string; line_no: number; list_price: number | null; price_source: string | null; override_approved_by: string | null; return_condition: string | null; return_note: string | null; sku: string; avg_cost: number; min_selling_price: number | null; last_purchase_cost: number; retail_price: number; dealer_price: number | null; wholesale_price: number | null; here: number };
 type Customer = { id: string; name: string; mobile: string | null; state_code: string | null; gstin: string | null; price_list_id: string | null; credit_limit: number; credit_days: number; customer_type: string; balance: number; is_cash: number };
 
@@ -58,6 +64,8 @@ export default function InvoiceEdit() {
   const [posting, setPosting] = useState(false);
   /** What the last pick did, said where the eye is — under the search box. */
   const [justAdded, setJustAdded] = useState<string | null>(null);
+  /** Why the owner says no to a change someone sent. */
+  const [why, setWhy] = useState('');
 
   const { data: rows } = useQuery<Inv>('SELECT * FROM sales_invoices WHERE id = ?', [id ?? '']);
   const doc = rows?.[0] ?? null;
@@ -65,6 +73,17 @@ export default function InvoiceEdit() {
     `SELECT l.*, pv.sku, pv.avg_cost, pv.min_selling_price, pv.last_purchase_cost, pv.retail_price, pv.dealer_price, pv.wholesale_price,
             COALESCE((SELECT qty FROM stock_on_hand sl WHERE sl.variant_id = l.variant_id AND sl.location_id = i.location_id), 0) AS here
      FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.invoice_id JOIN product_variants pv ON pv.id = l.variant_id WHERE l.invoice_id = ? ORDER BY l.line_no DESC`, [id ?? '']);
+  // A change to a bill already made: the bill as it stands, to show what is
+  // being changed — and its maal, which goes back on the shelf when the
+  // change is put in, so the stock check counts it as there.
+  const { data: wasRows } = useQuery<{ id: string; doc_no: string; status: string; grand_total: number; doc_date: string; payment_mode: string | null }>(
+    'SELECT id, doc_no, status, grand_total, doc_date, payment_mode FROM sales_invoices WHERE id = ?', [doc?.corrects_invoice_id ?? '']);
+  const was = wasRows?.[0] ?? null;
+  const { data: wasLines } = useQuery<{ variant_id: string; description: string; qty: number; rate: number; discount_pct: number }>(
+    'SELECT variant_id, description, qty, rate, discount_pct FROM sales_invoice_lines WHERE invoice_id = ? ORDER BY line_no', [doc?.corrects_invoice_id ?? '']);
+  const { data: senderRows } = useQuery<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ?', [doc?.submitted_by ?? '']);
+  const wasQty = (variantId: string) => (wasLines ?? []).filter((w) => w.variant_id === variantId).reduce((a, w) => a + w.qty, 0);
+  const available = (l: { variant_id: string; here: number }) => l.here + wasQty(l.variant_id);
   // The cash customer first — most bills at a wholesaler that are not on a
   // khata are a walk-in paying on the spot — then every khata by name.
   const { data: customers, isLoading: customersLoading } = useQuery<Customer>(`SELECT c.id, c.name, c.mobile, c.state_code, c.gstin, c.price_list_id, c.credit_limit, c.credit_days, c.customer_type, COALESCE(c.is_cash, 0) AS is_cash, COALESCE(pb.balance,0) AS balance FROM customers c LEFT JOIN party_balance_live pb ON pb.party_type='customer' AND pb.party_id=c.id WHERE c.is_active=1 ORDER BY COALESCE(c.is_cash, 0) DESC, c.name`);
@@ -241,20 +260,34 @@ export default function InvoiceEdit() {
     await updateRow(db, 'sales_invoice_lines', l.id, { rate: r, price_source: Math.abs(r - (l.list_price ?? -1)) < 0.005 ? l.price_source : 'manual', override_approved_by: approvedBy });
   }
 
-  async function post() {
-    if (!id || !doc) return;
-    if (!doc.customer_id) { notify('Grahak chuno.'); return; }
+  /** What no bill goes through without — made, sent as a change, or put in. */
+  function firstProblem(): string | null {
+    if (!doc) return 'Bill nahi mila.';
+    if (!doc.customer_id) return 'Grahak chuno.';
     if (customer?.is_cash && !isCNDoc(doc) && (doc.payment_mode === 'credit' || doc.payment_mode === 'mixed')) {
-      notify('Cash grahak ka udhaar nahi hota. Udhaar dena hai to grahak ka khata chuno ya naya banao.');
-      return;
+      return 'Cash grahak ka udhaar nahi hota. Udhaar dena hai to grahak ka khata chuno ya naya banao.';
     }
     // See isDateString: a blank date is discarded by the sync long after the
     // screen has said the bill was made.
-    if (!isDateString(doc.doc_date)) { notify('Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.', 'danger'); return; }
-    if (!(lines ?? []).length) { notify('Kam se kam ek item daalo.'); return; }
+    if (!isDateString(doc.doc_date)) return 'Tareekh theek nahi hai — YYYY-MM-DD likho, jaise 2026-09-30.';
+    if (!(lines ?? []).length) return 'Kam se kam ek item daalo.';
     for (const l of lines ?? []) {
-      if (l.qty <= 0) { notify(`${l.description}: qty zero se zyada honi chahiye.`); return; }
-      if (l.rate <= 0 && doc.doc_type === 'invoice') { notify(`${l.description}: rate daalo.`); return; }
+      if (l.qty <= 0) return `${l.description}: qty zero se zyada honi chahiye.`;
+      if (l.rate <= 0 && doc.doc_type === 'invoice') return `${l.description}: rate daalo.`;
+    }
+    return null;
+  }
+
+  /** Lines that ask for more than the shelf has — the old bill's maal counted back on it. */
+  const shortLines = () => (lines ?? [])
+    .filter((l) => l.variant_id && l.qty > available(l))
+    .map((l) => `${l.description}: stock ${available(l)}, bill ${l.qty}`);
+
+  async function post() {
+    if (!id || !doc) return;
+    const bad = firstProblem();
+    if (bad) { notify(bad, 'danger'); return; }
+    for (const l of lines ?? []) {
       const check = needsFloorCheck(l) ? checkPrice(l.rate, l, {}) : null;
       if (check?.needsApproval && !l.override_approved_by) { notify(`${l.description}: ${priceWarning(check)} Owner ya admin se approve karwao.`); return; }
       if (doc.doc_type === 'invoice' && !negativeOk && l.qty > l.here) { notify(`${l.description}: yahan sirf ${l.here} pade hain.`); return; }
@@ -276,9 +309,7 @@ export default function InvoiceEdit() {
     // silence and the stock drifted negative with nothing said. This is that
     // missing word: it asks, it does not block.
     if (!isCN && negativeOk) {
-      const short = (lines ?? [])
-        .filter((l) => l.variant_id && l.qty > l.here)
-        .map((l) => `${l.description}: stock ${l.here}, bill ${l.qty}`);
+      const short = shortLines();
       if (short.length) {
         const ok = await confirm(
           'Stock kam hai',
@@ -298,8 +329,50 @@ export default function InvoiceEdit() {
     } catch (e) { notify(`Bill nahi bana: ${(e as Error).message}. Dobara koshish karo.`, 'danger'); } finally { setPosting(false); }
   }
 
+  /** Owner or admin: put the change in — the old bill cancelled, this one in its place. */
+  async function applyChange() {
+    if (!id || !doc || !was) return;
+    const bad = firstProblem();
+    if (bad) { notify(bad, 'danger'); return; }
+    if (was.status !== 'posted') { notify('Purana bill ab bana hua nahi raha — ye badlav nahi lag sakta.', 'danger'); return; }
+    const short = shortLines();
+    if (short.length && !(await confirm('Stock kam hai', `${short.join('\n')}\n\nPhir bhi badlav lagayein? Stock minus mein chala jayega.`))) return;
+    if (!(await confirm('Badlav laga dein?', [
+      `${was.doc_no} cancel hoga aur badla hua bill lagega — ${formatINR(totals.totals.grand_total)} · ${customer?.name} · ${payModeLabel(doc.payment_mode)}.`,
+      'Pehle liya paisa naye bill par chala jayega; zyada hua to grahak ke khaate mein jama rahega.',
+    ].join(' ')))) return;
+    setPosting(true);
+    try {
+      let docNo = '';
+      await db.writeTransaction(async (tx) => { docNo = await postInvoiceCorrection(tx, id, actor); });
+      router.replace(`/invoice/${id}`);
+      notify(`Badlav lag gaya — ${docNo} ne ${was.doc_no} ki jagah li.`, 'ok');
+    } catch (e) { notify(`Badlav nahi laga: ${(e as Error).message}`, 'danger'); } finally { setPosting(false); }
+  }
+
+  /** Staff: send the change. The bill stays as it is until the owner says yes; till then it can still be changed. */
+  async function sendChange() {
+    if (!id || !doc) return;
+    const bad = firstProblem();
+    if (bad) { notify(bad, 'danger'); return; }
+    await patch({ submitted_at: new Date().toISOString(), submitted_by: profile?.id ?? actor.userId });
+    notify('Badlav owner ko bhej diya. Approve hone tak purana bill hi chalega.', 'ok');
+    router.back();
+  }
+
+  /** Owner: say no to a change someone sent, with the reason they will see. */
+  async function refuseChange() {
+    if (!id) return;
+    if (!why.trim()) { notify('Mana karne ki wajah likho — staff ko dikhegi.', 'danger'); return; }
+    await refuseInvoiceCorrection(db, id, why, actor);
+    notify('Badlav mana kar diya — bill waisa hi hai.', 'ok');
+    router.back();
+  }
+
   async function discard() {
-    if (!id || !(await confirm('Adhoora bill chhod dein?', 'Ye adhoora bill aur iski saari line mit jaayengi. Wapas nahi aayengi.'))) return;
+    const isChange = !!doc?.corrects_invoice_id;
+    if (!id || !(await confirm(isChange ? 'Ye badlav chhod dein?' : 'Adhoora bill chhod dein?',
+      isChange ? 'Bill waisa hi rahega jaisa bana tha.' : 'Ye adhoora bill aur iski saari line mit jaayengi. Wapas nahi aayengi.'))) return;
     await db.writeTransaction(async (tx) => { await tx.execute('DELETE FROM sales_invoice_lines WHERE invoice_id = ?', [id]); await deleteRow(tx, 'sales_invoices', id); });
     router.back();
   }
@@ -308,6 +381,11 @@ export default function InvoiceEdit() {
   if (!doc) return <PreparingDraft what="bill" />;
   if (doc.status !== 'draft') { router.replace(`/invoice/${doc.id}`); return null; }
   const isCN = doc.doc_type === 'credit_note';
+  const isChange = !!doc.corrects_invoice_id;
+  const changer = can('sale.cancel');
+  const heading = isCN ? 'Wapasi' : isChange ? 'Bill badlo' : 'Bill Banao';
+  const primary = isChange ? (changer ? applyChange : sendChange) : post;
+  const removed = isChange ? (wasLines ?? []).filter((w) => !(lines ?? []).some((l) => l.variant_id === w.variant_id)) : [];
   const showCost = can('catalog.view_cost');
   // The two things post() refuses outright and no amount of retrying fixes.
   // Everything else it checks needs a message, so it stays inside post().
@@ -322,19 +400,42 @@ export default function InvoiceEdit() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isCN ? 'Wapasi' : 'Bill Banao' }} />
+      <Stack.Screen options={{ title: heading }} />
       <Screen>
         <Row style={{ justifyContent: 'space-between' }} align="flex-start">
           <View style={{ flex: 1 }}>
-            <Text variant="display">{isCN ? 'Wapasi' : 'Bill Banao'}</Text>
+            <Text variant="display">{heading}</Text>
             <Text variant="small" color="textMuted">
               {isCN
                 ? 'Grahak jo maal wapas laaya, wo yahan likho — paisa uske khaate mein wapas jud jayega.'
+                : isChange
+                ? 'Jo galat hai wahi badlo — grahak, tareekh, maal, qty, rate, payment, sab.'
                 : 'Kisko maal diya? Khata wala ho to udhaar uske khaate mein chadhega; Cash grahak ka poora paisa abhi.'}
             </Text>
           </View>
           <Text variant="mono" color="textFaint">{statusLabel(doc.status)}</Text>
         </Row>
+        {isChange && was ? (
+          <Card keyline spine="accent" style={{ gap: space.xs }}>
+            <Text variant="heading">{was.doc_no} ka badlav</Text>
+            <Text variant="small" color="textMuted">
+              Pehle: {formatINR(was.grand_total)} · {(wasLines ?? []).length} item · {dateWords(was.doc_date)} · {payModeLabel(was.payment_mode)}
+            </Text>
+            <Text variant="small" color="textMuted">
+              {changer
+                ? '“Badlav lagao” par purana bill cancel hokar ye lagega — stock, khata aur liya hua paisa sab theek.'
+                : '“Owner ko bhejo” — owner approve karega tab bill badlega. Tab tak purana bill hi chalega.'}
+            </Text>
+            {doc.submitted_at ? (
+              <Text variant="small" color="warn">
+                {changer && doc.submitted_by !== profile?.id
+                  ? `${senderRows?.[0]?.full_name ?? 'Staff'} ne bheja — dekh ke lagao ya wajah likh ke mana karo.`
+                  : 'Owner ke review mein hai — approve hone tak badal sakte ho.'}
+              </Text>
+            ) : null}
+            {was.status !== 'posted' ? <Text variant="small" color="danger">Purana bill ab bana hua nahi raha — ye badlav nahi lag sakta. “Chhod do” kar do.</Text> : null}
+          </Card>
+        ) : null}
         {isCN && original?.[0] ? <Text variant="small" color="textMuted">Bill {original[0].doc_no} ke against. Qty utni hi rakho jitna maal sach mein wapas aaya. Jo toota ya kharab hai us par “Kharab · supplier ko jayega” chuno — wo bechne wale stock mein wapas nahi jayega.</Text> : null}
 
         <FormSection title="Grahak">
@@ -385,6 +486,7 @@ export default function InvoiceEdit() {
                   <Input label="Wapasi ka note" value={l.return_note ?? ''} onChangeText={(v) => updateRow(db, 'sales_invoice_lines', l.id, { return_note: v || null })} placeholder="Size galat · ek bulb nahi chala · dabba toota" returnKeyType="done" />
                 </>
               ) : null}
+              {isChange ? <WasLine now={l} was={(wasLines ?? []).find((w) => w.variant_id === l.variant_id) ?? null} /> : null}
               {doc.customer_id && !isCN && l.price_source !== 'last' ? <LastRate customerId={doc.customer_id} variantId={l.variant_id} currentRate={l.rate} /> : null}
               <Row style={{ justifyContent: 'space-between' }}>
                 <Text variant="small" color="textMuted">{gst ? `Taxable ${formatINR(tl?.taxable_value ?? 0)} · tax ${formatINR(tl?.tax_total ?? 0)}` : `${l.qty} × ${formatINR(l.rate)}`}{showCost ? ` · margin ${formatINR((l.rate * (1 - l.discount_pct / 100) - l.avg_cost) * l.qty)}` : ''}</Text>
@@ -393,6 +495,12 @@ export default function InvoiceEdit() {
             </LineCard>
           );
         })}
+
+        {removed.length ? (
+          <Card tone="alt">
+            <Text variant="small" color="danger">Bill se hataye: {removed.map((w) => `${w.description} (${w.qty})`).join(', ')}</Text>
+          </Card>
+        ) : null}
 
         <FormSection title="Payment aur total">
           {!isCN ? (
@@ -414,7 +522,7 @@ export default function InvoiceEdit() {
             onChangeText={(v) => patch({ notes: v })}
             placeholder={isCN ? 'Kyun wapas aaya' : 'Ramesh ne pahunchaya · shaam ko'}
             returnKeyType="done"
-            onSubmitEditing={() => { if (canPost && !posting) post(); }}
+            onSubmitEditing={() => { if (canPost && !posting) primary(); }}
           />
           <Divider />
           {totals.totals.discount_total ? <KV k="Chhoot" v={`- ${formatINR(totals.totals.discount_total)}`} mono /> : null}
@@ -449,8 +557,19 @@ export default function InvoiceEdit() {
           <Button title="Chhod do" tone="secondary" onPress={discard} />
           {/* A bill with no grahak or no maal can never post; post() only
               said so after the press. Now the button says it before. */}
-          <Button title={isCN ? 'Wapasi likh do' : 'Bill bana do'} size="lg" onPress={post} loading={posting} disabled={!canPost} style={{ flex: 1.25 }} />
+          {isChange && !changer ? (
+            <Button title={doc.submitted_at ? 'Badlav dobara bhejo' : 'Owner ko bhejo'} size="lg" onPress={sendChange} disabled={!canPost} style={{ flex: 1.25 }} />
+          ) : (
+            <Button title={isCN ? 'Wapasi likh do' : isChange ? 'Badlav lagao' : 'Bill bana do'} size="lg" onPress={primary} loading={posting}
+              disabled={!canPost || (isChange && was?.status !== 'posted')} style={{ flex: 1.25 }} />
+          )}
         </Row>
+        {isChange && changer && doc.submitted_at && doc.submitted_by !== profile?.id ? (
+          <Row gap={space.sm} align="flex-end">
+            <Input containerStyle={{ flex: 1 }} value={why} onChangeText={setWhy} placeholder="Mana karne ki wajah" />
+            <Button title="Mana karo" tone="danger" onPress={refuseChange} />
+          </Row>
+        ) : null}
       </Screen>
     </>
   );
@@ -490,6 +609,17 @@ function CreditBlock({ customer, credit, gst, interstate }: {
       ) : null}
       {gst ? <Text variant="small" color="textFaint">{interstate ? 'Doosre state ka · IGST' : 'Apne state ka · CGST + SGST'}</Text> : null}
     </Card>
+  );
+}
+
+/** On a change: what this line was on the bill, when it was something else — or that it is new. */
+function WasLine({ now, was }: { now: { qty: number; rate: number; discount_pct: number }; was: { qty: number; rate: number; discount_pct: number } | null }) {
+  if (!was) return <Text variant="small" color="accent">Naya — pehle bill mein nahi tha</Text>;
+  if (was.qty === now.qty && Math.abs(was.rate - now.rate) < 0.005 && was.discount_pct === now.discount_pct) return null;
+  return (
+    <Text variant="small" color="warn">
+      Pehle {was.qty} × {formatINR(was.rate)}{was.discount_pct ? ` − ${was.discount_pct}%` : ''} → ab {now.qty} × {formatINR(now.rate)}{now.discount_pct ? ` − ${now.discount_pct}%` : ''}
+    </Text>
   );
 }
 

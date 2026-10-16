@@ -169,7 +169,9 @@ export default function HomeScreen() {
             icon="alert-circle-outline"
             accent="rose"
             tone={(k?.low_stock_count ?? 0) > 0 ? 'warn' : undefined}
-            onPress={() => router.push('/stock')}
+            // Straight to those items, not the whole list to search through
+            // (owner, 16 Oct 2026). `at` makes a second tap open it afresh.
+            onPress={() => router.push(`/stock?filter=low&at=${Date.now()}`)}
           />
         </Grid>
       )}

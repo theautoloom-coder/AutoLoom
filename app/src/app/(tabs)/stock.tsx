@@ -13,7 +13,7 @@
  * the daily thing.
  */
 import { useQuery } from '@powersync/react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -52,8 +52,19 @@ type Filter = 'sab' | 'low' | 'khatam' | 'rate';
 export default function StockScreen() {
   const router = useRouter();
   const { can } = useSession();
+  const params = useLocalSearchParams<{ filter?: string; at?: string }>();
+  const asked: Filter | null = params.filter === 'low' || params.filter === 'khatam' || params.filter === 'rate' ? params.filter : null;
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<Filter>('sab');
+  const [filter, setFilter] = useState<Filter>(asked ?? 'sab');
+  // Home's "Khatam hone wala" opens this list on that filter (owner, 16 Oct
+  // 2026: "sirf woh list karo jo actual mein khatam hue hain, warna andar jaake
+  // dhoondhna padta hai"). The tab stays mounted, so each tap — a new `at` —
+  // sets it again, with the search cleared.
+  const [seenAt, setSeenAt] = useState(params.at);
+  if (params.at !== seenAt) {
+    setSeenAt(params.at);
+    if (asked) { setFilter(asked); setQ(''); }
+  }
 
   const tokens = useMemo(() => tokenize(q), [q]);
   // A blank search lists everything: the maal is the point of this screen, so
@@ -83,20 +94,25 @@ export default function StockScreen() {
   const kharab = (locations ?? []).find((l) => l.type === 'damaged');
 
   const all = rows ?? [];
+  // "Khatam hone wala": at or under its minimum, khatam ones included — the
+  // same rule as Home's tile, so the tile's number is this list's length.
+  const running = (r: Row) => r.qty <= Math.max(r.min_stock, r.reorder_level);
   const counts = {
     sab: all.length,
-    low: all.filter((r) => r.qty > 0 && r.qty <= Math.max(r.min_stock, r.reorder_level)).length,
+    low: all.filter(running).length,
     khatam: all.filter((r) => r.qty <= 0).length,
     // Maal in the shop with no buy rate yet — put in by staff, who do not
     // price. Until the owner fills it in, each sale of it reads as all profit.
     rate: all.filter((r) => r.qty > 0 && !r.avg_cost && !r.last_purchase_cost).length,
   };
   const shown = all.filter((r) =>
-    filter === 'low' ? r.qty > 0 && r.qty <= Math.max(r.min_stock, r.reorder_level)
+    filter === 'low' ? running(r)
     : filter === 'khatam' ? r.qty <= 0
     : filter === 'rate' ? r.qty > 0 && !r.avg_cost && !r.last_purchase_cost
     : true
   );
+  // What is running out, the emptiest first.
+  if (filter === 'low' || filter === 'khatam') shown.sort((a, b) => a.qty - b.qty);
 
   return (
     <Screen>
@@ -122,7 +138,7 @@ export default function StockScreen() {
       ) : (
         <Row gap={space.xs} wrap>
           <Chip label={`Sab ${counts.sab}`} selected={filter === 'sab'} onPress={() => setFilter('sab')} />
-          <Chip label={`Kam hai ${counts.low}`} selected={filter === 'low'} onPress={() => setFilter('low')} />
+          <Chip label={`Khatam hone wala ${counts.low}`} selected={filter === 'low'} onPress={() => setFilter('low')} />
           <Chip label={`Khatam ${counts.khatam}`} selected={filter === 'khatam'} onPress={() => setFilter('khatam')} />
           {showCost && counts.rate > 0 ? (
             <Chip label={`Rate baaki ${counts.rate}`} selected={filter === 'rate'} onPress={() => setFilter('rate')} />
@@ -193,7 +209,7 @@ export default function StockScreen() {
       )}
 
       <SectionTitle right={rowsLoading ? undefined : <Text variant="small" color="textFaint">{shown.length}</Text>}>
-        {filter === 'low' ? 'Kam hai' : filter === 'khatam' ? 'Khatam ho gaya' : filter === 'rate' ? 'Kharid rate bharna baaki' : 'Saara maal'}
+        {filter === 'low' ? 'Khatam hone wala' : filter === 'khatam' ? 'Khatam ho gaya' : filter === 'rate' ? 'Kharid rate bharna baaki' : 'Saara maal'}
       </SectionTitle>
 
       {rowsLoading ? (

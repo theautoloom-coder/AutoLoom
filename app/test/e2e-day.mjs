@@ -409,6 +409,25 @@ console.log('\n▸ owner: pay a supplier; staff edits a grahak');
     await page.waitForTimeout(3000);
     check('left alone, the change is gone and the bill stays', num(`select count(*) from sales_invoices where corrects_invoice_id is not null and status = 'draft'`) === before);
   });
+  // Owner, 16 Oct 2026: "khatam item wale section mein sab items aa rahe hain —
+  // sirf woh list karo jo actual mein khatam hue hain".
+  await step('Home’s khatam tile opens only what is running out', async () => {
+    await go(page, '/', 7000);
+    const tile = page.getByText('Khatam hone wala', { exact: true }).first();
+    // The tile shows a grey bar until its count is in.
+    let n = NaN;
+    for (let i = 0; i < 8 && !Number.isFinite(n); i++) {
+      // The tile's icon is a glyph between its label and its number.
+      n = Number((await page.locator('body').innerText().catch(() => '')).match(/khatam hone wala\D{0,8}(\d+)/i)?.[1] ?? NaN);
+      if (!Number.isFinite(n)) await page.waitForTimeout(1500);
+    }
+    await tile.click();
+    await page.waitForTimeout(5000);
+    const chip = page.getByRole('button', { name: /^Khatam hone wala \d+$/ });
+    check('the stock list opens on that filter', (await chip.getAttribute('aria-selected').catch(() => null)) === 'true');
+    const listed = Number((await chip.innerText().catch(() => '')).match(/(\d+)$/)?.[1] ?? NaN);
+    check('and lists as many as the tile said', Number.isFinite(n) && listed === n, `tile ${n}, list ${listed}`);
+  });
   await step('a stock entry opens from the supplier’s page', async () => {
     const sup = sql(`select supplier_id from purchases where status = 'posted' and doc_type = 'purchase' order by created_at desc limit 1`);
     await go(page, `/supplier/${sup}`, 6000);

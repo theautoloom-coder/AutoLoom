@@ -367,10 +367,11 @@ export const DASHBOARD_TODAY = {
       -- same clause here, Home's kharcha and munafa would disagree with Hisab
       -- on exactly the days somebody made a withdrawal.
       (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date = ?1 AND COALESCE(is_personal,0) = 0) AS spent_today,
+      -- What can be sold, as the Stock list counts it: kharab maal is not
+      -- stock, and Home's number must be the length of the list it opens.
       (SELECT COUNT(*) FROM product_variants pv JOIN products p ON p.id = pv.product_id
         WHERE pv.is_active = 1 AND p.is_active = 1
-          AND COALESCE((SELECT SUM(qty) FROM stock_on_hand sl WHERE sl.variant_id = pv.id),0)
-              <= MAX(pv.min_stock, pv.reorder_level)) AS low_stock_count`,
+          AND ${SELLABLE_QTY('pv')} <= MAX(pv.min_stock, pv.reorder_level)) AS low_stock_count`,
 };
 
 export const STOCK_VALUE_BY_LOCATION = {

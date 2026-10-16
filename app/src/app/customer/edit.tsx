@@ -10,7 +10,7 @@ import { INDIAN_STATES } from '@/lib/states';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
 import { useShopSettings } from '@/lib/use-settings';
-import { insertRow, nextCode, updateRow } from '@/lib/writes';
+import { insertRow, nextPartyCode, updateRow } from '@/lib/writes';
 import { Button, Card, Input, ListRow, Row, Screen, SectionTitle, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, SwitchRow, confirm, notify } from '@/ui/forms';
 
@@ -156,11 +156,7 @@ Phir bhi naya customer banayein? Do khaate ho jayenge.`,
 
     setSaving(true);
     try {
-      let code = form.code?.trim();
-      if (!code) {
-        const max = await db.getOptional<{ m: string }>("SELECT MAX(code) AS m FROM customers WHERE code LIKE 'C%'");
-        code = nextCode('C', max?.m);
-      }
+      const code = form.code?.trim() || await nextPartyCode(db, 'customers');
       const payload = {
         code, name: form.name.trim(), business_name: form.business_name?.trim() || null, owner_name: form.owner_name?.trim() || null,
         mobile: form.mobile?.replace(/\D/g, '') || null, alt_phone: form.alt_phone || null, email: form.email?.trim() || null,

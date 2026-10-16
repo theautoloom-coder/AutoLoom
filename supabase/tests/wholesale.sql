@@ -30,6 +30,7 @@ declare
   aid     uuid := gen_random_uuid();
   cid     uuid := gen_random_uuid();
   bill    uuid := gen_random_uuid();
+  newcust uuid := gen_random_uuid();
   made    uuid;
   cust    uuid;
   pass    int := 0;
@@ -282,6 +283,18 @@ begin
   else
     raise notice 'FAIL  the owner could not put a change in'; fail := fail + 1;
   end if;
+
+  -- 7d. A new grahak with a code another one has (owner, 16 Oct 2026: the
+  --     app numbered every grahak C0001) lands on the next free code.
+  perform set_config('request.jwt.claims', json_build_object('sub', staff, 'role', 'authenticated')::text, true);
+  insert into public.customers (id, code, name) values (newcust, (select code from public.customers order by created_at limit 1), 'Probe grahak');
+  select code ~ '^C[0-9]+$' and code <> (select code from public.customers order by created_at limit 1) into ok from public.customers where id = newcust;
+  if ok then
+    raise notice 'PASS  a grahak with a taken code gets the next free one'; pass := pass + 1;
+  else
+    raise notice 'FAIL  a grahak with a taken code was not renumbered'; fail := fail + 1;
+  end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', owner, 'role', 'authenticated')::text, true);
 
   -- 8. ...and writes partner money.
   insert into public.payments (direction, party_type, party_id, amount, mode, status)

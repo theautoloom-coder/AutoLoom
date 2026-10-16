@@ -203,6 +203,20 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
     check('the change waits for the owner', num(`select count(*) from sales_invoices where corrects_invoice_id = '${threeBill}' and status = 'draft' and submitted_at is not null`) === 1);
     check('the bill itself is untouched until then', sql(`select status from sales_invoices where id = '${threeBill}'`) === 'posted');
   });
+  // Owner, 16 Oct 2026: "user not able to make new grahak". The shop's cash
+  // grahak has the code CASH, and a C code with no number in it made every new
+  // grahak C0001 — a code already taken, so the server refused each one.
+  await step('staff make a new grahak', async () => {
+    sql(`insert into customers (code, name, is_active, search_text) select 'CZZZ', 'E2E code with no number', false, '' where not exists (select 1 from customers where code = 'CZZZ')`);
+    const name = `E2E Grahak ${Date.now().toString().slice(-5)}`;
+    await go(page, '/customer/edit', 5000);
+    await page.getByLabel('Naam').first().fill(name);
+    await page.getByRole('button', { name: 'Grahak bana do' }).click();
+    await page.waitForTimeout(8000);
+    const code = sql(`select code from customers where name = '${name}'`);
+    check('the new grahak reaches the server', !!code, code || 'not there');
+    check('with a code of its own', /^C\d{4,}$/.test(code) && num(`select count(*) from customers where code = '${code}'`) === 1, code);
+  });
   await step('staff can propose a new item', async () => {
     await go(page, '/requests', 4000);
     check('"Naya item bhejo" offered to staff', await page.getByRole('button', { name: /Naya item bhejo/ }).isVisible().catch(() => false));

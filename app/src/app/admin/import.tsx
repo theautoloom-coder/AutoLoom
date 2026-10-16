@@ -13,7 +13,7 @@ import { csvToObjects, IMPORT_TEMPLATES, isValidGstin, parseBool, parseNumber, s
 import { INDIAN_STATES } from '@/lib/states';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
-import { insertRow, nextCode, searchText, updateRow } from '@/lib/writes';
+import { insertRow, nextPartyCode, searchText, updateRow } from '@/lib/writes';
 import { Badge, Button, Card, Chip, Divider, Input, Row, Screen, SectionTitle, Text, useTheme } from '@/ui';
 import { notify } from '@/ui/forms';
 import { space } from '@/ui/theme';
@@ -211,14 +211,9 @@ export default function ImportScreen() {
           if (type === 'customers' || type === 'suppliers') {
             const table = type;
             const list = type === 'customers' ? customers : suppliers;
-            const prefix = type === 'customers' ? 'C' : 'S';
             const st = r.state_code ? INDIAN_STATES.find((s) => s.code === r.state_code.padStart(2, '0')) : r.gstin ? INDIAN_STATES.find((s) => s.code === stateCodeFromGstin(r.gstin)) : null;
             const existing = r.code ? list?.find((c) => c.code.toLowerCase() === r.code.toLowerCase()) : list?.find((c) => c.name.toLowerCase() === r.name.toLowerCase());
-            let code = r.code || existing?.code;
-            if (!code) {
-              const max = await tx.execute(`SELECT MAX(code) AS m FROM ${table} WHERE code LIKE '${prefix}%'`);
-              code = nextCode(prefix, (max.rows?._array?.[0]?.m as string) ?? null);
-            }
+            const code = r.code || existing?.code || await nextPartyCode(tx, table);
             const common = {
               code, name: r.name, mobile: r.mobile?.replace(/\D/g, '') || null, alt_phone: r.alt_phone || null, email: r.email || null, gstin: r.gstin?.toUpperCase() || null, pan: r.pan || (r.gstin ? r.gstin.slice(2, 12) : null),
               address_line1: r.address_line1 || null, address_line2: r.address_line2 || null, city: r.city || null, state_code: st?.code ?? null, state_name: st?.name ?? null, pincode: r.pincode || null,

@@ -92,7 +92,6 @@ export function searchText(...parts: Array<string | number | null | undefined>):
     .trim();
 }
 
-/** Next code in a series like C0001 -> C0002, from the current max. */
 /**
  * The next free party code, read the same way everywhere.
  *
@@ -101,19 +100,22 @@ export function searchText(...parts: Array<string | number | null | undefined>):
  * Stock Chadhao inserted one with no code, the server refused it (23502), and
  * the sync discarded it — no supplier, no error, and no way to receive stock
  * on a shop that had none yet. Every path that creates a party now asks here.
+ *
+ * Counted from the codes that are numbers (owner, 16 Oct 2026: "user not able
+ * to make new grahak"). It took MAX(code), a string max — and from 7 Oct the
+ * highest C code in the shop was 'CASH', the cash grahak's, which has no
+ * number. Every new grahak came out as C0001, Modern Car's code; the server
+ * refused each one as a duplicate and the phone dropped it. A string max also
+ * puts C9999 after C10000. Should two phones offline still pick one number,
+ * the server gives the second the next free one.
  */
 export async function nextPartyCode(
   db: { getOptional<T>(sql: string, params?: unknown[]): Promise<T | null> },
   table: 'customers' | 'suppliers'
 ): Promise<string> {
   const prefix = table === 'customers' ? 'C' : 'S';
-  const max = await db.getOptional<{ m: string | null }>(
-    `SELECT MAX(code) AS m FROM ${table} WHERE code LIKE '${prefix}%'`
+  const max = await db.getOptional<{ n: number | null }>(
+    `SELECT MAX(CAST(SUBSTR(code, 2) AS INTEGER)) AS n FROM ${table} WHERE code GLOB '${prefix}[0-9]*'`
   );
-  return nextCode(prefix, max?.m);
-}
-
-export function nextCode(prefix: string, currentMax: string | null | undefined, width = 4): string {
-  const n = currentMax && currentMax.startsWith(prefix) ? parseInt(currentMax.slice(prefix.length), 10) || 0 : 0;
-  return `${prefix}${String(n + 1).padStart(width, '0')}`;
+  return `${prefix}${String((max?.n ?? 0) + 1).padStart(4, '0')}`;
 }

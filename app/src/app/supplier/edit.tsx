@@ -8,7 +8,7 @@ import { isValidGstin, stateCodeFromGstin } from '@domain';
 import { INDIAN_STATES } from '@/lib/states';
 import { useSession } from '@/lib/session';
 import { useSystem } from '@/lib/system';
-import { insertRow, nextCode, updateRow } from '@/lib/writes';
+import { insertRow, nextPartyCode, updateRow } from '@/lib/writes';
 import { Button, Input, Row, Screen, Text } from '@/ui';
 import { FormSection, NumberField, SelectField, SwitchRow, confirm, notify } from '@/ui/forms';
 
@@ -81,8 +81,7 @@ Phir bhi naya supplier banayein?`))) return;
 
     setSaving(true);
     try {
-      let code = form.code?.trim();
-      if (!code) { const max = await db.getOptional<{ m: string }>("SELECT MAX(code) AS m FROM suppliers WHERE code LIKE 'S%'"); code = nextCode('S', max?.m); }
+      const code = form.code?.trim() || await nextPartyCode(db, 'suppliers');
       const payload = {
         code, name: form.name.trim(), company_name: form.company_name?.trim() || null, contact_person: form.contact_person || null, mobile: form.mobile?.replace(/\D/g, '') || null,
         alt_phone: form.alt_phone || null, email: form.email || null, gstin: form.gstin || null, pan: form.pan || null, address_line1: form.address_line1 || null, address_line2: form.address_line2 || null,

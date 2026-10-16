@@ -124,6 +124,13 @@ export default function InvoiceEdit() {
     setCreating(true);
     (async () => {
       const base = original?.[0];
+      // Opened from a khata grahak's page: the way their bills are paid (see
+      // modeFor). Everyone else starts on the cash grahak, paying now.
+      const opener = !against && customerParam ? customers?.find((c) => c.id === customerParam) : null;
+      const lastMode = opener && !opener.is_cash
+        ? (await db.getOptional<{ payment_mode: string | null }>(
+          "SELECT payment_mode FROM sales_invoices WHERE customer_id = ? AND doc_type = 'invoice' AND status = 'posted' ORDER BY doc_date DESC, created_at DESC LIMIT 1", [opener.id]))?.payment_mode || 'credit'
+        : null;
       const newId = await insertRow(db, 'sales_invoices', {
         doc_type: against ? 'credit_note' : 'invoice', doc_date: toDateString(), customer_id: base?.customer_id ?? (customerParam || cashCustomer?.id || null), location_id: base?.location_id ?? locationId,
         price_list_id: base?.price_list_id ?? null, is_interstate: base?.is_interstate ?? false, other_charges: 0,
@@ -133,7 +140,7 @@ export default function InvoiceEdit() {
         // then showed receivables that were never receivable, and the owner
         // chased people who had already paid. A counter sale is cash until
         // somebody says otherwise.
-        payment_mode: 'cash', credit_days: 0, status: 'draft',
+        payment_mode: lastMode ?? 'cash', credit_days: lastMode ? opener?.credit_days ?? 0 : 0, status: 'draft',
         against_invoice_id: against || null, salesperson_id: profile?.id ?? null,
       }, actor);
       if (against && originalLines) {
@@ -146,7 +153,7 @@ export default function InvoiceEdit() {
       createdHere.current = newId;
       setId(newId);
     })().catch((e) => notify(`Naya bill nahi khula: ${String((e as Error).message ?? e)}`, 'danger'));
-  }, [id, creating, locationId, db, actor, against, original, originalLines, originalLoading, originalLinesLoading, customerParam, profile?.id, customersLoading, cashCustomer?.id]);
+  }, [id, creating, locationId, db, actor, against, original, originalLines, originalLoading, originalLinesLoading, customerParam, profile?.id, customersLoading, cashCustomer?.id, customers]);
 
   // Opening Bill Banao makes a draft at once, so the screen has something to
   // write lines into. Backing out without adding anything left that empty
@@ -200,13 +207,34 @@ export default function InvoiceEdit() {
     return { price: r.price, source: r.source };
   }
 
+  /**
+   * How a grahak's bill starts out paid (owner, 16 Oct 2026: "udhaar ya cash
+   * wala option baar baar cash ho jaata hai"). The cash grahak pays on the
+   * spot. A khata grahak at a wholesaler mostly takes on udhaar — every bill on
+   * the shop's server had been switched to it by hand — so their bill starts
+   * the way their last one was paid, and on udhaar when there is none.
+   */
+  async function modeFor(cid: string | null, isCash: boolean): Promise<string> {
+    if (!cid || isCash) return 'cash';
+    const last = await db.getOptional<{ payment_mode: string | null }>(
+      "SELECT payment_mode FROM sales_invoices WHERE customer_id = ? AND doc_type = 'invoice' AND status = 'posted' ORDER BY doc_date DESC, created_at DESC LIMIT 1", [cid]);
+    return last?.payment_mode || 'credit';
+  }
+
   async function chooseCustomer(cid: string | null) {
     // A customer made a moment ago from this bill may not be in the list yet.
     const c = customers?.find((x) => x.id === cid)
-      ?? (cid ? await db.getOptional<Customer>('SELECT id, name, state_code, price_list_id, credit_days FROM customers WHERE id = ?', [cid]) : null)
+      ?? (cid ? await db.getOptional<Customer>('SELECT id, name, state_code, price_list_id, credit_days, COALESCE(is_cash, 0) AS is_cash FROM customers WHERE id = ?', [cid]) : null)
       ?? undefined;
     const cash = !!(c as Customer | undefined)?.is_cash;
-    const mode = cash && (doc?.payment_mode === 'credit' || doc?.payment_mode === 'mixed') ? 'cash' : doc?.payment_mode;
+    // The bill as it is now, not as the render this ran from saw it: back from
+    // "+ Naya banao" this ran with the bill as the screen first opened it, and
+    // put its payment back to Cash.
+    const now = id ? await db.getOptional<{ customer_id: string | null; payment_mode: string | null }>('SELECT customer_id, payment_mode FROM sales_invoices WHERE id = ?', [id]) : null;
+    const kept = now?.payment_mode ?? 'cash';
+    const mode = now?.customer_id === cid
+      ? (cash && (kept === 'credit' || kept === 'mixed') ? 'cash' : kept)
+      : isCNDoc(doc ?? { doc_type: 'invoice' }) ? kept : await modeFor(cid, cash);
     await patch({ customer_id: cid, customer_vehicle_id: null, price_list_id: c?.price_list_id ?? null, place_of_supply_state: c?.state_code ?? null, is_interstate: isInterstate(shop.company?.state_code, c?.state_code), credit_days: cash ? 0 : c?.credit_days ?? 0, payment_mode: mode });
     for (const l of lines ?? []) {
       const p = await priceFor(cid, l);

@@ -39,3 +39,4 @@ deploy/manual/index.html
 # never be updated again — a new key forces a new package name and every phone
 # reinstalls from scratch — so it is backed up outside the repo, never in it.
 deploy/keys/
+backups/

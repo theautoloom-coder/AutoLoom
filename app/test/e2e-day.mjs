@@ -122,6 +122,8 @@ console.log('\n▸ salesman: udhaar bill, then "Jama laga do" from the bill');
     await page.waitForTimeout(900);
     await page.getByText('XYZ Accessories', { exact: true }).locator('visible=true').first().click();
     await page.waitForTimeout(1200);
+    // Owner, 16 Oct 2026: "udhaar ya cash wala option baar baar cash ho jaata hai".
+    check('a khata grahak’s bill starts on udhaar', (await page.getByRole('button', { name: 'Udhaar', exact: true }).first().getAttribute('aria-selected').catch(() => null)) === 'true');
     await page.getByPlaceholder('Scan karo ya SKU / naam likho').fill('xtreme');
     await page.waitForTimeout(2500);
     await page.getByText(/X-tremeVision/i).first().click();
